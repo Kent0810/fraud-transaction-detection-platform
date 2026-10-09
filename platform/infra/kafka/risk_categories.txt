@@ -1,0 +1,14 @@
+entertainment:1000
+food_dining:1000
+gas_transport:1000
+grocery_net:1000
+grocery_pos:1000
+health_fitness:1000
+home:1000
+kids_pets:1000
+misc_net:1000
+misc_pos:1000
+personal_care:1000
+shopping_net:1000
+shopping_pos:1000
+travel:1000

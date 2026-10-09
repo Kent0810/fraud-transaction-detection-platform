@@ -20,11 +20,9 @@ import time
 from confluent_kafka import KafkaException, Producer
 
 from config import Config, ConfigError
+from constants.float_fields import FLOAT_FIELDS
 
 log = logging.getLogger("event-source")
-
-FLOAT_FIELDS = ("ts_epoch", "amt", "merch_lat", "merch_long")
-
 
 def to_event(row):
     event = dict(row)
@@ -44,7 +42,7 @@ class Replayer:
         self.failed = 0
         self.started_at = 0
 
-    def stop(self, signum):
+    def stop(self, signum, _frame):
         log.info("received signal %s, stopping", signum)
         self.stopping = True
 
@@ -145,6 +143,8 @@ def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
     try:
         main()
     except ConfigError as exc:

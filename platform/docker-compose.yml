@@ -36,7 +36,7 @@ services:
     environment:
       <<: *kafka-env
       EVENTS_SOURCE_FILE: /data/stream/events.csv
-      REPLAY_SPEED: ${REPLAY_SPEED:-3600}   # see prepare_stream.py --speed
+      REPLAY_SPEED: ${REPLAY_SPEED:-1}   # events.csv is already compressed by prepare_stream.py --speed 3600
     volumes:
       - ../datasets/Sparkov_Data_Generation/data:/data:ro
     depends_on:
@@ -76,6 +76,17 @@ services:
       timeout: 10s
       retries: 12
       start_period: 20s
+
+  kafka-ui:
+    image: kafbat/kafka-ui:${KAFKA_UI_VERSION:-v1.5.0}
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   kafka-init:                         # creates all app topics + seeds risk_categories
     image: apache/kafka:${KAFKA_VERSION:-4.3.1}
