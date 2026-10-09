@@ -42,11 +42,9 @@ coverage/
 npm-debug.log*
 yarn-error.log*
 
-# ───────── Data (large / generated, rebuild locally) ─────────
-# simulate_data.csv is ~150 MB, over GitHub's 100 MB file limit
-datasets/Sparkov_Data_Generation/data/*.csv
-!datasets/Sparkov_Data_Generation/data/merchants.csv
-datasets/Sparkov_Data_Generation/data/stream/
+# ───────── Datasets (cloned + downloaded locally, see datasets/README.md) ─────────
+# Upstream generator repo + data files (simulate_data.csv is ~150 MB)
+datasets/Sparkov_Data_Generation/
 
 # ───────── Infra artifacts ─────────
 # Cassandra sink connector jar, downloaded and unpacked locally
