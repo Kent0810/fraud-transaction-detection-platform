@@ -1,0 +1,55 @@
+# ───────── OS / editors ─────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# ───────── Secrets / local env ─────────
+.env
+.env.*
+!.env.example
+platform/secrets/
+*.pem
+*.key
+gcp-sa*.json
+
+# ───────── Python ─────────
+__pycache__/
+*.py[oc]
+.venv/
+*.egg-info/
+build/
+dist/
+wheels/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ───────── Java (stream-processor) ─────────
+target/
+.gradle/
+*.class
+hs_err_pid*.log
+
+# ───────── Node (ops-console, card-holder-app) ─────────
+node_modules/
+.next/
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# ───────── Data (large / generated, rebuild locally) ─────────
+# simulate_data.csv is ~150 MB, over GitHub's 100 MB file limit
+datasets/Sparkov_Data_Generation/data/*.csv
+!datasets/Sparkov_Data_Generation/data/merchants.csv
+datasets/Sparkov_Data_Generation/data/stream/
+
+# ───────── Infra artifacts ─────────
+# Cassandra sink connector jar, downloaded and unpacked locally
+platform/infra/connect/plugins/
+*.jar
+!**/gradle/wrapper/gradle-wrapper.jar

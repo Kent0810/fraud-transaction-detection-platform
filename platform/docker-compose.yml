@@ -1,0 +1,332 @@
+name: card-fraud
+
+x-kafka-env: &kafka-env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  TOPIC_TRANSACTIONS: transactions
+  TOPIC_CONTROL: control
+  TOPIC_DECISIONS: decisions
+  TOPIC_ALERTS: alerts
+  TOPIC_CASES: cases
+  TOPIC_RISK_CATEGORIES: risk_categories
+
+x-postgres-env: &postgres-env
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: ${POSTGRES_DB:-fraud}
+  POSTGRES_USER: ${POSTGRES_USER:-fraud}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraud}
+
+x-cassandra-env: &cassandra-env
+  CASSANDRA_CONTACT_POINTS: cassandra
+  CASSANDRA_PORT: 9042
+  CASSANDRA_LOCAL_DC: dc1
+  CASSANDRA_KEYSPACE: fraud
+
+x-bigquery-env: &bigquery-env
+  BQ_PROJECT: ${BQ_PROJECT:-fraud-local}
+  BQ_DATASET_RAW: ${BQ_DATASET_RAW:-raw}
+  BQ_DATASET_MART: ${BQ_DATASET_MART:-mart}
+  # Empty = real BigQuery. With the emulator profile set to http://bigquery-emulator:9050
+  BQ_API_ENDPOINT: ${BQ_API_ENDPOINT:-}
+  GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp-sa.json
+
+services:
+  event-source:
+    build: ./services/event-source
+    environment:
+      <<: *kafka-env
+      EVENTS_SOURCE_FILE: /data/stream/events.csv
+      REPLAY_SPEED: ${REPLAY_SPEED:-3600}   # see prepare_stream.py --speed
+    volumes:
+      - ../datasets/Sparkov_Data_Generation/data:/data:ro
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    restart: on-failure
+
+  # ──────────────── Kafka (every topic keyed by card_id) ────────────────
+  kafka:
+    image: apache/kafka:${KAFKA_VERSION:-4.3.1}
+    hostname: kafka
+    ports:
+      - "29092:29092"                 # host clients: localhost:29092
+    environment:
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-4L6g3nShT-eMCtK--X86sw}
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # single broker: every internal topic must use 1 replica
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1   # needed by exactly_once_v2
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1                 # Kafka Streams changelog/repartition topics
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # app topics come from kafka-init only
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  kafka-init:                         # creates all app topics + seeds risk_categories
+    image: apache/kafka:${KAFKA_VERSION:-4.3.1}
+    environment:
+      PARTITIONS: ${KAFKA_PARTITIONS:-12}  # identical on all card_id topics so they co-partition
+    volumes:
+      - ./infra/kafka:/seed:ro        # risk_categories.txt  (category:threshold per line)
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        BIN=/opt/kafka/bin
+        create() {
+          $$BIN/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic "$$1" --partitions "$$2" --replication-factor 1 "$${@:3}"
+        }
+        create transactions "$$PARTITIONS" --config retention.ms=604800000
+        create decisions    "$$PARTITIONS" --config retention.ms=604800000
+        create alerts       "$$PARTITIONS" --config retention.ms=604800000
+        # latest summary per card -> card_state + triage_queue
+        create cases        "$$PARTITIONS" --config cleanup.policy=compact
+        # blocks/budgets live in changelog-backed state stores; keeping control
+        # forever lets you rebuild them after a full application reset
+        create control      "$$PARTITIONS" --config retention.ms=-1
+        # small reference data read as a GlobalKTable (R5); 1 partition is enough
+        create risk_categories 1 --config cleanup.policy=compact
+        $$BIN/kafka-console-producer.sh --bootstrap-server kafka:9092 --topic risk_categories \
+          --property parse.key=true --property key.separator=: < /seed/risk_categories.txt
+        $$BIN/kafka-topics.sh --bootstrap-server kafka:9092 --list
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+
+  # ───────────────────────── Control loop ─────────────────────────
+  postgres:                           # mutable reference data, audit log, outbox
+    image: postgres:${POSTGRES_VERSION:-17}
+    command:
+      - postgres
+      - -c
+      - wal_level=logical             # required by Debezium
+      - -c
+      - max_replication_slots=4
+      - -c
+      - max_wal_senders=4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fraud}
+      POSTGRES_USER: ${POSTGRES_USER:-fraud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraud}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro   # *.sql: reference tables, audit, outbox
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  connect:                            # one Kafka Connect worker for both edges:
+                                      #   source: Debezium outbox  -> control
+                                      #   sink:   decisions/alerts/cases -> Cassandra
+    image: quay.io/debezium/connect:${DEBEZIUM_VERSION:-3.6.2.Final}
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: connect
+      CONFIG_STORAGE_TOPIC: _connect_configs
+      OFFSET_STORAGE_TOPIC: _connect_offsets
+      STATUS_STORAGE_TOPIC: _connect_status
+      # single broker: the worker's internal topics must use 1 replica (default is 3)
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter    # key = card_id
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    volumes:
+      # DataStax Apache Kafka Connector (Cassandra sink) jar, unpacked here
+      - ./infra/connect/plugins/cassandra-sink:/kafka/connect/cassandra-sink:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8083/connectors >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  connect-init:                       # registers every connector in ./infra/connect/*.json (idempotent PUT)
+    image: curlimages/curl:${CURL_VERSION:-8.21.0}
+    volumes:
+      - ./infra/connect:/config:ro    # outbox-connector.json, cassandra-sink.json
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        for f in /config/*.json; do
+          name=$$(basename "$$f" .json)
+          echo "registering $$name"
+          curl -fsS -X PUT -H 'Content-Type: application/json' \
+            --data @"$$f" "http://connect:8083/connectors/$$name/config"
+          echo
+        done
+    depends_on:
+      connect:
+        condition: service_healthy
+      cassandra-init:                 # sink needs the tables first
+        condition: service_completed_successfully
+    restart: on-failure
+
+  # ───────────────────────── Hot path ─────────────────────────
+  stream-processor:                   # Kafka Streams rules app (Java): transactions + control -> decisions, alerts, cases
+    build: ./services/stream-processor   # e.g. FROM eclipse-temurin:21-jre, fat jar with kafka-streams 4.3.x
+    environment:
+      <<: *kafka-env
+      APPLICATION_ID: fraud-rules      # = consumer group + prefix of changelog topics
+      PROCESSING_GUARANTEE: exactly_once_v2
+      COMMIT_INTERVAL_MS: 100          # the exactly-once default, written out
+      NUM_STANDBY_REPLICAS: 0          # set 1 when you run 2+ instances
+      STATE_DIR: /var/lib/kafka-streams
+    volumes:
+      - streams-state:/var/lib/kafka-streams   # local RocksDB; rebuilt from changelogs if lost
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    restart: on-failure
+
+  cassandra:                          # serving store: history, alerts, card_state, triage_queue
+    image: cassandra:${CASSANDRA_VERSION:-5.0}
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: fraud
+      CASSANDRA_DC: dc1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  cassandra-init:                     # keyspace + tables
+    image: cassandra:${CASSANDRA_VERSION:-5.0}
+    volumes:
+      - ./infra/cassandra:/schema:ro  # schema.cql (CREATE ... IF NOT EXISTS)
+    command: ["cqlsh", "cassandra", "9042", "-f", "/schema/schema.cql"]
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    restart: on-failure
+
+  notifier:                           # alerts topic -> push to cardholder
+    build: ./services/notifier
+    environment:
+      <<: *kafka-env
+      KAFKA_GROUP_ID: notifier
+      KAFKA_ISOLATION_LEVEL: read_committed   # only see committed exactly-once output
+      PUSH_TARGET_URL: http://cardholder-app:8080/internal/push
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      cardholder-app:
+        condition: service_started
+    restart: on-failure
+
+  # ───────────────────────── Applications ─────────────────────────
+  ops-console:                        # analysts/agents: reads Cassandra, writes blocks + outbox to Postgres
+    build: ./services/ops-console
+    ports:
+      - "3000:3000"
+    environment:
+      <<: [*postgres-env, *cassandra-env]
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+
+  cardholder-app:                     # history, budget, alerts
+    build: ./services/card-holder-app/backend
+    ports:
+      - "8080:8080"
+    environment:
+      <<: [*postgres-env, *cassandra-env]
+      PORT: 8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+
+  # ───────────────────────── Cold path ─────────────────────────
+  batch-loader:                       # all topics + side files -> BigQuery (idempotent, counted)
+    build: ./services/batch-loader
+    environment:
+      <<: [*kafka-env, *bigquery-env]
+      KAFKA_GROUP_ID: batch-loader
+      KAFKA_ISOLATION_LEVEL: read_committed
+      LOAD_INTERVAL_SECONDS: ${LOAD_INTERVAL_SECONDS:-300}
+      # Loaded straight from the source files, never via Kafka
+      GROUND_TRUTH_FILE: /data/stream/ground_truth.csv
+      DIM_CARD_FILE: /data/stream/dim_card.csv
+    volumes:
+      - ../datasets/Sparkov_Data_Generation/data:/data:ro
+      - ${GCP_SA_KEY_FILE:-./secrets/gcp-sa.json}:/secrets/gcp-sa.json:ro   # file must exist, see notes
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      bigquery-emulator:
+        condition: service_started
+        required: false               # only when --profile bq-emulator is on
+    restart: on-failure
+
+  bigquery-emulator:                  # local stand-in for BigQuery: --profile bq-emulator
+    image: ghcr.io/goccy/bigquery-emulator:${BQ_EMULATOR_VERSION:-0.6.6}
+    profiles: [bq-emulator]
+    platform: linux/amd64             # no arm64 image published
+    command:
+      - --project=${BQ_PROJECT:-fraud-local}
+      - --data-from-yaml=/seed/datasets.yaml
+    ports:
+      - "9050:9050"                   # REST
+      - "9060:9060"                   # gRPC
+    volumes:
+      - ./infra/bigquery:/seed:ro     # datasets.yaml: raw + mart datasets
+
+  risk-dashboards:                    # loss and trends, SQL on BigQuery (real BigQuery only)
+    image: metabase/metabase:${METABASE_VERSION:-v0.58-lts}
+    ports:
+      - "3001:3000"
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    volumes:
+      - metabase-data:/metabase-data
+
+volumes:
+  kafka-data:
+  pg-data:
+  cassandra-data:
+  streams-state:
+  metabase-data:
