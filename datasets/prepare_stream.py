@@ -50,6 +50,10 @@ GROUND_TRUTH_HEADER = ["txn_id", "is_fraud"]
 
 MERCHANT_PREFIX = "fraud_"
 
+# Defaults resolve next to this script, so it runs from any working directory.
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "Sparkov_Data_Generation", "data")
+
 
 def parse_now(value):
     """Accept an epoch (int/float) or an ISO-8601 timestamp; return epoch secs."""
@@ -169,9 +173,9 @@ def main():
             "  python prepare_stream.py --now 2026-01-01T00:00:00Z\n"
         ),
     )
-    parser.add_argument("-i", "--input", default="data/simulate_data.csv",
+    parser.add_argument("-i", "--input", default=os.path.join(DATA_DIR, "simulate_data.csv"),
                         help="source CSV (default: %(default)s)")
-    parser.add_argument("-o", "--outdir", default="data/stream",
+    parser.add_argument("-o", "--outdir", default=os.path.join(DATA_DIR, "stream"),
                         help="output folder (default: %(default)s)")
     parser.add_argument("--speed", type=float, default=1.0,
                         help="replay compression factor; 3600 = one real second "

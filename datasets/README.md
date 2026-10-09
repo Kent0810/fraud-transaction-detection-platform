@@ -30,12 +30,11 @@ git clone https://github.com/namebrandon/Sparkov_Data_Generation.git
 #    https://www.kaggle.com/datasets/kartik2112/fraud-detection
 #    -> datasets/Sparkov_Data_Generation/data/simulate_data.csv
 
-# 3. Build the stream (writes data/stream/)
-cd Sparkov_Data_Generation
-python3 ../prepare_stream.py --speed 3600
+# 3. Build the stream (writes Sparkov_Data_Generation/data/stream/; works from any folder)
+python3 prepare_stream.py --speed 3600
 
 # 4. Replay it into Kafka
-cd ../../platform
+cd ../platform
 REPLAY_SPEED=1 docker compose up --build event-source
 ```
 

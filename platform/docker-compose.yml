@@ -36,7 +36,7 @@ services:
     environment:
       <<: *kafka-env
       EVENTS_SOURCE_FILE: /data/stream/events.csv
-      REPLAY_SPEED: ${REPLAY_SPEED:-3600}   # see prepare_stream.py --speed
+      REPLAY_SPEED: ${REPLAY_SPEED:-1}   # events.csv is already compressed by prepare_stream.py --speed 3600
     volumes:
       - ../datasets/Sparkov_Data_Generation/data:/data:ro
     depends_on:
