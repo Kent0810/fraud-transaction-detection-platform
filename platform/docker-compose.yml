@@ -31,30 +31,16 @@ x-bigquery-env: &bigquery-env
   GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp-sa.json
 
 services:
-  event-source:
-    build: ./services/event-source
-    environment:
-      <<: *kafka-env
-      EVENTS_SOURCE_FILE: /data/stream/events.csv
-      REPLAY_SPEED: ${REPLAY_SPEED:-1}   # events.csv is already compressed by prepare_stream.py --speed 3600
-    volumes:
-      - ../datasets/Sparkov_Data_Generation/data:/data:ro
-    depends_on:
-      kafka-init:
-        condition: service_completed_successfully
-    restart: on-failure
-
-  # ──────────────── Kafka (every topic keyed by card_id) ────────────────
   kafka:
     image: apache/kafka:${KAFKA_VERSION:-4.3.1}
     hostname: kafka
     ports:
-      - "29092:29092"                 # host clients: localhost:29092
+      - "29092:29092"
     environment:
-      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-4L6g3nShT-eMCtK--X86sw}
+      CLUSTER_ID: "5FvWEDinTUmQ5DCz1gXYvA" # run this to generate docker run --rm apache/kafka /opt/kafka/bin/kafka-storage.sh random-uuid
       KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -74,8 +60,21 @@ services:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
       interval: 10s
       timeout: 10s
-      retries: 12
+      retries: 10
       start_period: 20s
+
+  kafka-init:
+    image: apache/kafka:${KAFKA_VERSION:-4.3.1}
+    environment:
+      PARTITIONS: ${KAFKA_PARTITIONS:-12}  # identical on all card_id topics so they co-partition
+    volumes:
+      - ./infra/kafka:/seed:ro        # risk_categories.txt  (category:threshold per line)
+      - ./scripts:/scripts:ro
+    entrypoint: ["/bin/bash", "/scripts/kafka-init.sh"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
 
   kafka-ui:
     image: kafbat/kafka-ui:${KAFKA_UI_VERSION:-v1.5.0}
@@ -87,39 +86,19 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-
-  kafka-init:                         # creates all app topics + seeds risk_categories
-    image: apache/kafka:${KAFKA_VERSION:-4.3.1}
+    
+  event-source:
+    build: ./services/event-source
     environment:
-      PARTITIONS: ${KAFKA_PARTITIONS:-12}  # identical on all card_id topics so they co-partition
+      <<: *kafka-env
+      EVENTS_SOURCE_FILE: /data/stream/events.csv
+      REPLAY_SPEED: ${REPLAY_SPEED:-3600}   # 1 real second = 1 simulated hour; 1 = real time
     volumes:
-      - ./infra/kafka:/seed:ro        # risk_categories.txt  (category:threshold per line)
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        set -euo pipefail
-        BIN=/opt/kafka/bin
-        create() {
-          $$BIN/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
-            --topic "$$1" --partitions "$$2" --replication-factor 1 "$${@:3}"
-        }
-        create transactions "$$PARTITIONS" --config retention.ms=604800000
-        create decisions    "$$PARTITIONS" --config retention.ms=604800000
-        create alerts       "$$PARTITIONS" --config retention.ms=604800000
-        # latest summary per card -> card_state + triage_queue
-        create cases        "$$PARTITIONS" --config cleanup.policy=compact
-        # blocks/budgets live in changelog-backed state stores; keeping control
-        # forever lets you rebuild them after a full application reset
-        create control      "$$PARTITIONS" --config retention.ms=-1
-        # small reference data read as a GlobalKTable (R5); 1 partition is enough
-        create risk_categories 1 --config cleanup.policy=compact
-        $$BIN/kafka-console-producer.sh --bootstrap-server kafka:9092 --topic risk_categories \
-          --property parse.key=true --property key.separator=: < /seed/risk_categories.txt
-        $$BIN/kafka-topics.sh --bootstrap-server kafka:9092 --list
+      - ../datasets/Sparkov_Data_Generation/data:/data:ro
     depends_on:
-      kafka:
-        condition: service_healthy
-    restart: "no"
+      kafka-init:
+        condition: service_completed_successfully
+    restart: on-failure
 
   # ───────────────────────── Control loop ─────────────────────────
   postgres:                           # mutable reference data, audit log, outbox

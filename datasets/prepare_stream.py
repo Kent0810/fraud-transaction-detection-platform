@@ -1,32 +1,3 @@
-#!/usr/bin/env python3
-"""Reshape simulate_data.csv into a replayable event stream + side tables.
-
-Transformations applied (see --help for knobs):
-
-1. Timestamp shift. offset = now - max(unix_time), so the history ends "now".
-   Every event's ts = unix_time + offset. With --speed S the historical span is
-   compressed by S while still ending at now:
-
-       ts = now - (max_unix_time - unix_time) / S
-
-   S = 1     -> ts == unix_time + offset (real-time span, ~6 months)
-   S = 3600  -> one real second per simulated hour
-   S = 86400 -> one real second per simulated day
-
-2. Label split. is_fraud never appears in the event; it goes to
-   ground_truth.csv as (txn_id, is_fraud).
-
-3. Customer profile out of the event. The 13 fields that are static per card
-   (first, last, gender, street, city, state, zip, job, dob, city_pop, lat,
-   long) are written once to dim_card.csv. The event keeps only the merchant
-   location (merch_lat / merch_long) as the transaction's location.
-
-4. Merchant cleanup. The "fraud_" prefix is stripped from merchant names.
-
-Stdlib only. Two streaming passes, so memory stays flat regardless of input
-size; row order (already sorted by unix_time) is preserved.
-"""
-
 import argparse
 import csv
 import json
@@ -53,21 +24,6 @@ MERCHANT_PREFIX = "fraud_"
 # Defaults resolve next to this script, so it runs from any working directory.
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         "Sparkov_Data_Generation", "data")
-
-
-def parse_now(value):
-    """Accept an epoch (int/float) or an ISO-8601 timestamp; return epoch secs."""
-    if value is None:
-        return datetime.now(timezone.utc).timestamp()
-    try:
-        return float(value)
-    except ValueError:
-        pass
-    text = value.strip().replace("Z", "+00:00")
-    dt = datetime.fromisoformat(text)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.timestamp()
 
 
 def iso(epoch):
@@ -120,7 +76,7 @@ def write_dim_card(path, cards):
             writer.writerow([cc_num] + list(cards[cc_num]))
 
 
-def write_stream(src, events_path, truth_path, max_unix, now_ts, speed):
+def write_stream(src, events_path, truth_path):
     """Pass 2: events (no label, no profile) + ground truth, in source order."""
     written = 0
     frauds = 0
@@ -135,8 +91,7 @@ def write_stream(src, events_path, truth_path, max_unix, now_ts, speed):
         events.writerow(EVENT_HEADER)
         truth.writerow(GROUND_TRUTH_HEADER)
         for row in reader:
-            unix_time = int(row["unix_time"])
-            ts_epoch = now_ts - (max_unix - unix_time) / speed
+            ts_epoch = int(row["unix_time"])
             txn_id = row["trans_num"]
             merchant = row["merchant"]
             if merchant.startswith(MERCHANT_PREFIX):
@@ -169,26 +124,17 @@ def main():
         epilog=(
             "examples:\n"
             "  python prepare_stream.py\n"
-            "  python prepare_stream.py --speed 3600        # 1 real second = 1 simulated hour\n"
-            "  python prepare_stream.py --now 2026-01-01T00:00:00Z\n"
+            "  python prepare_stream.py -i other.csv -o out/\n"
+            "\n"
+            "replay speed is set by REPLAY_SPEED in platform/docker-compose.yml\n"
         ),
     )
     parser.add_argument("-i", "--input", default=os.path.join(DATA_DIR, "simulate_data.csv"),
                         help="source CSV (default: %(default)s)")
     parser.add_argument("-o", "--outdir", default=os.path.join(DATA_DIR, "stream"),
                         help="output folder (default: %(default)s)")
-    parser.add_argument("--speed", type=float, default=1.0,
-                        help="replay compression factor; 3600 = one real second "
-                             "per simulated hour (default: %(default)s)")
-    parser.add_argument("--now", default=None,
-                        help="anchor the end of history at this epoch or ISO-8601 "
-                             "timestamp instead of the current time")
     args = parser.parse_args()
 
-    if args.speed <= 0:
-        sys.exit("error: --speed must be greater than 0")
-
-    now_ts = parse_now(args.now)
     os.makedirs(args.outdir, exist_ok=True)
     events_path = os.path.join(args.outdir, "events.csv")
     truth_path = os.path.join(args.outdir, "ground_truth.csv")
@@ -204,21 +150,16 @@ def main():
     write_dim_card(dim_path, scan["cards"])
     print(f"wrote {dim_path} ({len(scan['cards'])} cards)")
 
-    written, frauds, first_ts, last_ts = write_stream(
-        args.input, events_path, truth_path, scan["max_unix"], now_ts, args.speed
-    )
+    written, frauds, first_ts, last_ts = write_stream(args.input, events_path, truth_path)
     print(f"wrote {events_path} ({written} events)")
     print(f"wrote {truth_path} ({frauds} fraudulent)")
 
-    offset = now_ts - scan["max_unix"]
     manifest = {
         "source": os.path.abspath(args.input),
         "generated_at": iso(datetime.now(timezone.utc).timestamp()),
         "rows": written,
         "cards": len(scan["cards"]),
         "fraud_rows": frauds,
-        "speed": args.speed,
-        "offset_seconds": offset,
         "source_unix_min": scan["min_unix"],
         "source_unix_max": scan["max_unix"],
         "stream_start": iso(first_ts),
@@ -229,9 +170,9 @@ def main():
         json.dump(manifest, fh, indent=2)
         fh.write("\n")
     print(f"wrote {manifest_path}")
-    print(f"\nhistory ends {manifest['stream_end']} "
-          f"(offset {offset:,.0f}s, speed {args.speed:g}x)")
-    print(f"stream spans {manifest['stream_span_seconds'] / 3600:,.2f} real hours")
+    print(f"\nevents span {manifest['stream_start']} -> {manifest['stream_end']} "
+          f"({manifest['stream_span_seconds'] / 86400:,.1f} days); "
+          f"replay speed: REPLAY_SPEED in docker-compose.yml")
 
 
 if __name__ == "__main__":

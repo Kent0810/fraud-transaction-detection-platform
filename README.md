@@ -44,7 +44,7 @@ cd datasets
 git clone https://github.com/namebrandon/Sparkov_Data_Generation.git
 # download fraudTest.csv from https://www.kaggle.com/datasets/kartik2112/fraud-detection
 #   -> datasets/Sparkov_Data_Generation/data/simulate_data.csv
-python3 prepare_stream.py --speed 3600
+python3 prepare_stream.py
 ```
 
 ### 2. Start Kafka and the replay
@@ -56,8 +56,8 @@ docker compose up -d --build event-source
 
 This starts `kafka`, runs `kafka-init` (creates the topics and seeds
 `risk_categories`), then starts `event-source`, which replays `events.csv` into
-the `transactions` topic. With the default `REPLAY_SPEED=1` the replay takes
-about 1.3 hours.
+the `transactions` topic. Event times are restamped to "now", and with the
+default `REPLAY_SPEED=3600` the replay takes about 1.3 hours.
 
 ### 3. Check it is working
 
@@ -90,7 +90,7 @@ Set as environment variables before `docker compose up`:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REPLAY_SPEED` | `1` | Time compression of the replay. Keep `1` when `prepare_stream.py --speed 3600` was used, or the timeline is compressed twice |
+| `REPLAY_SPEED` | `3600` | Replay speed: `3600` = one real second per simulated hour, `1` = real time |
 | `KAFKA_PARTITIONS` | `12` | Partitions per topic (all card-keyed topics share it so they co-partition) |
 | `KAFKA_VERSION` | `4.3.1` | Kafka image tag |
 

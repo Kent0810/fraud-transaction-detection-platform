@@ -3,11 +3,14 @@
 One CSV row -> one Kafka record:
   key       = cc_num (every topic is keyed by card_id, so they co-partition)
   value     = JSON of the event row, numbers typed
-  timestamp = ts_epoch in ms (event time, used by Kafka Streams windows)
+  timestamp = event time in ms (used by Kafka Streams windows)
 
-  REPLAY_SPEED = 1     -> real time
-  REPLAY_SPEED = 3600  -> one real second per simulated hour
-  REPLAY_SPEED = 0     -> no pacing, send as fast as possible
+Event time is restamped at replay: the first event is "now", and the gaps
+between events are divided by REPLAY_SPEED, so ts / ts_epoch / timestamp all
+match the moment the record is sent.
+
+  REPLAY_SPEED = 1     -> real time (193-day dataset takes 193 days)
+  REPLAY_SPEED = 3600  -> one real second per simulated hour (~1.3 h)
 """
 
 import csv
@@ -16,6 +19,7 @@ import logging
 import signal
 import sys
 import time
+from datetime import datetime, timezone
 
 from confluent_kafka import KafkaException, Producer
 
@@ -77,7 +81,8 @@ class Replayer:
         self.producer.poll(0)
 
     def run(self, path):
-        self.started_at = time.monotonic() # the start of the flow
+        self.started_at = time.monotonic() # the start of the flow, for pacing
+        replay_start = time.time()         # the same moment on the wall clock, for event time
 
         with open(path, newline="", encoding="utf-8") as fh:
             reader = csv.DictReader(fh)
@@ -88,15 +93,21 @@ class Replayer:
                     break
                 event = to_event(row)
 
-                event_ts = event["ts_epoch"]
+                source_ts = event["ts_epoch"]
 
                 if first_ts is None:
-                    first_ts = event_ts
+                    first_ts = source_ts
 
-                if self.speed > 0:
-                    self.poll_until(self.started_at + (event_ts - first_ts) / self.speed)  # time since the FIRST event, scaled
-                    if self.stopping:
-                        break
+                offset = (source_ts - first_ts) / self.speed  # time since the FIRST event, scaled
+
+                self.poll_until(self.started_at + offset)
+                if self.stopping:
+                    break
+
+                # Restamp: the replay looks live, starting now, compressed by REPLAY_SPEED.
+                event_ts = replay_start + offset
+                event["ts_epoch"] = round(event_ts, 3)
+                event["ts"] = datetime.fromtimestamp(event_ts, timezone.utc).isoformat(timespec="milliseconds")
 
                 self.produce(
                     key=event["cc_num"].encode(),

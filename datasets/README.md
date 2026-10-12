@@ -14,10 +14,26 @@ as if the transactions were happening now.
 - **Ground truth** (`ground_truth.csv`): the fraud label per transaction, kept
   aside to measure how well the rules catch fraud.
 - **Card profiles** (`dim_card.csv`): static cardholder data, one row per card.
-- Timestamps are shifted so the history ends now, and can be compressed
-  (`--speed 3600` = one real second per simulated hour).
+- Timestamps stay as in the source. event-source restamps them at replay time,
+  so the stream looks live; the speed is `REPLAY_SPEED` in
+  `platform/docker-compose.yml`.
 
 The data is not committed; set it up locally with the steps below.
+
+## Input / output
+
+**Input:** `Sparkov_Data_Generation/data/simulate_data.csv`
+
+**Output** (`Sparkov_Data_Generation/data/stream/`):
+
+| File | Fields | Rows |
+|---|---|---|
+| `events.csv` | `txn_id`, `ts`, `ts_epoch`, `cc_num`, `merchant`, `category`, `amt`, `merch_lat`, `merch_long` | one per transaction |
+| `ground_truth.csv` | `txn_id`, `is_fraud` | one per transaction |
+| `dim_card.csv` | `cc_num`, `first`, `last`, `gender`, `street`, `city`, `state`, `zip`, `lat`, `long`, `city_pop`, `job`, `dob` | one per card |
+| `manifest.json` | row counts and time span | — |
+
+**Dropped fields:** the unnamed index column, `trans_date_trans_time`
 
 ## How to run
 
@@ -31,12 +47,13 @@ git clone https://github.com/namebrandon/Sparkov_Data_Generation.git
 #    -> datasets/Sparkov_Data_Generation/data/simulate_data.csv
 
 # 3. Build the stream (writes Sparkov_Data_Generation/data/stream/; works from any folder)
-python3 prepare_stream.py --speed 3600
+python3 prepare_stream.py
 
 # 4. Replay it into Kafka
 cd ../platform
-REPLAY_SPEED=1 docker compose up --build event-source
+docker compose up --build event-source
 ```
 
-Use `--speed 3600` with `REPLAY_SPEED=1`, not 3600 for both: each compresses
-time, so using both replays the 193-day dataset in about a second.
+Replay speed is `REPLAY_SPEED` in `platform/docker-compose.yml` (default `3600`:
+one real second per simulated hour, the 193-day dataset in about 1.3 hours).
+`events.csv` does not depend on it, so you only rebuild it when the source changes.

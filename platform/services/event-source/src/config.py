@@ -32,7 +32,7 @@ class Config:
     def from_env(cls) -> "Config":
         speed = cls._parse("REPLAY_SPEED", cls._require("REPLAY_SPEED"), float)
         if speed <= 0:
-            raise ValueError(f"REPLAY_SPEED must be greater than 0, got {speed}")
+            raise ConfigError(f"REPLAY_SPEED must be greater than 0, got {speed}")
 
         return cls(
             bootstrap=cls._require("KAFKA_BOOTSTRAP_SERVERS"),
