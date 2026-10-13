@@ -7,7 +7,6 @@ x-kafka-env: &kafka-env
   TOPIC_DECISIONS: decisions
   TOPIC_ALERTS: alerts
   TOPIC_CASES: cases
-  TOPIC_RISK_CATEGORIES: risk_categories
 
 x-postgres-env: &postgres-env
   POSTGRES_HOST: postgres
@@ -66,9 +65,9 @@ services:
   kafka-init:
     image: apache/kafka:${KAFKA_VERSION:-4.3.1}
     environment:
+      BOOTSTRAP: kafka:9092
       PARTITIONS: ${KAFKA_PARTITIONS:-12}  # identical on all card_id topics so they co-partition
-    volumes:
-      - ./infra/kafka:/seed:ro        # risk_categories.txt  (category:threshold per line)
+    volumes: # read-only
       - ./scripts:/scripts:ro
     entrypoint: ["/bin/bash", "/scripts/kafka-init.sh"]
     depends_on:

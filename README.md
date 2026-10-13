@@ -54,10 +54,10 @@ cd platform
 docker compose up -d --build event-source
 ```
 
-This starts `kafka`, runs `kafka-init` (creates the topics and seeds
-`risk_categories`), then starts `event-source`, which replays `events.csv` into
-the `transactions` topic. Event times are restamped to "now", and with the
-default `REPLAY_SPEED=3600` the replay takes about 1.3 hours.
+This starts `kafka`, runs `kafka-init` (creates the topics), then starts
+`event-source`, which replays `events.csv` into the `transactions` topic. Event
+times are restamped to "now", and with the default `REPLAY_SPEED=3600` the
+replay takes about 1.3 hours.
 
 ### 3. Check it is working
 
@@ -105,7 +105,7 @@ datasets/
   README.md                    data setup
 platform/
   docker-compose.yml           every service of the platform
-  infra/kafka/                 seed data for kafka-init (risk_categories.txt)
+  scripts/kafka-init.sh        creates the Kafka topics
   services/
     event-source/              Python, replays events.csv into Kafka
     stream-processor/          (planned) Kafka Streams rules app, Java
