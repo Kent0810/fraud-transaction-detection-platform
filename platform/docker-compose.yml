@@ -1,7 +1,7 @@
 name: card-fraud
 
 x-kafka-env: &kafka-env
-  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  KAFKA_BOOTSTRAP_SERVERS: &kafka-bootstrap kafka:9092
   TOPIC_TRANSACTIONS: transactions
   TOPIC_CONTROL: control
   TOPIC_DECISIONS: decisions
@@ -65,7 +65,7 @@ services:
   kafka-init:
     image: apache/kafka:${KAFKA_VERSION:-4.3.1}
     environment:
-      BOOTSTRAP: kafka:9092
+      <<: *kafka-env
       PARTITIONS: ${KAFKA_PARTITIONS:-12}  # identical on all card_id topics so they co-partition
     volumes: # read-only
       - ./scripts:/scripts:ro
@@ -81,7 +81,7 @@ services:
       - "8090:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: *kafka-bootstrap
     depends_on:
       kafka:
         condition: service_healthy
@@ -132,7 +132,7 @@ services:
     ports:
       - "8083:8083"
     environment:
-      BOOTSTRAP_SERVERS: kafka:9092
+      BOOTSTRAP_SERVERS: *kafka-bootstrap
       GROUP_ID: connect
       CONFIG_STORAGE_TOPIC: _connect_configs
       OFFSET_STORAGE_TOPIC: _connect_offsets
