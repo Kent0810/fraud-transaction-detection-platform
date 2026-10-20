@@ -29,7 +29,7 @@ wheels/
 .coverage
 htmlcov/
 
-# ───────── Java (stream-processor) ─────────
+# ───────── Java (fraud-detector) ─────────
 target/
 .gradle/
 *.class

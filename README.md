@@ -7,7 +7,7 @@ and loaded into BigQuery for reporting.
 
 ```
                          ┌─────────────── hot path ───────────────┐
-datasets ──> event-source ──> Kafka: transactions ──> stream-processor ──> decisions / alerts / cases
+datasets ──> event-source ──> Kafka: transactions ──> fraud-detector ──> decisions / alerts / cases
                                          ▲                                   │
                                          │ control                           ├──> Cassandra ──> ops-console, cardholder-app
               ops-console ──> Postgres ──┘ (outbox via Debezium)             └──> notifier ──> cardholder-app
@@ -22,10 +22,8 @@ datasets ──> event-source ──> Kafka: transactions ──> stream-process
 | `datasets/prepare_stream.py` | ✅ working |
 | `event-source` (CSV -> Kafka `transactions`) | ✅ working |
 | Kafka + topic init (`kafka`, `kafka-init`) | ✅ working |
-| stream-processor, notifier, ops-console, cardholder-app, batch-loader | 🚧 not built yet (defined in compose only) |
-
-Because the other services have no code yet, start **only** `event-source`, not
-the whole compose file.
+| `fraud-detector` (Kafka Streams, Java) | 🚧 reads `transactions` and logs progress; no rules or output topics yet |
+| notifier, ops-console, cardholder-app, batch-loader | 🚧 not built yet (commented out in compose) |
 
 ## Prerequisites
 
@@ -73,6 +71,14 @@ docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
 
 From the host, Kafka is reachable at `localhost:29092`.
 
+To also run the fraud detector, which reads `transactions` from the beginning
+and logs one line per 1000 records:
+
+```bash
+docker compose up -d --build fraud-detector
+docker compose logs -f fraud-detector
+```
+
 ### 4. Stop / reset
 
 ```bash
@@ -108,7 +114,7 @@ platform/
   scripts/kafka-init.sh        creates the Kafka topics
   services/
     event-source/              Python, replays events.csv into Kafka
-    stream-processor/          (planned) Kafka Streams rules app, Java
+    fraud-detector/            Java (Maven), Kafka Streams app; reads transactions for now
     notifier/                  (planned) alerts -> push notifications
     card-holder-app/           (planned) backend + mobile
 ```

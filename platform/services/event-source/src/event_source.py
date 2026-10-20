@@ -132,6 +132,7 @@ def main():
         "enable.idempotence": True,   # acks=all, no duplicates on producer retry
         "compression.type": "lz4",
         "linger.ms": 20,
+        "partitioner": "murmur2_random",
     })
 
     replayer = Replayer(producer, cfg.topic, cfg.speed, cfg.log_every)
