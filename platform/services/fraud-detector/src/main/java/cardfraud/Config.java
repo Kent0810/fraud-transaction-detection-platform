@@ -13,6 +13,9 @@ record Config(
         int numStandbyReplicas,
         String stateDir,
         String transactionsTopic,
+        String decisionsTopic,
+        String alertsTopic,
+        String casesTopic,
         long logEvery) {
 
     static class ConfigException extends RuntimeException {
@@ -35,6 +38,9 @@ record Config(
                 (int) parseLong("NUM_STANDBY_REPLICAS"),
                 require("STATE_DIR"),
                 require("TOPIC_TRANSACTIONS"),
+                require("TOPIC_DECISIONS"),
+                require("TOPIC_ALERTS"),
+                require("TOPIC_CASES"),
                 logEvery);
     }
 

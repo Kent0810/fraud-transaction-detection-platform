@@ -1,0 +1,19 @@
+{
+  "connector.class": "com.datastax.oss.kafka.sink.CassandraSinkConnector",
+  "tasks.max": "1",
+  "topics": "decisions,alerts,cases",
+
+  "contactPoints": "cassandra",
+  "port": "9042",
+  "loadBalancing.localDc": "dc1",
+
+  "consumer.override.isolation.level": "read_committed",
+
+  "topic.decisions.fraud.txn_by_card.mapping": "card_id=key, ts=value.ts, txn_id=value.txn_id, merchant=value.merchant, category=value.category, amount=value.amount, merch_lat=value.merch_lat, merch_long=value.merch_long, decision=value.decision, score=value.score, fired_rules=value.fired_rules, decided_at=value.decided_at",
+
+  "topic.alerts.fraud.alerts_by_card.mapping": "card_id=key, ts=value.ts, alert_id=value.alert_id, txn_id=value.txn_id, rule_id=value.rule_id, score=value.score, amount=value.amount",
+
+  "topic.cases.fraud.card_state.mapping": "card_id=key, risk_score=value.risk_score, priority=value.priority, amount_sum=value.amount_sum, open_alerts=value.open_alerts, last_decision=value.last_decision, updated_at=value.updated_at",
+
+  "topic.cases.fraud.triage_queue.mapping": "bucket=value.bucket, card_id=key, priority=value.priority, risk_score=value.risk_score, amount_sum=value.amount_sum, open_alerts=value.open_alerts, last_decision=value.last_decision, updated_at=value.updated_at"
+}
