@@ -1,10 +1,10 @@
-package cardfraud;
+package com.cardfraud.frauddetector.model;
 
 import java.util.List;
 
 // Exactly one per transaction. Carries the transaction's fields too, so the Cassandra sink
 // can fill txn_by_card from this topic alone.
-record Decision(
+public record Decision(
         String txnId,
         String cardId,
         String ts,
@@ -18,5 +18,5 @@ record Decision(
         List<String> firedRules,
         String decidedAt) {
 
-    enum Verdict { ALLOW, STEP_UP, DECLINE }
+    public enum Verdict { ALLOW, STEP_UP, DECLINE }
 }

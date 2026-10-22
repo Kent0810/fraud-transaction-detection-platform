@@ -1,7 +1,7 @@
-package cardfraud;
+package com.cardfraud.frauddetector.model;
 
 // Latest summary per card, updated on every decision that is not ALLOW.
-record CaseSummary(
+public record CaseSummary(
         String cardId,
         double riskScore,
         double priority,    // score x amount, ranks the analyst queue
@@ -12,9 +12,9 @@ record CaseSummary(
         String updatedAt) {
 
     // The starting value before a card's first flagged decision (the aggregate's initializer).
-    static final CaseSummary EMPTY = new CaseSummary(null, 0, 0, 0, 0, null, null, null);
+    public static final CaseSummary EMPTY = new CaseSummary(null, 0, 0, 0, 0, null, null, null);
 
-    CaseSummary update(String cardId, Decision d) {
+    public CaseSummary update(String cardId, Decision d) {
         // TODO return a NEW CaseSummary (records are immutable):
         //   riskScore / priority: keep the highest seen; amountSum / openAlerts: add this decision's;
         //   lastDecision: this one; bucket: today's UTC date; updatedAt: now.

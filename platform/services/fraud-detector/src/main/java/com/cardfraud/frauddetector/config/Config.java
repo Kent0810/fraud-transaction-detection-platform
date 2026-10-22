@@ -1,11 +1,11 @@
-package cardfraud;
+package com.cardfraud.frauddetector.config;
 
 import java.util.Properties;
 
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsConfig;
 
-record Config(
+public record Config(
         String bootstrap,
         String applicationId,
         String processingGuarantee,
@@ -18,13 +18,13 @@ record Config(
         String casesTopic,
         long logEvery) {
 
-    static class ConfigException extends RuntimeException {
-        ConfigException(String message) {
+    public static class ConfigException extends RuntimeException {
+        public ConfigException(String message) {
             super(message);
         }
     }
 
-    static Config fromEnv() {
+    public static Config fromEnv() {
         long logEvery = parseLong("LOG_EVERY");
         if (logEvery <= 0) {
             throw new ConfigException("LOG_EVERY must be greater than 0, got " + logEvery);
@@ -44,7 +44,7 @@ record Config(
                 logEvery);
     }
 
-    Properties toStreamsProperties() {
+    public Properties toStreamsProperties() {
         Properties props = new Properties();
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, this.applicationId);
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, this.bootstrap);
