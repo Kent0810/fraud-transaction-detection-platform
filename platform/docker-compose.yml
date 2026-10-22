@@ -233,7 +233,8 @@ services:
   #     retries: 12
 
   connect:
-    image: quay.io/debezium/connect:${DEBEZIUM_VERSION:-3.6.2.Final}
+    build:                            # Debezium Connect + the Cassandra sink plugin (infra/connect/Dockerfile)
+      context: ./infra/connect
     ports:
       - "8083:8083"
     environment:
@@ -249,8 +250,6 @@ services:
       KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter    # key = card_id
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-    volumes:
-      - ./infra/connect/plugins/cassandra-sink:/kafka/connect/cassandra-sink:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8083/connectors >/dev/null"]
       interval: 10s
@@ -293,18 +292,17 @@ services:
   #     cassandra-init:
   #       condition: service_completed_successfully
 
-  # cardholder-app:                     # history, budget, alerts
-  #   build: ./services/card-holder-app/backend
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     <<: [*postgres-env, *cassandra-env]
-  #     PORT: 8080
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     cassandra-init:
-  #       condition: service_completed_successfully
+  cardholder-app:                     # NestJS API: history, alerts, card state (read-only from Cassandra)
+    build: ./services/card-holder-app/backend
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *cassandra-env              # add *postgres-env once budgets / merchant rules move to Postgres
+      PORT: 8080
+    depends_on:
+      cassandra-init:
+        condition: service_completed_successfully
+    restart: on-failure
 
 volumes:
   kafka-data:
