@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
@@ -9,10 +9,10 @@ import { day, greeting, relative } from '@/components/format';
 import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { TxnRow } from '@/components/TxnRow';
+import { UserSwitcher } from '@/components/UserSwitcher';
 import { SectionHeader, Surface } from '@/components/ui';
 import { vnd } from '@/components/vnd';
-import { CARD } from '@/data/mock';
-import { PROFILE, useSettings } from '@/data/settings';
+import { useSettings, useUser } from '@/data/settings';
 import { useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
 
@@ -21,8 +21,9 @@ type IconName = keyof typeof Ionicons.glyphMap;
 // Home: card, quick actions and transaction history (reads txn_by_card, newest first).
 export default function HomeScreen() {
   const c = useColors();
-  const { transactions, budget, frozen, toggleFrozen, alerts, balance, transfers, status, error, cardId, refresh } =
-    useStore();
+  const { transactions, budget, frozen, toggleFrozen, alerts, balance, transfers, status, error, refresh } = useStore();
+  const user = useUser();
+  const [switching, setSwitching] = useState(false);
   const { hideBalance, theme, update } = useSettings();
   const openAlerts = alerts.filter((a) => a.status === 'OPEN').length;
 
@@ -52,12 +53,19 @@ export default function HomeScreen() {
       <FadeInUp>
         <View style={styles.header}>
           <ScalePressable accessibilityLabel="Settings" onPress={() => router.push('/settings')}>
-            <Avatar name={PROFILE.name} size={44} />
+            <Avatar name={user.name} size={44} />
           </ScalePressable>
-          <View style={{ flex: 1 }}>
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={() => setSwitching(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Switch account">
             <Text style={[styles.hello, { color: c.muted }]}>{greeting()},</Text>
-            <Text style={[styles.who, { color: c.text }]}>{PROFILE.name.split(' ')[0]}</Text>
-          </View>
+            <View style={styles.whoRow}>
+              <Text style={[styles.who, { color: c.text }]}>{user.name.split(' ')[0]}</Text>
+              <Ionicons name="chevron-down" size={18} color={c.muted} />
+            </View>
+          </Pressable>
           <ScalePressable
             accessibilityLabel={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             onPress={() => update('theme', theme === 'dark' ? 'light' : 'dark')}
@@ -89,8 +97,8 @@ export default function HomeScreen() {
 
       <FadeInUp delay={80} distance={28}>
         <BankCard
-          last4={cardId?.slice(-4) ?? CARD.last4}
-          holder={PROFILE.name}
+          last4={user.cardId.slice(-4)}
+          holder={user.name}
           spent={budget.spent}
           limit={budget.limit}
           period={budget.period}
@@ -169,6 +177,7 @@ export default function HomeScreen() {
           </Surface>
         </FadeInUp>
       ))}
+      <UserSwitcher visible={switching} onClose={() => setSwitching(false)} />
     </Screen>
   );
 }
@@ -177,6 +186,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg },
   hello: { fontSize: 14 },
   who: { fontSize: 18, fontWeight: '800' },
+  whoRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bell: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   dot: { position: 'absolute', top: 10, right: 11, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.lg },

@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { apiEnabled, fetchAlerts, fetchTransactions, resolveCardId } from './api';
+import { apiEnabled, fetchAlerts, fetchTransactions } from './api';
+import { useUser } from './settings';
 
-import { ALERTS, BALANCE, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, SAVED_RECIPIENTS, TRANSACTIONS, TRANSFERS } from './mock';
+import { ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, SAVED_RECIPIENTS, TRANSACTIONS, TRANSFERS } from './mock';
 import type { Alert, Bank, Budget, MerchantRule, Period, Recipient, RuleType, Transfer, TransferKind, Txn } from './types';
 
 // What the transfer form hands to the confirm screen.
@@ -10,6 +11,7 @@ export type TransferDraft = { kind: TransferKind; to: Recipient; amount: number;
 
 // Card history and alerts come from the backend (Cassandra) when EXPO_PUBLIC_API_URL is set,
 // otherwise from mock data. Budgets, merchant rules and transfers are always mocked for now.
+// One store per signed-in user: the root layout remounts it (key = user id) on a switch.
 export type DataStatus = 'mock' | 'loading' | 'ready' | 'error';
 
 type Store = {
@@ -47,32 +49,30 @@ const TRANSFER_MS = 1200;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchCardData(): Promise<{ cardId: string | null; transactions: Txn[]; alerts: Alert[] }> {
-  const cardId = await resolveCardId();
-  if (!cardId) return { cardId: null, transactions: [], alerts: [] };
+async function fetchCardData(cardId: string): Promise<{ transactions: Txn[]; alerts: Alert[] }> {
   const [transactions, alerts] = await Promise.all([fetchTransactions(cardId), fetchAlerts(cardId)]);
-  return { cardId, transactions, alerts };
+  return { transactions, alerts };
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const user = useUser();
+  const cardId = user.cardId;
   const [budget, setBudgetState] = useState<Budget>(BUDGET);
   const [rules, setRules] = useState<MerchantRule[]>(MERCHANT_RULES);
   const [frozen, setFrozen] = useState(false);
-  const [balance, setBalance] = useState(BALANCE);
+  const [balance, setBalance] = useState(user.balance);
   const [transfers, setTransfers] = useState<Transfer[]>(TRANSFERS);
   const [saved, setSaved] = useState<Recipient[]>(SAVED_RECIPIENTS);
   const [draft, setDraft] = useState<TransferDraft | null>(null);
   const [status, setStatus] = useState<DataStatus>(apiEnabled ? 'loading' : 'mock');
   const [error, setError] = useState<string | null>(null);
-  const [cardId, setCardId] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Txn[]>(apiEnabled ? [] : TRANSACTIONS);
   const [alerts, setAlerts] = useState<Alert[]>(apiEnabled ? [] : ALERTS);
 
   // Fetch first, then apply the result in a callback, so no state is set synchronously in the effect.
   const load = useCallback(() => {
-    fetchCardData().then(
+    fetchCardData(cardId).then(
       (data) => {
-        setCardId(data.cardId);
         setTransactions(data.transactions);
         setAlerts(data.alerts);
         setError(null);
@@ -83,7 +83,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setStatus('error');
       },
     );
-  }, []);
+  }, [cardId]);
 
   useEffect(() => {
     if (apiEnabled) load();

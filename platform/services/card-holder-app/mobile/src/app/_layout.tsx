@@ -2,17 +2,26 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
 
-import { SettingsProvider } from '@/data/settings';
+import { SettingsProvider, useSettings } from '@/data/settings';
 import { StoreProvider } from '@/data/store';
 import { useColors, useScheme } from '@/theme';
 
 export default function RootLayout() {
   return (
     <SettingsProvider>
-      <StoreProvider>
-        <AppShell />
-      </StoreProvider>
+      <UserScope />
     </SettingsProvider>
+  );
+}
+
+// key = user id: switching accounts remounts the store, so every screen starts fresh with that
+// user's card data (and the app returns to Home, like a real account switch).
+function UserScope() {
+  const { userId } = useSettings();
+  return (
+    <StoreProvider key={userId}>
+      <AppShell />
+    </StoreProvider>
   );
 }
 

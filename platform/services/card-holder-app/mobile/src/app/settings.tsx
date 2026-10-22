@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { FadeInUp, stagger } from '@/components/motion';
 import { SectionHeader, Surface } from '@/components/ui';
-import { PROFILE, useSettings, type Settings } from '@/data/settings';
+import { useSettings, useUser, type Settings } from '@/data/settings';
+import { USERS } from '@/data/users';
 import { apiEnabled, apiUrl } from '@/data/api';
 import { useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
@@ -15,6 +16,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 export default function SettingsScreen() {
   const c = useColors();
   const settings = useSettings();
+  const user = useUser();
   const { frozen, toggleFrozen } = useStore();
   const dark = settings.theme === 'dark';
 
@@ -33,16 +35,42 @@ export default function SettingsScreen() {
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <FadeInUp>
         <Surface style={styles.profile}>
-          <Avatar name={PROFILE.name} size={64} />
+          <Avatar name={user.name} size={64} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.name, { color: c.text }]}>{PROFILE.name}</Text>
-            <Text style={[styles.muted, { color: c.muted }]}>{PROFILE.email}</Text>
-            <Text style={[styles.muted, { color: c.muted }]}>Member since {PROFILE.memberSince}</Text>
+            <Text style={[styles.name, { color: c.text }]}>{user.name}</Text>
+            <Text style={[styles.muted, { color: c.muted }]}>{user.email}</Text>
+            <Text style={[styles.muted, { color: c.muted }]}>
+              Card •••• {user.cardId.slice(-4)} · member since {user.memberSince}
+            </Text>
           </View>
         </Surface>
       </FadeInUp>
 
       <FadeInUp delay={stagger(1)}>
+        <SectionHeader title="Switch account" />
+        <Surface style={styles.group}>
+          {USERS.map((u, i) => (
+            <View key={u.id}>
+              {i > 0 && <Divider />}
+              <Pressable
+                onPress={() => settings.update('userId', u.id)}
+                disabled={u.id === user.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected: u.id === user.id }}
+                style={styles.row}>
+                <Avatar name={u.name} size={40} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowLabel, { color: c.text }]}>{u.name}</Text>
+                  <Text style={[styles.rowDetail, { color: c.muted }]}>Card •••• {u.cardId.slice(-4)}</Text>
+                </View>
+                {u.id === user.id && <Ionicons name="checkmark-circle" size={22} color={c.primary} />}
+              </Pressable>
+            </View>
+          ))}
+        </Surface>
+      </FadeInUp>
+
+      <FadeInUp delay={stagger(2)}>
         <SectionHeader title="Appearance" />
         <Surface style={styles.group}>
           <Row icon={dark ? 'moon-outline' : 'sunny-outline'} label="Dark mode" detail={dark ? 'On' : 'Off'}>
@@ -56,7 +84,7 @@ export default function SettingsScreen() {
         </Surface>
       </FadeInUp>
 
-      <FadeInUp delay={stagger(2)}>
+      <FadeInUp delay={stagger(3)}>
         <SectionHeader title="Privacy & security" />
         <Surface style={styles.group}>
           {toggle('hideBalance', 'Hide balance', 'eye-off-outline', 'Show •••• on the home screen')}
@@ -69,7 +97,7 @@ export default function SettingsScreen() {
         </Surface>
       </FadeInUp>
 
-      <FadeInUp delay={stagger(3)}>
+      <FadeInUp delay={stagger(4)}>
         <SectionHeader title="Notifications" />
         <Surface style={styles.group}>
           {toggle('notifyDeclines', 'Suspicious payments', 'shield-outline', 'When we flag or decline a payment')}
@@ -80,7 +108,7 @@ export default function SettingsScreen() {
         </Surface>
       </FadeInUp>
 
-      <FadeInUp delay={stagger(4)}>
+      <FadeInUp delay={stagger(5)}>
         <SectionHeader title="About" />
         <Surface style={styles.group}>
           <Row icon="information-circle-outline" label="Version" detail="1.0.0 · demo build" />

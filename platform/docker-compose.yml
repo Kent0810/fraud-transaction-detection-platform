@@ -92,6 +92,7 @@ services:
       <<: *kafka-env
       EVENTS_SOURCE_FILE: /data/stream/events.csv
       REPLAY_SPEED: ${REPLAY_SPEED:-3600}   # 1 real second = 1 simulated hour; 1 = real time
+      MAX_EVENTS: ${MAX_EVENTS:-1000}          # stop after this many events; 0 = the whole file (~555k)
     volumes:
       - ../datasets/Sparkov_Data_Generation/data:/data:ro
     depends_on:

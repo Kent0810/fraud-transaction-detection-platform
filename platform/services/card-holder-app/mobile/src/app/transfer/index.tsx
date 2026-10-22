@@ -21,14 +21,13 @@ import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Button } from '@/components/ui';
 import { groupThousands, parseVnd, toAccountName, vnd, vndInWords } from '@/components/vnd';
 import { ACCOUNT } from '@/data/mock';
-import { PROFILE, useSettings } from '@/data/settings';
+import { useSettings, useUser } from '@/data/settings';
 import { useStore } from '@/data/store';
 import type { Recipient, TransferKind } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
 
 const QUICK = [100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 const MIN_AMOUNT = 1_000;
-const DEFAULT_CONTENT = `${toAccountName(PROFILE.name)} transfer`;
 
 type Lookup = { state: 'idle' | 'checking' | 'notfound' } | { state: 'found'; name: string };
 
@@ -37,6 +36,7 @@ export default function TransferFormScreen() {
   const c = useColors();
   const { balance, banks, saved, lookupAccount, setDraft } = useStore();
   const { hideBalance, update } = useSettings();
+  const user = useUser();
 
   const [kind, setKind] = useState<TransferKind>('NAPAS');
   const [bankCode, setBankCode] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export default function TransferFormScreen() {
   // Result of the last finished lookup, tagged with the bank+account it was for.
   const [result, setResult] = useState<{ key: string; name: string | null } | null>(null);
   const [amountText, setAmountText] = useState('');
-  const [content, setContent] = useState(DEFAULT_CONTENT);
+  const [content, setContent] = useState(`${toAccountName(user.name)} transfer`);
   const [save, setSave] = useState(false);
   const [picking, setPicking] = useState(false);
 

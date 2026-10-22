@@ -11,6 +11,8 @@ match the moment the record is sent.
 
   REPLAY_SPEED = 1     -> real time (193-day dataset takes 193 days)
   REPLAY_SPEED = 3600  -> one real second per simulated hour (~1.3 h)
+
+MAX_EVENTS stops after the first N rows (0 = the whole file).
 """
 
 import csv
@@ -36,11 +38,12 @@ def to_event(row):
 
 
 class Replayer:
-    def __init__(self, producer, topic, speed, log_every):
+    def __init__(self, producer, topic, speed, log_every, max_events):
         self.producer = producer
         self.topic = topic
         self.speed = speed
         self.log_every = log_every
+        self.max_events = max_events  # 0 = no limit
         self.stopping = False
         self.sent = 0
         self.failed = 0
@@ -91,6 +94,9 @@ class Replayer:
             for row in reader:
                 if self.stopping:
                     break
+                if self.max_events and self.sent >= self.max_events:
+                    log.info("reached MAX_EVENTS=%d, stopping", self.max_events)
+                    break
                 event = to_event(row)
 
                 source_ts = event["ts_epoch"]
@@ -135,12 +141,13 @@ def main():
         "partitioner": "murmur2_random",
     })
 
-    replayer = Replayer(producer, cfg.topic, cfg.speed, cfg.log_every)
+    replayer = Replayer(producer, cfg.topic, cfg.speed, cfg.log_every, cfg.max_events)
 
     signal.signal(signal.SIGTERM, replayer.stop)
     signal.signal(signal.SIGINT, replayer.stop)
 
-    log.info("start replaying %s -> %s (speed %g, bootstrap %s)", cfg.path, cfg.topic, cfg.speed, cfg.bootstrap)
+    log.info("start replaying %s -> %s (speed %g, max events %s, bootstrap %s)",
+             cfg.path, cfg.topic, cfg.speed, cfg.max_events or "all", cfg.bootstrap)
     try:
         replayer.run(cfg.path)
     finally:

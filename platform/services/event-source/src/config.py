@@ -13,6 +13,7 @@ class Config:
     path: str
     speed: float
     log_every: int
+    max_events: int  # 0 = the whole file
 
     @staticmethod
     def _require(name: str) -> str:
@@ -34,10 +35,15 @@ class Config:
         if speed <= 0:
             raise ConfigError(f"REPLAY_SPEED must be greater than 0, got {speed}")
 
+        max_events = cls._parse("MAX_EVENTS", os.environ.get("MAX_EVENTS", "0"), int)
+        if max_events < 0:
+            raise ConfigError(f"MAX_EVENTS must be 0 (all) or more, got {max_events}")
+
         return cls(
             bootstrap=cls._require("KAFKA_BOOTSTRAP_SERVERS"),
             topic=cls._require("TOPIC_TRANSACTIONS"),
             path=cls._require("EVENTS_SOURCE_FILE"),
             speed=speed,
             log_every=cls._parse("LOG_EVERY", os.environ.get("LOG_EVERY", "1000"), int),
+            max_events=max_events,
         )

@@ -4,11 +4,8 @@ import type { Alert, Bank, Budget, MerchantRule, Recipient, Transfer, Txn } from
 const now = Date.now();
 const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
 
-export const CARD = { last4: '7244', holder: 'Card ending 7244' };
-
 // The cardholder's own payment account (VND). Transfers are sent from here.
 export const ACCOUNT = { bankCode: 'DEMO', number: '1903 5566 7788', label: 'Payment account' };
-export const BALANCE = 125_450_000;
 
 // Mock bank list for the picker: short names only, no logos.
 export const BANKS: Bank[] = [
