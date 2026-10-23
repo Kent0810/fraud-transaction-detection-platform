@@ -1,28 +1,30 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { money, PERIOD_LABEL } from '@/components/format';
+import { money, PERIOD_LABEL, toUsd, toVnd } from '@/components/format';
 import { FadeInUp } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { Button, Ring, ScreenTitle, SectionHeader, Surface } from '@/components/ui';
+import { groupThousands, parseVnd } from '@/components/vnd';
 import { useStore } from '@/data/store';
 import type { Period } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
 
 const PERIODS: Period[] = ['DAY', 'WEEK', 'MONTH'];
 const PERIOD_ADJECTIVE: Record<Period, string> = { DAY: 'Daily', WEEK: 'Weekly', MONTH: 'Monthly' };
-const PRESETS = [500, 1000, 1500, 2500];
+// In đồng; the budget itself is stored and sent in dollars, like the card amounts it is compared with.
+const PRESETS = [10_000_000, 25_000_000, 40_000_000, 60_000_000];
 
 export default function BudgetScreen() {
   const c = useColors();
   const { budget, setBudget } = useStore();
-  const [limitText, setLimitText] = useState(String(budget.limit));
+  const [limitText, setLimitText] = useState(groupThousands(toVnd(budget.limit)));
   const [period, setPeriod] = useState<Period>(budget.period);
   const [saved, setSaved] = useState(false);
 
-  const limit = Number(limitText.replace(/[^0-9.]/g, ''));
-  const valid = Number.isFinite(limit) && limit > 0;
-  const changed = valid && (limit !== budget.limit || period !== budget.period);
+  const limit = parseVnd(limitText);
+  const valid = toUsd(limit) > 0;
+  const changed = valid && (toUsd(limit) !== budget.limit || period !== budget.period);
   const left = budget.limit - budget.spent;
   const pct = budget.spent / budget.limit;
 
@@ -60,14 +62,17 @@ export default function BudgetScreen() {
         <SectionHeader title="Set a new budget" />
         <Surface style={{ gap: space.lg }}>
           <View style={[styles.amountBox, { backgroundColor: c.surfaceAlt, borderColor: valid ? 'transparent' : c.decline }]}>
-            <Text style={[styles.currency, { color: c.muted }]}>$</Text>
             <TextInput
               value={limitText}
-              onChangeText={(t) => edit(() => setLimitText(t))}
-              keyboardType="decimal-pad"
-              accessibilityLabel="Budget limit in dollars"
+              onChangeText={(t) => {
+                const n = parseVnd(t);
+                edit(() => setLimitText(n ? groupThousands(Math.min(n, 999_999_999_999)) : ''));
+              }}
+              keyboardType="number-pad"
+              accessibilityLabel="Budget limit in dong"
               style={[styles.amountInput, { color: c.text }]}
             />
+            <Text style={[styles.currency, { color: c.muted }]}>VND</Text>
           </View>
 
           <View style={styles.presets}>
@@ -76,9 +81,9 @@ export default function BudgetScreen() {
               return (
                 <Pressable
                   key={p}
-                  onPress={() => edit(() => setLimitText(String(p)))}
+                  onPress={() => edit(() => setLimitText(groupThousands(p)))}
                   style={[styles.preset, { backgroundColor: on ? c.primarySoft : c.surfaceAlt }]}>
-                  <Text style={{ color: on ? c.primary : c.text, fontWeight: '700' }}>${p.toLocaleString()}</Text>
+                  <Text style={{ color: on ? c.primary : c.text, fontWeight: '700' }}>{p / 1_000_000}M đ</Text>
                 </Pressable>
               );
             })}
@@ -101,7 +106,7 @@ export default function BudgetScreen() {
           </View>
 
           <Button label={saved ? 'Saved' : 'Save budget'} icon={saved ? 'checkmark' : undefined} onPress={() => {
-            setBudget(limit, period);
+            setBudget(toUsd(limit), period);
             setSaved(true);
           }} disabled={!changed && !saved} />
           <Text style={[styles.note, { color: c.muted }]}>
@@ -134,8 +139,8 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
   statDivider: { width: StyleSheet.hairlineWidth },
   amountBox: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, borderWidth: 1.5, paddingHorizontal: space.lg },
-  currency: { fontSize: 28, fontWeight: '700' },
-  amountInput: { flex: 1, fontSize: 32, fontWeight: '800', paddingVertical: space.md, marginLeft: space.xs },
+  currency: { fontSize: 16, fontWeight: '700' },
+  amountInput: { flex: 1, minWidth: 0, fontSize: 32, fontWeight: '800', paddingVertical: space.md, marginRight: space.sm },
   presets: { flexDirection: 'row', gap: space.sm },
   preset: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.pill },
   segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 4 },

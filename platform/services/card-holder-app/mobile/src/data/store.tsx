@@ -3,9 +3,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import * as commands from './commands';
 import { apiEnabled } from './http';
 import { type Controls, fetchAlerts, fetchControls, fetchTransactions } from './queries';
-import { useUser } from './settings';
+import { useUser } from './auth';
 
-import { ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, SAVED_RECIPIENTS, TRANSACTIONS, TRANSFERS } from './mock';
+import { ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, SAVED_RECIPIENTS, TRANSACTIONS } from './mock';
 import type { Alert, Bank, Budget, MerchantRule, Period, Recipient, RuleType, Transfer, TransferKind, Txn } from './types';
 
 export type TransferDraft = { kind: TransferKind; to: Recipient; amount: number; content: string; save: boolean };
@@ -66,7 +66,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [rules, setRules] = useState<MerchantRule[]>(apiEnabled ? [] : MERCHANT_RULES);
   const [frozen, setFrozen] = useState(false);
   const [balance, setBalance] = useState(user.balance);
-  const [transfers, setTransfers] = useState<Transfer[]>(TRANSFERS);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [saved, setSaved] = useState<Recipient[]>(SAVED_RECIPIENTS);
   const [draft, setDraft] = useState<TransferDraft | null>(null);
   const [status, setStatus] = useState<DataStatus>(apiEnabled ? 'loading' : 'mock');

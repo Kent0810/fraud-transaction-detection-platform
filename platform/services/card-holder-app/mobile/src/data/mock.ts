@@ -1,4 +1,4 @@
-import type { Alert, Bank, Budget, MerchantRule, Recipient, Transfer, Txn } from './types';
+import type { Alert, Bank, Budget, MerchantRule, Recipient, Txn } from './types';
 
 const now = Date.now();
 const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
@@ -6,7 +6,7 @@ const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
 export const ACCOUNT = { bankCode: 'DEMO', number: '1903 5566 7788', label: 'Payment account' };
 
 export const BANKS: Bank[] = [
-  { code: 'DEMO', name: 'Demo Bank (same bank)' },
+  { code: 'DEMO', name: 'HCM Mock Banking (same bank)' },
   { code: 'VCB', name: 'Vietcombank' },
   { code: 'TCB', name: 'Techcombank' },
   { code: 'MB', name: 'MB Bank' },
@@ -26,27 +26,6 @@ export const SAVED_RECIPIENTS: Recipient[] = [
 ];
 
 export const LOOKUP_NAMES = ['HOANG GIA BAO', 'VO THANH TAM', 'DANG NGOC LAN', 'BUI QUOC HUY', 'DO THI MAI'];
-
-export const TRANSFERS: Transfer[] = [
-  {
-    transferId: 'FT26294718203',
-    kind: 'NAPAS',
-    to: SAVED_RECIPIENTS[1],
-    amount: 350_000,
-    fee: 0,
-    content: 'JAMIE CARTER dinner',
-    ts: minutesAgo(30 * 60),
-  },
-  {
-    transferId: 'FT26290551874',
-    kind: 'NAPAS',
-    to: SAVED_RECIPIENTS[0],
-    amount: 5_000_000,
-    fee: 0,
-    content: 'JAMIE CARTER October rent',
-    ts: minutesAgo(4 * 24 * 60),
-  },
-];
 
 export const TRANSACTIONS: Txn[] = [
   { txnId: 't-1009', ts: minutesAgo(3), merchant: 'Kuhn LLC', category: 'shopping_net', amount: 919.99, decision: 'DECLINE', score: 0.8, firedRules: ['R2', 'R5'] },

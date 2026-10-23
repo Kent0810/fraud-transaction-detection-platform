@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { FadeInUp, stagger } from '@/components/motion';
-import { SectionHeader, Surface } from '@/components/ui';
-import { useSettings, useUser, type Settings } from '@/data/settings';
-import { USERS } from '@/data/users';
+import { Button, SectionHeader, Surface } from '@/components/ui';
+import { useAuth, useUser } from '@/data/auth';
+import { useSettings, type Settings } from '@/data/settings';
 import { apiEnabled, apiUrl } from '@/data/http';
 import { useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
@@ -17,6 +17,7 @@ export default function SettingsScreen() {
   const c = useColors();
   const settings = useSettings();
   const user = useUser();
+  const { logout } = useAuth();
   const { frozen, toggleFrozen } = useStore();
   const dark = settings.theme === 'dark';
 
@@ -47,30 +48,6 @@ export default function SettingsScreen() {
       </FadeInUp>
 
       <FadeInUp delay={stagger(1)}>
-        <SectionHeader title="Switch account" />
-        <Surface style={styles.group}>
-          {USERS.map((u, i) => (
-            <View key={u.id}>
-              {i > 0 && <Divider />}
-              <Pressable
-                onPress={() => settings.update('userId', u.id)}
-                disabled={u.id === user.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected: u.id === user.id }}
-                style={styles.row}>
-                <Avatar name={u.name} size={40} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowLabel, { color: c.text }]}>{u.name}</Text>
-                  <Text style={[styles.rowDetail, { color: c.muted }]}>Card •••• {u.cardId.slice(-4)}</Text>
-                </View>
-                {u.id === user.id && <Ionicons name="checkmark-circle" size={22} color={c.primary} />}
-              </Pressable>
-            </View>
-          ))}
-        </Surface>
-      </FadeInUp>
-
-      <FadeInUp delay={stagger(2)}>
         <SectionHeader title="Appearance" />
         <Surface style={styles.group}>
           <Row icon={dark ? 'moon-outline' : 'sunny-outline'} label="Dark mode" detail={dark ? 'On' : 'Off'}>
@@ -84,7 +61,7 @@ export default function SettingsScreen() {
         </Surface>
       </FadeInUp>
 
-      <FadeInUp delay={stagger(3)}>
+      <FadeInUp delay={stagger(2)}>
         <SectionHeader title="Privacy & security" />
         <Surface style={styles.group}>
           {toggle('hideBalance', 'Hide balance', 'eye-off-outline', 'Show •••• on the home screen')}
@@ -97,7 +74,7 @@ export default function SettingsScreen() {
         </Surface>
       </FadeInUp>
 
-      <FadeInUp delay={stagger(4)}>
+      <FadeInUp delay={stagger(3)}>
         <SectionHeader title="Notifications" />
         <Surface style={styles.group}>
           {toggle('notifyDeclines', 'Suspicious payments', 'shield-outline', 'When we flag or decline a payment')}
@@ -108,7 +85,7 @@ export default function SettingsScreen() {
         </Surface>
       </FadeInUp>
 
-      <FadeInUp delay={stagger(5)}>
+      <FadeInUp delay={stagger(4)}>
         <SectionHeader title="About" />
         <Surface style={styles.group}>
           <Row icon="information-circle-outline" label="Version" detail="1.0.0 · demo build" />
@@ -121,6 +98,10 @@ export default function SettingsScreen() {
           <Divider />
           <Row icon="swap-horizontal-outline" label="Transfers, budget, merchants" detail="Mock data for now" />
         </Surface>
+      </FadeInUp>
+
+      <FadeInUp delay={stagger(5)} style={styles.logout}>
+        <Button label="Log out" icon="log-out-outline" variant="danger" onPress={logout} />
       </FadeInUp>
     </ScrollView>
   );
@@ -157,4 +138,5 @@ const styles = StyleSheet.create({
   rowIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: 16, fontWeight: '600' },
   rowDetail: { fontSize: 13, marginTop: 2 },
+  logout: { marginTop: space.xl },
 });

@@ -12,7 +12,11 @@ export type KafkaConfig = {
   controlTopic: string;
 };
 
-export type Config = CassandraConfig & KafkaConfig & { port: number };
+export type AuthConfig = {
+  loginPassword: string;
+};
+
+export type Config = CassandraConfig & KafkaConfig & AuthConfig & { port: number };
 
 function required(name: string): string {
   const value = process.env[name];
@@ -53,10 +57,17 @@ export function loadKafkaConfig(): KafkaConfig {
   };
 }
 
+export function loadAuthConfig(): AuthConfig {
+  return {
+    loginPassword: process.env.LOGIN_PASSWORD || 'admin1234',
+  };
+}
+
 export function loadConfig(): Config {
   return {
     port: int('PORT', process.env.PORT ?? '8080'),
     ...loadCassandraConfig(),
     ...loadKafkaConfig(),
+    ...loadAuthConfig(),
   };
 }

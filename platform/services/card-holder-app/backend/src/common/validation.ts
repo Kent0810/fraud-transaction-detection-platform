@@ -8,8 +8,7 @@ export const NEXT_CURSOR = 'X-Next-Cursor';
 @Injectable()
 export class CardIdPipe implements PipeTransform<string, string> {
   transform(value: string): string {
-    if (!CARD_ID.test(value)) throw new BadRequestException('cardId must be 8 to 19 digits');
-    return value;
+    return cardId(value);
   }
 }
 
@@ -19,6 +18,11 @@ export class CursorPipe implements PipeTransform<string | undefined, string | un
     if (value !== undefined && !CURSOR.test(value)) throw new BadRequestException('invalid cursor');
     return value;
   }
+}
+
+export function cardId(value: unknown): string {
+  if (typeof value !== 'string' || !CARD_ID.test(value)) throw new BadRequestException('cardId must be 8 to 19 digits');
+  return value;
 }
 
 export const clamp = (n: number, max: number) => Math.min(Math.max(n, 1), max);

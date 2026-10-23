@@ -1,12 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Appearance } from 'react-native';
 
-import { initialUserId, userById, type User } from './users';
-
 export type ThemeChoice = 'light' | 'dark';
 
 export type Settings = {
-  userId: string;
   theme: ThemeChoice;
   hideBalance: boolean;
   biometrics: boolean;
@@ -19,7 +16,7 @@ type SettingsStore = Settings & {
   update: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
 };
 
-const DEFAULTS: Omit<Settings, 'theme' | 'userId'> = {
+const DEFAULTS: Omit<Settings, 'theme'> = {
   hideBalance: false,
   biometrics: true,
   notifyDeclines: true,
@@ -32,7 +29,6 @@ const SettingsContext = createContext<SettingsStore | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(() => ({
     ...DEFAULTS,
-    userId: initialUserId(),
     theme: Appearance.getColorScheme() === 'dark' ? 'dark' : 'light',
   }));
 
@@ -50,8 +46,4 @@ export function useSettings(): SettingsStore {
     throw new Error('useSettings must be used inside SettingsProvider');
   }
   return s;
-}
-
-export function useUser(): User {
-  return userById(useSettings().userId);
 }

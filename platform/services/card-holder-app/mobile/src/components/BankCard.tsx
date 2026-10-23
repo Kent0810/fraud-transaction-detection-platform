@@ -6,7 +6,9 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Period } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
 
+import { BANK_SHORT } from './brand';
 import { money, PERIOD_LABEL } from './format';
+import { Logo } from './Logo';
 import { NATIVE } from './motion';
 
 type Props = { last4: string; holder: string; spent: number; limit: number; period: Period; frozen: boolean };
@@ -34,7 +36,11 @@ export function BankCard({ last4, holder, spent, limit, period, frozen }: Props)
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
             <Glows />
             <View style={styles.top}>
-              <Text style={styles.brand}>Debit</Text>
+              <View style={styles.brandRow}>
+                <Logo size={22} mono />
+                <Text style={styles.brand}>{BANK_SHORT}</Text>
+                <Text style={styles.debit}>Debit</Text>
+              </View>
               {frozen ? (
                 <View style={styles.tag}>
                   <Ionicons name="snow" size={12} color="#fff" />
@@ -100,7 +106,9 @@ const styles = StyleSheet.create({
   glowA: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.08)', top: -90, right: -60 },
   glowB: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', bottom: -70, left: -40 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.xl },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   brand: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 1 },
+  debit: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   tagText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   label: { color: 'rgba(255,255,255,0.75)', fontSize: 14 },

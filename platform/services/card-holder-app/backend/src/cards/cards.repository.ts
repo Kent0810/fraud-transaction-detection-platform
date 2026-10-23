@@ -33,6 +33,11 @@ export class CardsRepository {
     return result.toArray().map((r) => r.cardId);
   }
 
+  async exists(cardId: string): Promise<boolean> {
+    const result = await this.txns.find({ cardId }, { limit: 1 });
+    return result.first() !== null;
+  }
+
   async transactionPage(cardId: string, limit: number, cursor?: string): Promise<Page<TxnDto>> {
     return toPage(await this.txns.find({ cardId }, undefined, pageOptions(limit, cursor)), toTxn);
   }

@@ -1,30 +1,43 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { BankCard } from '@/components/BankCard';
-import { day, greeting, relative } from '@/components/format';
+import { category, day, greeting, money, relative } from '@/components/format';
+import { Wordmark } from '@/components/Logo';
 import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { TxnRow } from '@/components/TxnRow';
-import { UserSwitcher } from '@/components/UserSwitcher';
 import { SectionHeader, Surface } from '@/components/ui';
 import { vnd } from '@/components/vnd';
-import { useSettings, useUser } from '@/data/settings';
+import { useUser } from '@/data/auth';
+import { useSettings } from '@/data/settings';
 import { useStore } from '@/data/store';
+import type { Txn } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
+const RECENT_MERCHANTS = 2;
+
 export default function HomeScreen() {
   const c = useColors();
-  const { transactions, budget, frozen, toggleFrozen, alerts, balance, transfers, status, error, refresh } = useStore();
+  const { transactions, budget, frozen, toggleFrozen, alerts, balance, status, error, refresh } = useStore();
   const user = useUser();
-  const [switching, setSwitching] = useState(false);
   const { hideBalance, theme, update } = useSettings();
   const openAlerts = alerts.filter((a) => a.status === 'OPEN').length;
+
+  // Latest approved payment to each of the two most recently paid merchants.
+  const recentMerchants = useMemo(() => {
+    const latest = new Map<string, Txn>();
+    for (const t of [...transactions].sort((a, b) => b.ts.localeCompare(a.ts))) {
+      if (t.decision !== 'DECLINE' && !latest.has(t.merchant)) latest.set(t.merchant, t);
+      if (latest.size === RECENT_MERCHANTS) break;
+    }
+    return [...latest.values()];
+  }, [transactions]);
 
   const sections = useMemo(() => {
     const byDay = new Map<string, typeof transactions>();
@@ -50,21 +63,17 @@ export default function HomeScreen() {
         )
       }>
       <FadeInUp>
+        <View style={styles.brand}>
+          <Wordmark size={26} />
+        </View>
         <View style={styles.header}>
           <ScalePressable accessibilityLabel="Settings" onPress={() => router.push('/settings')}>
             <Avatar name={user.name} size={44} />
           </ScalePressable>
-          <Pressable
-            style={{ flex: 1 }}
-            onPress={() => setSwitching(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Switch account">
+          <View style={{ flex: 1 }}>
             <Text style={[styles.hello, { color: c.muted }]}>{greeting()},</Text>
-            <View style={styles.whoRow}>
-              <Text style={[styles.who, { color: c.text }]}>{user.name.split(' ')[0]}</Text>
-              <Ionicons name="chevron-down" size={18} color={c.muted} />
-            </View>
-          </Pressable>
+            <Text style={[styles.who, { color: c.text }]}>{user.name.split(' ')[0]}</Text>
+          </View>
           <ScalePressable
             accessibilityLabel={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             onPress={() => update('theme', theme === 'dark' ? 'light' : 'dark')}
@@ -119,28 +128,33 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {transfers.length > 0 && (
+      {recentMerchants.length > 0 && (
         <FadeInUp delay={360}>
           <SectionHeader title="Transfers" />
           <Surface style={styles.list}>
-            {transfers.slice(0, 3).map((t, i) => {
-              return (
-                <FadeInUp key={t.transferId} delay={stagger(i, 60, 420)}>
-                  <View style={[styles.transfer, i > 0 && [styles.divider, { borderTopColor: c.border }]]}>
-                    <Avatar name={t.to.name} size={44} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.transferName, { color: c.text }]} numberOfLines={1}>
-                        {t.to.name}
-                      </Text>
-                      <Text style={[styles.transferMeta, { color: c.muted }]} numberOfLines={1}>
-                        {t.to.bankCode} · {relative(t.ts)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.transferAmount, { color: c.text }]}>-{vnd(t.amount)}</Text>
+            {recentMerchants.map((t, i) => (
+              <FadeInUp key={t.txnId} delay={stagger(i, 60, 420)}>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/txn/[id]', params: { id: t.txnId } })}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.transfer,
+                    i > 0 && [styles.divider, { borderTopColor: c.border }],
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}>
+                  <Avatar name={t.merchant} size={44} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.transferName, { color: c.text }]} numberOfLines={1}>
+                      {t.merchant}
+                    </Text>
+                    <Text style={[styles.transferMeta, { color: c.muted }]} numberOfLines={1}>
+                      {category(t.category)} · {relative(t.ts)}
+                    </Text>
                   </View>
-                </FadeInUp>
-              );
-            })}
+                  <Text style={[styles.transferAmount, { color: c.text }]}>-{money(t.amount)}</Text>
+                </Pressable>
+              </FadeInUp>
+            ))}
           </Surface>
         </FadeInUp>
       )}
@@ -176,16 +190,15 @@ export default function HomeScreen() {
           </Surface>
         </FadeInUp>
       ))}
-      <UserSwitcher visible={switching} onClose={() => setSwitching(false)} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  brand: { marginBottom: space.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg },
   hello: { fontSize: 14 },
   who: { fontSize: 18, fontWeight: '800' },
-  whoRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bell: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   dot: { position: 'absolute', top: 10, right: 11, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.lg },
