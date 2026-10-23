@@ -112,7 +112,6 @@ export default function HomeScreen() {
           period={budget.period}
           frozen={frozen}
         />
-        <Text style={[styles.hint, { color: c.muted }]}>Tap the card to flip it</Text>
       </FadeInUp>
 
       <View style={styles.actions}>
@@ -204,7 +203,6 @@ const styles = StyleSheet.create({
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.lg },
   balanceLabel: { fontSize: 14 },
   balance: { fontSize: 34, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] },
-  hint: { fontSize: 12, textAlign: 'center', marginTop: space.sm },
   actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.lg },
   action: { alignItems: 'center', gap: space.sm, width: 72 },
   actionIcon: { width: 56, height: 56, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },

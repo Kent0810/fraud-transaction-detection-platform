@@ -1,31 +1,20 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { Body, Controller, HttpCode, Post, UnauthorizedException } from '@nestjs/common';
+import { CommandBus } from '@nestjs/cqrs';
 
-import { Body, Controller, HttpCode, Inject, Post, UnauthorizedException } from '@nestjs/common';
-import { QueryBus } from '@nestjs/cqrs';
-
-import { CardExistsQuery } from '../cards/queries/card-exists.query';
-import type { Config } from '../config';
-import { CONFIG } from '../config.module';
-import { DISPLAY_NAME, parseLogin, type SessionDto } from './auth.types';
-
-const digest = (s: string) => createHash('sha256').update(s).digest();
+import { parseLogin, type SessionDto } from './auth.types';
+import { LoginCommand } from './commands/login.command';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    @Inject(CONFIG) private readonly cfg: Config,
-    private readonly queries: QueryBus,
-  ) {}
+  constructor(private readonly commands: CommandBus) {}
 
   @Post('login')
   @HttpCode(200)
   async login(@Body() body: unknown): Promise<SessionDto> {
     const { cardId, password } = parseLogin(body);
-    const passwordOk = timingSafeEqual(digest(password), digest(this.cfg.loginPassword));
-    // Same error for an unknown card and a wrong password, so login can't be used to probe card numbers.
-    if (!passwordOk || !(await this.queries.execute(new CardExistsQuery(cardId)))) {
-      throw new UnauthorizedException('incorrect card number or password');
-    }
-    return { cardId, name: DISPLAY_NAME };
+    const session = await this.commands.execute(new LoginCommand(cardId, password));
+    // Same error for an unknown card, a wrong password and a locked login, so login can't be used to probe card numbers.
+    if (!session) throw new UnauthorizedException('incorrect card number or password');
+    return session;
   }
 }

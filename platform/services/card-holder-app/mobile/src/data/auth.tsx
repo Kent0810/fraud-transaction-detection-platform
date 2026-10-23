@@ -4,7 +4,8 @@ import { apiEnabled, HttpError, request } from './http';
 import { clearSession, readSession, writeSession } from './session-storage';
 import { userFor, type User } from './users';
 
-type Session = { cardId: string; name: string };
+// email is absent in the mock build and in sessions saved before the backend returned it.
+type Session = { cardId: string; name: string; email?: string };
 
 type AuthStore = {
   user: User | null;
@@ -40,7 +41,8 @@ function parseSession(raw: string | null): Session | null {
   if (!raw) return null;
   try {
     const s = JSON.parse(raw) as Partial<Session>;
-    return typeof s.cardId === 'string' && CARD_ID.test(s.cardId) && typeof s.name === 'string' ? { cardId: s.cardId, name: s.name } : null;
+    if (typeof s.cardId !== 'string' || !CARD_ID.test(s.cardId) || typeof s.name !== 'string') return null;
+    return { cardId: s.cardId, name: s.name, email: typeof s.email === 'string' ? s.email : undefined };
   } catch {
     return null;
   }
@@ -71,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthStore>(
-    () => ({ user: session ? userFor(session.cardId, session.name) : null, restoring, login, logout }),
+    () => ({ user: session ? userFor(session.cardId, session.name, session.email) : null, restoring, login, logout }),
     [session, restoring, login, logout],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

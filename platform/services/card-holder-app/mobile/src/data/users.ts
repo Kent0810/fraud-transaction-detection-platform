@@ -6,10 +6,10 @@ export type User = {
   balance: number;
 };
 
-export function userFor(cardId: string, name: string): User {
+export function userFor(cardId: string, name: string, email?: string): User {
   return {
     name,
-    email: `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+    email: email ?? `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
     memberSince: '2021',
     cardId,
     balance: 100_000_000,

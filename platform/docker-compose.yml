@@ -11,9 +11,9 @@ x-kafka-env: &kafka-env
 x-postgres-env: &postgres-env
   POSTGRES_HOST: postgres
   POSTGRES_PORT: 5432
-  POSTGRES_DB: ${POSTGRES_DB:-fraud}
-  POSTGRES_USER: ${POSTGRES_USER:-fraud}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraud}
+  POSTGRES_DB: ${POSTGRES_DB:-db}
+  POSTGRES_USER: ${POSTGRES_USER:-db_user}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-db_password}
 
 x-cassandra-env: &cassandra-env
   CASSANDRA_CONTACT_POINTS: cassandra
@@ -208,30 +208,37 @@ services:
   #     - metabase-data:/metabase-data
 
   # # ───────────────────────── Control loop ─────────────────────────
-  # postgres:                           # mutable reference data, audit log, outbox
-  #   image: postgres:${POSTGRES_VERSION:-17}
-  #   command:
-  #     - postgres
-  #     - -c
-  #     - wal_level=logical             # required by Debezium
-  #     - -c
-  #     - max_replication_slots=4
-  #     - -c
-  #     - max_wal_senders=4
-  #   ports:
-  #     - "5432:5432"
-  #   environment:
-  #     POSTGRES_DB: ${POSTGRES_DB:-fraud}
-  #     POSTGRES_USER: ${POSTGRES_USER:-fraud}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fraud}
-  #   volumes:
-  #     - pg-data:/var/lib/postgresql/data
-  #     - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro   # *.sql: reference tables, audit, outbox
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 12
+  postgres:
+    image: postgres:17
+    entrypoint: ["/bin/bash", "/scripts/postgres-start.sh"]
+    ports:
+      - "5432:5432"
+    environment:
+      <<: *postgres-env
+    volumes:
+      - ./scripts:/scripts:ro
+      - pg-data:/var/lib/postgresql/data
+      - ./infra/postgres/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  postgres-seed:                      # dim_card.csv -> cardholders + logins; idempotent, runs on every up
+    image: postgres:17
+    environment:
+      <<: *postgres-env
+      CARD_HOLDER_FILE: /data/stream/dim_card.csv
+      DEMO_PASSWORD: admin1234
+    volumes:
+      - ./infra/postgres/seed:/seed:ro
+      - ../datasets/Sparkov_Data_Generation/data:/data:ro
+    entrypoint: ["/bin/bash", "/seed/seed-cardholders.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   connect:
     build:                            # Debezium Connect + the Cassandra sink plugin (infra/connect/Dockerfile)
@@ -298,9 +305,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      <<: [*cassandra-env, *kafka-env]
+      <<: [*cassandra-env, *kafka-env, *postgres-env]
       PORT: 8080
     depends_on:
+      postgres-seed:
+        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
       cassandra-init:
@@ -318,7 +327,7 @@ services:
 
 volumes:
   kafka-data:
-  # pg-data:
+  pg-data:
   cassandra-data:
   streams-state:
   # metabase-data:

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 
 import { CardsController } from './cards.controller';
 import { CardsRepository } from './cards.repository';
-import { CardExistsHandler } from './queries/card-exists.query';
 import { GetAlertsHandler } from './queries/get-alerts.query';
 import { GetCardStateHandler } from './queries/get-card-state.query';
 import { GetTransactionHandler } from './queries/get-transaction.query';
@@ -18,7 +17,6 @@ import { ListCardsHandler } from './queries/list-cards.query';
     GetTransactionHandler,
     GetAlertsHandler,
     GetCardStateHandler,
-    CardExistsHandler,
   ],
 })
 export class CardsModule {}

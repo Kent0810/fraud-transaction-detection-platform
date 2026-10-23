@@ -1,8 +1,6 @@
 import { cardId, record, text } from '../common/validation';
 
-export const DISPLAY_NAME = 'John Doe';
-
-export type SessionDto = { cardId: string; name: string };
+export type SessionDto = { cardId: string; name: string; email: string };
 
 export type LoginRequest = { cardId: string; password: string };
 

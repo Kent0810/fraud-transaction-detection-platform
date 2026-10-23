@@ -12,11 +12,15 @@ export type KafkaConfig = {
   controlTopic: string;
 };
 
-export type AuthConfig = {
-  loginPassword: string;
+export type PostgresConfig = {
+  postgresHost: string;
+  postgresPort: number;
+  postgresDb: string;
+  postgresUser: string;
+  postgresPassword: string;
 };
 
-export type Config = CassandraConfig & KafkaConfig & AuthConfig & { port: number };
+export type Config = CassandraConfig & KafkaConfig & PostgresConfig & { port: number };
 
 function required(name: string): string {
   const value = process.env[name];
@@ -57,9 +61,13 @@ export function loadKafkaConfig(): KafkaConfig {
   };
 }
 
-export function loadAuthConfig(): AuthConfig {
+export function loadPostgresConfig(): PostgresConfig {
   return {
-    loginPassword: process.env.LOGIN_PASSWORD || 'admin1234',
+    postgresHost: required('POSTGRES_HOST'),
+    postgresPort: int('POSTGRES_PORT', required('POSTGRES_PORT')),
+    postgresDb: required('POSTGRES_DB'),
+    postgresUser: required('POSTGRES_USER'),
+    postgresPassword: required('POSTGRES_PASSWORD'),
   };
 }
 
@@ -68,6 +76,6 @@ export function loadConfig(): Config {
     port: int('PORT', process.env.PORT ?? '8080'),
     ...loadCassandraConfig(),
     ...loadKafkaConfig(),
-    ...loadAuthConfig(),
+    ...loadPostgresConfig(),
   };
 }
