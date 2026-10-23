@@ -293,7 +293,7 @@ services:
   #     cassandra-init:
   #       condition: service_completed_successfully
 
-  cardholder-app:                     # NestJS API, CQRS: commands -> Kafka (control), queries <- Cassandra
+  cardholder-backend:
     build: ./services/card-holder-app/backend
     ports:
       - "8080:8080"
@@ -306,6 +306,15 @@ services:
       cassandra-init:
         condition: service_completed_successfully
     restart: on-failure
+
+  cardholder-mobile:
+    build:
+      context: ./services/card-holder-app/mobile
+    ports:
+      - "19006:80"
+    depends_on:
+      cardholder-backend:
+        condition: service_started
 
 volumes:
   kafka-data:
