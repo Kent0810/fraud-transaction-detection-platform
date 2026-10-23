@@ -1,0 +1,14 @@
+[project]
+name = "fraud-ml"
+version = "0.1.0"
+description = "Trains the fraud model (LightGBM) and exports it to ONNX for fraud-detector"
+requires-python = ">=3.12"
+dependencies = [
+    "lightgbm>=4.7.0",
+    "numpy>=2.5.4",
+    "onnx>=1.23.2",
+    "onnxmltools>=1.16.0",
+    "onnxruntime>=1.31.0",
+    "pandas>=3.0.6",
+    "scikit-learn>=1.9.1",
+]

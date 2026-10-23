@@ -1,0 +1,26 @@
+{
+  "model_version": "lgbm-v1",
+  "test": {
+    "rows": 111144,
+    "fraud_rows": 184,
+    "pr_auc": 0.526,
+    "roc_auc": 0.9826,
+    "threshold": 0.9156,
+    "precision": 0.696,
+    "recall": 0.4728,
+    "true_positives": 87,
+    "false_positives": 38,
+    "false_negatives": 97
+  },
+  "top_features": [
+    "amt",
+    "hour",
+    "secs_since_prev",
+    "amt_ratio_30d",
+    "amt_mean_30d",
+    "cat_food_dining",
+    "prior_txn_count",
+    "cat_travel"
+  ],
+  "onnx_max_abs_diff": 1.8425930614629493e-07
+}
