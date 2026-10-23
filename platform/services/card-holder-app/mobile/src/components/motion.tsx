@@ -1,10 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Platform, Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
-// The native driver isn't available on web; there Animated runs in JS.
 export const NATIVE = Platform.OS !== 'web';
 
-// Fades in while sliding up a little. Use `delay` to stagger items in a list.
 export function FadeInUp({
   children,
   delay = 0,
@@ -30,7 +28,6 @@ export function FadeInUp({
   return <Animated.View style={[style, { opacity: t, transform: [{ translateY }] }]}>{children}</Animated.View>;
 }
 
-// Springs in from small: for success icons and badges.
 export function PopIn({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   const t = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -40,7 +37,6 @@ export function PopIn({ children, delay = 0 }: { children: ReactNode; delay?: nu
   return <Animated.View style={{ opacity: t, transform: [{ scale }] }}>{children}</Animated.View>;
 }
 
-// A Pressable that shrinks slightly while pressed.
 export function ScalePressable({
   children,
   style,
@@ -56,5 +52,4 @@ export function ScalePressable({
   );
 }
 
-// Staggered delay for the i-th item in a list, capped so long lists don't lag.
 export const stagger = (i: number, step = 50, base = 0) => base + Math.min(i, 10) * step;

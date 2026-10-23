@@ -1,96 +1,90 @@
 import { Injectable } from '@nestjs/common';
-import { types } from 'cassandra-driver';
+import type { mapping } from 'cassandra-driver';
 
-import { CassandraService } from '../cassandra/cassandra.service';
-import type { AlertDto, CardStateDto, TxnDto, Verdict } from './cards.types';
+import { CassandraService } from '../shared/cassandra/cassandra.service';
+import { type AlertRow, type CardStateRow, iso, num, type Page, pageOptions, toPage, type TxnRow } from '../shared/cassandra/models';
+import type { AlertDto, AlertStatus, CardStateDto, TxnDto, Verdict } from './cards.types';
 
-/**
- * Reads the Cassandra serving tables (filled by the Kafka Connect sink).
- * Every query stays inside one card's partition, as the schema was designed for.
- */
+type ByCard = { cardId: string };
+
 @Injectable()
 export class CardsRepository {
-  constructor(private readonly db: CassandraService) {}
+  private readonly txns: mapping.ModelMapper<TxnRow>;
+  private readonly alertRows: mapping.ModelMapper<AlertRow>;
+  private readonly states: mapping.ModelMapper<CardStateRow>;
+  private readonly distinctCards: (doc: { limit: number }) => Promise<mapping.Result<Pick<TxnRow, 'cardId'>>>;
+  private readonly txnById: (doc: ByCard & { txnId: string }) => Promise<mapping.Result<TxnRow>>;
 
-  private run(query: string, params: unknown[]) {
-    return this.db.client.execute(query, params, { prepare: true });
+  constructor(db: CassandraService) {
+    this.txns = db.mapper.forModel<TxnRow>('Txn');
+    this.alertRows = db.mapper.forModel<AlertRow>('Alert');
+    this.states = db.mapper.forModel<CardStateRow>('CardState');
+    this.distinctCards = this.txns.mapWithQuery('SELECT DISTINCT card_id FROM txn_by_card LIMIT ?', (doc: { limit: number }) => [
+      doc.limit,
+    ]);
+    this.txnById = this.txns.mapWithQuery(
+      'SELECT * FROM txn_by_card WHERE card_id = ? AND txn_id = ? ALLOW FILTERING',
+      (doc: ByCard & { txnId: string }) => [doc.cardId, doc.txnId],
+    );
   }
 
-  // A token-range scan over partitions. Fine for picking a demo card, not for production traffic.
   async cards(limit: number): Promise<string[]> {
-    const rs = await this.run('SELECT DISTINCT card_id FROM txn_by_card LIMIT ?', [limit]);
-    return rs.rows.map((r) => r.get('card_id'));
+    const result = await this.distinctCards({ limit });
+    return result.toArray().map((r) => r.cardId);
+  }
+
+  async transactionPage(cardId: string, limit: number, cursor?: string): Promise<Page<TxnDto>> {
+    return toPage(await this.txns.find({ cardId }, undefined, pageOptions(limit, cursor)), toTxn);
   }
 
   async transactions(cardId: string, limit: number): Promise<TxnDto[]> {
-    const rs = await this.run('SELECT * FROM txn_by_card WHERE card_id = ? LIMIT ?', [cardId, limit]);
-    return rs.rows.map(toTxn);
+    const result = await this.txns.find({ cardId }, { limit });
+    return result.toArray().map(toTxn);
   }
 
-  // txn_id is a clustering column after ts, so a lookup by txn_id alone needs ALLOW FILTERING.
-  // That's fine here: it only scans this one card's partition (~160 rows over 90 days).
   async transaction(cardId: string, txnId: string): Promise<TxnDto | null> {
-    const rs = await this.run('SELECT * FROM txn_by_card WHERE card_id = ? AND txn_id = ? ALLOW FILTERING', [
-      cardId,
-      txnId,
-    ]);
-    const row = rs.first();
+    const row = (await this.txnById({ cardId, txnId })).first();
     return row ? toTxn(row) : null;
   }
 
   async alerts(cardId: string, limit: number): Promise<AlertDto[]> {
-    const [alerts, txns] = await Promise.all([
-      this.run('SELECT * FROM alerts_by_card WHERE card_id = ? LIMIT ?', [cardId, limit]),
-      // alerts_by_card has no merchant column: take it from the card's recent transactions.
-      this.transactions(cardId, 500),
-    ]);
+    const [alerts, txns] = await Promise.all([this.alertRows.find({ cardId }, { limit }), this.transactions(cardId, 500)]);
     const merchants = new Map(txns.map((t) => [t.txnId, t.merchant]));
-    return alerts.rows.map((r) => ({
-      alertId: r.get('alert_id'),
-      txnId: r.get('txn_id'),
-      ruleId: r.get('rule_id'),
-      ts: iso(r.get('ts')) ?? '',
-      amount: num(r.get('amount')),
-      merchant: merchants.get(r.get('txn_id')) ?? 'Unknown merchant',
-      // Nothing writes status yet (see schema.cql), so a new alert is OPEN.
-      status: r.get('status') ?? 'OPEN',
+    return alerts.toArray().map((r) => ({
+      alertId: r.alertId,
+      txnId: r.txnId,
+      ruleId: r.ruleId,
+      ts: iso(r.ts) ?? '',
+      amount: num(r.amount),
+      merchant: merchants.get(r.txnId) ?? 'Unknown merchant',
+      status: (r.status as AlertStatus | null) ?? 'OPEN',
     }));
   }
 
   async cardState(cardId: string): Promise<CardStateDto | null> {
-    const row = (await this.run('SELECT * FROM card_state WHERE card_id = ?', [cardId])).first();
+    const row = await this.states.get({ cardId });
     if (!row) return null;
     return {
-      cardId: row.get('card_id'),
-      riskScore: num(row.get('risk_score')),
-      priority: num(row.get('priority')),
-      amountSum: num(row.get('amount_sum')),
-      openAlerts: row.get('open_alerts') ?? 0,
-      lastDecision: row.get('last_decision'),
-      updatedAt: iso(row.get('updated_at')),
+      cardId: row.cardId,
+      riskScore: num(row.riskScore),
+      priority: num(row.priority),
+      amountSum: num(row.amountSum),
+      openAlerts: row.openAlerts ?? 0,
+      lastDecision: row.lastDecision as Verdict | null,
+      updatedAt: iso(row.updatedAt),
     };
   }
 }
 
-function toTxn(r: types.Row): TxnDto {
+function toTxn(r: TxnRow): TxnDto {
   return {
-    txnId: r.get('txn_id'),
-    ts: iso(r.get('ts')) ?? '',
-    merchant: r.get('merchant'),
-    category: r.get('category'),
-    amount: num(r.get('amount')),
-    decision: (r.get('decision') as Verdict | null) ?? 'ALLOW',
-    score: num(r.get('score')),
-    firedRules: [...(r.get('fired_rules') ?? [])].sort(),
+    txnId: r.txnId,
+    ts: iso(r.ts) ?? '',
+    merchant: r.merchant,
+    category: r.category,
+    amount: num(r.amount),
+    decision: (r.decision as Verdict | null) ?? 'ALLOW',
+    score: num(r.score),
+    firedRules: [...(r.firedRules ?? [])].sort(),
   };
-}
-
-function iso(ts: Date | null): string | null {
-  return ts ? ts.toISOString() : null;
-}
-
-// `decimal` columns come back as BigDecimal; `double` as number.
-function num(value: types.BigDecimal | number | null): number {
-  if (value == null) return 0;
-  return typeof value === 'number' ? value : value.toNumber();
 }

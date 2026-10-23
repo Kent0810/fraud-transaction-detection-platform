@@ -1,10 +1,11 @@
 import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
-import { Client } from 'cassandra-driver';
+import { Client, mapping } from 'cassandra-driver';
 
-import type { Config } from '../config';
-import { CONFIG } from './cassandra.module.tokens';
+import type { CassandraConfig, Config } from '../../config';
+import { CONFIG } from '../../config.module';
+import { MODELS } from './models';
 
-export function createClient(cfg: Config): Client {
+export function createClient(cfg: CassandraConfig): Client {
   return new Client({
     contactPoints: cfg.contactPoints,
     protocolOptions: { port: cfg.cassandraPort },
@@ -13,14 +14,19 @@ export function createClient(cfg: Config): Client {
   });
 }
 
-// One driver client for the whole app: it pools connections and caches prepared statements.
+export function createMapper(client: Client): mapping.Mapper {
+  return new mapping.Mapper(client, MODELS);
+}
+
 @Injectable()
 export class CassandraService implements OnModuleInit, OnApplicationShutdown {
   private readonly log = new Logger(CassandraService.name);
   readonly client: Client;
+  readonly mapper: mapping.Mapper;
 
   constructor(@Inject(CONFIG) private readonly cfg: Config) {
     this.client = createClient(cfg);
+    this.mapper = createMapper(this.client);
   }
 
   async onModuleInit(): Promise<void> {

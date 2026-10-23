@@ -18,7 +18,6 @@ import { radius, space, useColors } from '@/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-// Home: card, quick actions and transaction history (reads txn_by_card, newest first).
 export default function HomeScreen() {
   const c = useColors();
   const { transactions, budget, frozen, toggleFrozen, alerts, balance, transfers, status, error, refresh } = useStore();

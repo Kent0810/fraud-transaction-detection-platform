@@ -13,7 +13,6 @@ const PERIODS: Period[] = ['DAY', 'WEEK', 'MONTH'];
 const PERIOD_ADJECTIVE: Record<Period, string> = { DAY: 'Daily', WEEK: 'Weekly', MONTH: 'Monthly' };
 const PRESETS = [500, 1000, 1500, 2500];
 
-// Budget: spend against the limit, and set a new one (BR5).
 export default function BudgetScreen() {
   const c = useColors();
   const { budget, setBudget } = useStore();

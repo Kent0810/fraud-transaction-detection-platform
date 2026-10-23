@@ -1,17 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { apiEnabled, fetchAlerts, fetchTransactions } from './api';
+import * as commands from './commands';
+import { apiEnabled } from './http';
+import { type Controls, fetchAlerts, fetchControls, fetchTransactions } from './queries';
 import { useUser } from './settings';
 
 import { ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, SAVED_RECIPIENTS, TRANSACTIONS, TRANSFERS } from './mock';
 import type { Alert, Bank, Budget, MerchantRule, Period, Recipient, RuleType, Transfer, TransferKind, Txn } from './types';
 
-// What the transfer form hands to the confirm screen.
 export type TransferDraft = { kind: TransferKind; to: Recipient; amount: number; content: string; save: boolean };
 
-// Card history and alerts come from the backend (Cassandra) when EXPO_PUBLIC_API_URL is set,
-// otherwise from mock data. Budgets, merchant rules and transfers are always mocked for now.
-// One store per signed-in user: the root layout remounts it (key = user id) on a switch.
 export type DataStatus = 'mock' | 'loading' | 'ready' | 'error';
 
 type Store = {
@@ -41,24 +39,31 @@ type Store = {
 
 const StoreContext = createContext<Store | null>(null);
 
-// Simulates the outbox -> Kafka -> rules app delay before a change takes effect.
 const PROPAGATION_MS = 1500;
-// Mock only: pretend lookups and transfers take a moment. No money moves.
 const LOOKUP_MS = 700;
 const TRANSFER_MS = 1200;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchCardData(cardId: string): Promise<{ transactions: Txn[]; alerts: Alert[] }> {
-  const [transactions, alerts] = await Promise.all([fetchTransactions(cardId), fetchAlerts(cardId)]);
-  return { transactions, alerts };
+type CardData = { transactions: Txn[]; alerts: Alert[]; controls: Controls };
+
+async function fetchCardData(cardId: string): Promise<CardData> {
+  const [transactions, alerts, controls] = await Promise.all([fetchTransactions(cardId), fetchAlerts(cardId), fetchControls(cardId)]);
+  return { transactions, alerts, controls };
 }
+
+const toRules = (controls: Controls): MerchantRule[] => controls.merchantRules.map((r) => ({ ...r, pending: false }));
+
+const withControls = (budget: Budget, controls: Controls): Budget =>
+  controls.budget ? { ...budget, limit: controls.budget.limit, period: controls.budget.period } : budget;
+
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const user = useUser();
   const cardId = user.cardId;
   const [budget, setBudgetState] = useState<Budget>(BUDGET);
-  const [rules, setRules] = useState<MerchantRule[]>(MERCHANT_RULES);
+  const [rules, setRules] = useState<MerchantRule[]>(apiEnabled ? [] : MERCHANT_RULES);
   const [frozen, setFrozen] = useState(false);
   const [balance, setBalance] = useState(user.balance);
   const [transfers, setTransfers] = useState<Transfer[]>(TRANSFERS);
@@ -69,19 +74,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Txn[]>(apiEnabled ? [] : TRANSACTIONS);
   const [alerts, setAlerts] = useState<Alert[]>(apiEnabled ? [] : ALERTS);
 
-  // Fetch first, then apply the result in a callback, so no state is set synchronously in the effect.
   const load = useCallback(() => {
     fetchCardData(cardId).then(
       (data) => {
         setTransactions(data.transactions);
         setAlerts(data.alerts);
+        setRules(toRules(data.controls));
+        setBudgetState((b) => withControls(b, data.controls));
         setError(null);
         setStatus('ready');
       },
       (e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(message(e));
         setStatus('error');
       },
+    );
+  }, [cardId]);
+
+  const reloadControls = useCallback(() => {
+    fetchControls(cardId).then(
+      (controls) => {
+        setRules(toRules(controls));
+        setBudgetState((b) => withControls(b, controls));
+      },
+      (e: unknown) => setError(message(e)),
     );
   }, [cardId]);
 
@@ -95,7 +111,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     load();
   }, [load]);
 
-  // With live data, "spent" is this month's approved card payments. The limit stays mocked.
   const effectiveBudget = useMemo<Budget>(() => {
     if (!apiEnabled) return budget;
     const now = new Date();
@@ -111,26 +126,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const toggleFrozen = useCallback(() => setFrozen((f) => !f), []);
 
-  const setBudget = useCallback((limit: number, period: Period) => {
-    setBudgetState((b) => ({ ...b, limit, period }));
-  }, []);
+  const setBudget = useCallback(
+    (limit: number, period: Period) => {
+      setBudgetState((b) => ({ ...b, limit, period }));
+      if (apiEnabled) commands.setBudget(cardId, limit, period).catch(reloadControls);
+    },
+    [cardId, reloadControls],
+  );
 
-  const setMerchantRule = useCallback((merchant: string, type: RuleType) => {
-    setRules((rs) => [
-      { merchant, type, createdAt: new Date().toISOString(), pending: true },
-      ...rs.filter((r) => r.merchant !== merchant),
-    ]);
-    setTimeout(() => {
-      setRules((rs) => rs.map((r) => (r.merchant === merchant ? { ...r, pending: false } : r)));
-    }, PROPAGATION_MS);
-  }, []);
+  const setMerchantRule = useCallback(
+    (merchant: string, type: RuleType) => {
+      setRules((rs) => [
+        { merchant, type, createdAt: new Date().toISOString(), pending: true },
+        ...rs.filter((r) => r.merchant !== merchant),
+      ]);
+      const settle = () => setRules((rs) => rs.map((r) => (r.merchant === merchant ? { ...r, pending: false } : r)));
+      if (!apiEnabled) {
+        setTimeout(settle, PROPAGATION_MS);
+        return;
+      }
+      commands.setMerchantRule(cardId, merchant, type).then(settle, reloadControls);
+    },
+    [cardId, reloadControls],
+  );
 
-  const releaseMerchant = useCallback((merchant: string) => {
-    setRules((rs) => rs.filter((r) => r.merchant !== merchant));
-  }, []);
+  const releaseMerchant = useCallback(
+    (merchant: string) => {
+      setRules((rs) => rs.filter((r) => r.merchant !== merchant));
+      if (apiEnabled) commands.releaseMerchant(cardId, merchant).catch(reloadControls);
+    },
+    [cardId, reloadControls],
+  );
 
-  // Mock "account name inquiry": saved recipients resolve to their name, any other
-  // 6+ digit number to a made-up one. Returns null when the number can't exist.
   const lookupAccount = useCallback(
     async (bankCode: string, account: string) => {
       await wait(LOOKUP_MS);

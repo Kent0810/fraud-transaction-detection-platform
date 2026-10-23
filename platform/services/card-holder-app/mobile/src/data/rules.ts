@@ -1,4 +1,3 @@
-// Cardholder-friendly wording for each detection rule.
 export const RULE_TEXT: Record<string, { title: string; detail: string }> = {
   R1: { title: 'Many payments at once', detail: '5 or more payments on your card within a minute.' },
   R2: { title: 'Unusually large amount', detail: 'Much larger than your usual spending.' },

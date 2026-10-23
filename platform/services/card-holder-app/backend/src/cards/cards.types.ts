@@ -1,5 +1,3 @@
-// Response shapes. They match the mobile app's types (src/data/types.ts), so it can use them as-is.
-
 export type Verdict = 'ALLOW' | 'STEP_UP' | 'DECLINE';
 
 export type TxnDto = {
@@ -13,6 +11,8 @@ export type TxnDto = {
   firedRules: string[];
 };
 
+export type AlertStatus = 'OPEN' | 'CONFIRMED' | 'CLEARED';
+
 export type AlertDto = {
   alertId: string;
   txnId: string;
@@ -20,7 +20,7 @@ export type AlertDto = {
   ts: string;
   amount: number;
   merchant: string;
-  status: 'OPEN' | 'CONFIRMED' | 'CLEARED';
+  status: AlertStatus;
 };
 
 export type CardStateDto = {

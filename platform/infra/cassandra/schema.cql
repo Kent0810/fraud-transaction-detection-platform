@@ -58,3 +58,18 @@ CREATE TABLE IF NOT EXISTS triage_queue (
   updated_at     timestamp,
   PRIMARY KEY ((bucket), card_id)
 ) WITH default_time_to_live = 172800;   -- 2 days
+
+
+-- control topic: current budget and merchant rules per card.
+-- A RELEASE_MERCHANT event has every non-key column null, so the sink deletes the row.
+CREATE TABLE IF NOT EXISTS controls_by_card (
+  card_id        text,
+  control_id     text,      -- 'budget' or 'merchant:<name>'
+  kind           text,      -- BUDGET, MERCHANT
+  merchant       text,
+  rule           text,      -- BLOCK, ALLOW
+  budget_limit   decimal,
+  budget_period  text,      -- DAY, WEEK, MONTH
+  updated_at     timestamp,
+  PRIMARY KEY ((card_id), control_id)
+);

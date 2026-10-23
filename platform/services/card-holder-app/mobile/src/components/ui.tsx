@@ -85,7 +85,6 @@ export function ProgressBar({ value }: { value: number }) {
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-// Draws itself from empty to `value` on mount, and animates when the value changes.
 export function Ring({ value, size = 180, stroke = 16, children }: { value: number; size?: number; stroke?: number; children?: ReactNode }) {
   const c = useColors();
   const pct = Math.max(0, Math.min(1, value));
@@ -94,7 +93,6 @@ export function Ring({ value, size = 180, stroke = 16, children }: { value: numb
   const color = pct >= 1 ? c.decline : pct >= 0.8 ? c.stepUp : c.primary;
   const progress = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
-    // strokeDashoffset is an SVG prop, so this can't use the native driver.
     Animated.timing(progress, { toValue: pct, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [pct, progress]);
   const offset = progress.interpolate({ inputRange: [0, 1], outputRange: [circumference, 0] });

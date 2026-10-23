@@ -7,7 +7,7 @@ import { FadeInUp, stagger } from '@/components/motion';
 import { SectionHeader, Surface } from '@/components/ui';
 import { useSettings, useUser, type Settings } from '@/data/settings';
 import { USERS } from '@/data/users';
-import { apiEnabled, apiUrl } from '@/data/api';
+import { apiEnabled, apiUrl } from '@/data/http';
 import { useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
 
@@ -116,7 +116,7 @@ export default function SettingsScreen() {
           <Row
             icon="document-text-outline"
             label="Card data"
-            detail={apiEnabled ? `Live from ${apiUrl} (Cassandra)` : 'Mock data (set EXPO_PUBLIC_API_URL to go live)'}
+            detail={apiEnabled ? `Live from ${apiUrl} (queries: Cassandra, commands: Kafka)` : 'Mock data (set EXPO_PUBLIC_API_URL to go live)'}
           />
           <Divider />
           <Row icon="swap-horizontal-outline" label="Transfers, budget, merchants" detail="Mock data for now" />

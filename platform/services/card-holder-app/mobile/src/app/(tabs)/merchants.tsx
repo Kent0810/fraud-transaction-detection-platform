@@ -8,7 +8,6 @@ import { useStore } from '@/data/store';
 import type { MerchantRule, RuleType } from '@/data/types';
 import { space, useColors } from '@/theme';
 
-// Merchant rules: blocked merchants are always declined, trusted ones skip the fraud checks.
 export default function MerchantsScreen() {
   const { rules } = useStore();
 

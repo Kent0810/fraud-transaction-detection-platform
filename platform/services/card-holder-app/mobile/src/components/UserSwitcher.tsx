@@ -8,7 +8,6 @@ import { radius, space, useColors } from '@/theme';
 
 import { Avatar } from './Avatar';
 
-// Bottom sheet to switch between the demo users. Picking one reloads that user's card data.
 export function UserSwitcher({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const c = useColors();
   const insets = useSafeAreaInsets();

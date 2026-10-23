@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { space } from '@/theme';
 
-// Scrollable tab screen with the top safe area applied (tabs hide the native header).
 export function Screen({ children, ...rest }: { children: ReactNode } & ScrollViewProps) {
   const insets = useSafeAreaInsets();
   return (

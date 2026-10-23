@@ -8,7 +8,6 @@ import { useColors } from '@/theme';
 type IconName = keyof typeof Ionicons.glyphMap;
 
 function TabIcon({ name, color, size }: { name: IconName; color: ColorValue; size: number }) {
-  // The tab bar always passes a color string (from tabBarActiveTintColor / InactiveTintColor).
   return <Ionicons name={name} color={color as string} size={size} />;
 }
 

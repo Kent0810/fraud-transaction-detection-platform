@@ -1,11 +1,8 @@
-// Shapes mirror the Cassandra tables (txn_by_card, alerts_by_card) and the
-// Postgres reference data (budgets, merchant rules) the app will read later.
-
 export type Verdict = 'ALLOW' | 'STEP_UP' | 'DECLINE';
 
 export type Txn = {
   txnId: string;
-  ts: string; // ISO-8601
+  ts: string;
   merchant: string;
   category: string;
   amount: number;
@@ -17,7 +14,7 @@ export type Txn = {
 export type AlertStatus = 'OPEN' | 'CONFIRMED' | 'CLEARED';
 
 export type Alert = {
-  alertId: string; // txn_id:rule_id
+  alertId: string;
   txnId: string;
   ruleId: string;
   ts: string;
@@ -34,27 +31,26 @@ export type Budget = {
   spent: number;
 };
 
-// Transfers follow Vietnamese banking: VND amounts, account names in upper case without accents.
 export type Bank = {
-  code: string; // short name shown in the app, e.g. VCB
+  code: string;
   name: string;
 };
 
 export type Recipient = {
   bankCode: string;
   account: string;
-  name: string; // e.g. NGUYEN VAN AN
+  name: string;
 };
 
-export type TransferKind = 'INTERNAL' | 'NAPAS'; // same bank, or another bank via NAPAS 247
+export type TransferKind = 'INTERNAL' | 'NAPAS';
 
 export type Transfer = {
-  transferId: string; // reference shown on the receipt
+  transferId: string;
   kind: TransferKind;
   to: Recipient;
-  amount: number; // VND
-  fee: number; // VND
-  content: string; // transfer message
+  amount: number;
+  fee: number;
+  content: string;
   ts: string;
 };
 
@@ -64,6 +60,5 @@ export type MerchantRule = {
   merchant: string;
   type: RuleType;
   createdAt: string;
-  // A change goes Postgres -> outbox -> Kafka before the rules app enforces it.
   pending: boolean;
 };

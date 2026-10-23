@@ -13,7 +13,6 @@ import { radius, space, useColors } from '@/theme';
 
 const OTP_LENGTH = 6;
 
-// Review the transfer and enter a Smart OTP (any 6 digits in the demo).
 export default function ConfirmTransferScreen() {
   const c = useColors();
   const { draft, banks, sendTransfer, setDraft } = useStore();
@@ -83,7 +82,6 @@ export default function ConfirmTransferScreen() {
             );
           })}
         </Pressable>
-        {/* Hidden input behind the boxes: it holds the digits and brings up the keypad. */}
         <TextInput
           ref={otpInput}
           value={otp}

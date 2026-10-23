@@ -1,13 +1,10 @@
 import type { Alert, Bank, Budget, MerchantRule, Recipient, Transfer, Txn } from './types';
 
-// Mock data only. Merchants and categories come from the Sparkov stream.
 const now = Date.now();
 const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
 
-// The cardholder's own payment account (VND). Transfers are sent from here.
 export const ACCOUNT = { bankCode: 'DEMO', number: '1903 5566 7788', label: 'Payment account' };
 
-// Mock bank list for the picker: short names only, no logos.
 export const BANKS: Bank[] = [
   { code: 'DEMO', name: 'Demo Bank (same bank)' },
   { code: 'VCB', name: 'Vietcombank' },
@@ -28,7 +25,6 @@ export const SAVED_RECIPIENTS: Recipient[] = [
   { bankCode: 'DEMO', account: '190355660011', name: 'PHAM THU HA' },
 ];
 
-// Names handed out by the mock account lookup for numbers that aren't saved.
 export const LOOKUP_NAMES = ['HOANG GIA BAO', 'VO THANH TAM', 'DANG NGOC LAN', 'BUI QUOC HUY', 'DO THI MAI'];
 
 export const TRANSFERS: Transfer[] = [

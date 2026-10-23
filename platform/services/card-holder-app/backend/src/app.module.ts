@@ -1,11 +1,15 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 
 import { CardsModule } from './cards/cards.module';
-import { CassandraModule } from './cassandra/cassandra.module';
+import { ConfigModule } from './config.module';
+import { ControlsModule } from './controls/controls.module';
 import { HealthController } from './health/health.controller';
+import { KafkaModule } from './kafka/kafka.module';
+import { SharedModule } from './shared/shared.module';
 
 @Module({
-  imports: [CassandraModule, CardsModule],
+  imports: [CqrsModule.forRoot(), ConfigModule, SharedModule, KafkaModule, CardsModule, ControlsModule],
   controllers: [HealthController],
 })
 export class AppModule {}

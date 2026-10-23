@@ -3,11 +3,10 @@ import { Appearance } from 'react-native';
 
 import { initialUserId, userById, type User } from './users';
 
-// User preferences. In memory only: they reset when the app restarts.
 export type ThemeChoice = 'light' | 'dark';
 
 export type Settings = {
-  userId: string; // who is signed in (demo: switchable)
+  userId: string;
   theme: ThemeChoice;
   hideBalance: boolean;
   biometrics: boolean;
@@ -31,7 +30,6 @@ const DEFAULTS: Omit<Settings, 'theme' | 'userId'> = {
 const SettingsContext = createContext<SettingsStore | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  // Start in the device's mode; after that, the user's choice wins.
   const [settings, setSettings] = useState<Settings>(() => ({
     ...DEFAULTS,
     userId: initialUserId(),
@@ -54,7 +52,6 @@ export function useSettings(): SettingsStore {
   return s;
 }
 
-// The signed-in user.
 export function useUser(): User {
   return userById(useSettings().userId);
 }

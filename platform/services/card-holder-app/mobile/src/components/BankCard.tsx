@@ -11,7 +11,6 @@ import { NATIVE } from './motion';
 
 type Props = { last4: string; holder: string; spent: number; limit: number; period: Period; frozen: boolean };
 
-// Tap to flip: the front shows spending, the back shows (masked) card details.
 export function BankCard({ last4, holder, spent, limit, period, frozen }: Props) {
   const c = useColors();
   const flip = useState(() => new Animated.Value(0))[0];

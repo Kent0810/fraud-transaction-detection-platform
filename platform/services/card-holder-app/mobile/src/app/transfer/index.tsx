@@ -31,7 +31,6 @@ const MIN_AMOUNT = 1_000;
 
 type Lookup = { state: 'idle' | 'checking' | 'notfound' } | { state: 'found'; name: string };
 
-// Transfer form, laid out like Vietnamese banking apps. Mock only, no money moves.
 export default function TransferFormScreen() {
   const c = useColors();
   const { balance, banks, saved, lookupAccount, setDraft } = useStore();
@@ -41,7 +40,6 @@ export default function TransferFormScreen() {
   const [kind, setKind] = useState<TransferKind>('NAPAS');
   const [bankCode, setBankCode] = useState<string | null>(null);
   const [account, setAccount] = useState('');
-  // Result of the last finished lookup, tagged with the bank+account it was for.
   const [result, setResult] = useState<{ key: string; name: string | null } | null>(null);
   const [amountText, setAmountText] = useState('');
   const [content, setContent] = useState(`${toAccountName(user.name)} transfer`);
@@ -53,7 +51,6 @@ export default function TransferFormScreen() {
   const amount = parseVnd(amountText);
   const alreadySaved = saved.some((r) => r.bankCode === effectiveBank && r.account === account);
 
-  // Look the account name up shortly after the number stops changing.
   const lookupKey = effectiveBank && account.length >= 6 ? `${effectiveBank}|${account}` : null;
   useEffect(() => {
     if (!lookupKey || !effectiveBank) return;

@@ -14,8 +14,6 @@ export default function RootLayout() {
   );
 }
 
-// key = user id: switching accounts remounts the store, so every screen starts fresh with that
-// user's card data (and the app returns to Home, like a real account switch).
 function UserScope() {
   const { userId } = useSettings();
   return (
@@ -25,14 +23,12 @@ function UserScope() {
   );
 }
 
-// Separate component so it can read the theme from SettingsProvider above it.
 function AppShell() {
   const c = useColors();
   const scheme = useScheme();
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      {/* On web, keep a phone-width column instead of stretching across the screen. */}
       <View style={{ flex: 1, backgroundColor: c.surfaceAlt }}>
         <View style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: 440, alignSelf: 'center' } : { flex: 1 }}>
           <Stack

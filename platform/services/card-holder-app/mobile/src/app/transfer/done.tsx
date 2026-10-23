@@ -9,13 +9,11 @@ import { radius, space, useColors } from '@/theme';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// "14:32 · 22/10/2026"
 function vnDateTime(iso: string): string {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())} · ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-// The receipt after a successful transfer.
 export default function TransferDoneScreen() {
   const c = useColors();
   const { transferId } = useLocalSearchParams<{ transferId: string }>();
@@ -51,7 +49,6 @@ export default function TransferDoneScreen() {
           </FadeInUp>
         </View>
 
-        {/* Ticket-style tear line with notches on both sides. */}
         <View style={styles.tear}>
           <View style={[styles.notch, styles.notchLeft, { backgroundColor: c.bg }]} />
           <View style={[styles.dashes, { borderColor: c.border }]} />

@@ -2,7 +2,6 @@ import { StyleSheet, Text, View } from 'react-native';
 
 const HUES = ['#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
 
-// First and last word: "Jamie Carter" -> JC, "NGUYEN VAN AN" -> NA.
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/);
   const first = words[0]?.[0] ?? '';
@@ -10,7 +9,6 @@ export function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-// Colored circle with the person's initials; the color is stable per name.
 export function Avatar({ name, size = 48 }: { name: string; size?: number }) {
   const hue = HUES[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % HUES.length];
   return (

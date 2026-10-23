@@ -14,7 +14,6 @@ type Props = {
   onClose: () => void;
 };
 
-// Bottom sheet with a searchable bank list.
 export function BankPicker({ visible, banks, selected, onSelect, onClose }: Props) {
   const c = useColors();
   const insets = useSafeAreaInsets();

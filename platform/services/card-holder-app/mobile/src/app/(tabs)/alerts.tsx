@@ -14,7 +14,6 @@ import { radius, space, useColors } from '@/theme';
 
 type Filter = 'OPEN' | 'ALL';
 
-// Alerts: reads alerts_by_card. New ones also arrive as push from the notifier.
 export default function AlertsScreen() {
   const c = useColors();
   const { alerts } = useStore();
