@@ -9,6 +9,13 @@ set -euo pipefail
 
 : "${CARD_HOLDER_FILE:?CARD_HOLDER_FILE is not set}"
 : "${DEMO_PASSWORD:?DEMO_PASSWORD is not set}"
+: "${OPENING_BALANCE:?OPENING_BALANCE is not set}"
+
+# Goes into the SQL unquoted (:opening_balance), so it must be a plain integer.
+if [[ ! "$OPENING_BALANCE" =~ ^[0-9]+$ ]]; then
+  echo "OPENING_BALANCE must be a whole number of minor units, got '$OPENING_BALANCE'" >&2
+  exit 1
+fi
 
 export PGPASSWORD="$POSTGRES_PASSWORD"
 
@@ -16,7 +23,7 @@ export PGPASSWORD="$POSTGRES_PASSWORD"
 # the path is expanded by bash in the -c line instead.
 psql -v ON_ERROR_STOP=1 -1 \
   --host "$POSTGRES_HOST" --port "$POSTGRES_PORT" --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
-  -v password="$DEMO_PASSWORD" \
+  -v password="$DEMO_PASSWORD" -v opening_balance="$OPENING_BALANCE" \
   -c "CREATE TEMP TABLE dim_card (
         cc_num text, first text, last text, gender text, street text, city text, state text, zip text,
         lat double precision, long double precision, city_pop integer, job text, dob date)" \
@@ -43,6 +50,16 @@ INSERT INTO auth (card_id, password_hash)
 SELECT c.card_id, crypt(:'password', gen_salt('bf', 8))
 FROM cardholders c
 WHERE NOT EXISTS (SELECT 1 FROM auth l WHERE l.card_id = c.card_id);
+
+-- Opens an account only for cards that have none, so a rerun never resets a balance that transfers have moved.
+WITH opened AS (
+  INSERT INTO accounts (card_id, balance)
+  SELECT card_id, :opening_balance FROM cardholders ORDER BY card_id   -- account numbers follow card order
+  ON CONFLICT (card_id) DO NOTHING
+  RETURNING card_id, balance
+)
+INSERT INTO ledger_entries (card_id, kind, amount)
+SELECT card_id, 'OPENING', balance FROM opened;
 
 SELECT count(*) AS cardholders FROM cardholders;
 SQL

@@ -147,8 +147,6 @@ services:
         condition: service_healthy
     restart: on-failure
 
-
-
   # notifier:                           # alerts topic -> push to cardholder
   #   build: ./services/notifier
   #   environment:
@@ -225,12 +223,13 @@ services:
       timeout: 5s
       retries: 12
 
-  postgres-seed:                      # dim_card.csv -> cardholders + logins; idempotent, runs on every up
+  postgres-seed:                      # dim_card.csv -> cardholders, logins, accounts; idempotent, runs on every up
     image: postgres:17
     environment:
       <<: *postgres-env
       CARD_HOLDER_FILE: /data/stream/dim_card.csv
       DEMO_PASSWORD: admin1234
+      OPENING_BALANCE: ${OPENING_BALANCE:-100000000}   # VND, every new account; existing balances are kept
     volumes:
       - ./infra/postgres/seed:/seed:ro
       - ../datasets/Sparkov_Data_Generation/data:/data:ro

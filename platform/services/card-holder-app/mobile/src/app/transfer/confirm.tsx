@@ -4,10 +4,10 @@ import type React from 'react';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp } from '@/components/motion';
 import { Button, Empty } from '@/components/ui';
 import { vnd, vndInWords } from '@/components/vnd';
-import { ACCOUNT } from '@/data/mock';
 import { useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
 
@@ -15,7 +15,7 @@ const OTP_LENGTH = 6;
 
 export default function ConfirmTransferScreen() {
   const c = useColors();
-  const { draft, banks, sendTransfer, setDraft } = useStore();
+  const { draft, banks, accountNumber, sendTransfer, setDraft } = useStore();
   const [otp, setOtp] = useState('');
   const [sending, setSending] = useState(false);
   const otpInput = useRef<React.ComponentRef<typeof TextInput>>(null);
@@ -26,7 +26,7 @@ export default function ConfirmTransferScreen() {
 
   const bank = banks.find((b) => b.code === draft.to.bankCode);
   const rows: [string, string][] = [
-    ['From account', ACCOUNT.number],
+    ['From account', printAccount(accountNumber)],
     ['To account', draft.to.account],
     ['Account name', draft.to.name],
     ['Bank', bank ? `${bank.code} · ${bank.name}` : draft.to.bankCode],

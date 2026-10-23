@@ -13,6 +13,9 @@ export function money(usd: number): string {
   return vnd(toVnd(usd));
 }
 
+// 190300000001 -> 1903 0000 0001, the way account numbers are printed.
+export const accountNumber = (digits: string) => digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+
 export function category(raw: string): string {
   const suffix = raw.match(/_(net|pos)$/)?.[1];
   const label = raw.replace(/_(net|pos)$/, '').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());

@@ -17,6 +17,7 @@ import {
 
 import { Avatar } from '@/components/Avatar';
 import { BankPicker } from '@/components/BankPicker';
+import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Button } from '@/components/ui';
 import { groupThousands, parseVnd, toAccountName, vnd, vndInWords } from '@/components/vnd';
@@ -30,15 +31,14 @@ import { radius, space, useColors } from '@/theme';
 const QUICK = [100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 const MIN_AMOUNT = 1_000;
 
-type Lookup = { state: 'idle' | 'checking' | 'notfound' } | { state: 'found'; name: string };
+type Lookup = { state: 'idle' | 'checking' | 'notfound' | 'self' } | { state: 'found'; name: string };
 
 export default function TransferFormScreen() {
   const c = useColors();
-  const { balance, banks, saved, lookupAccount, setDraft } = useStore();
+  const { balance, accountNumber, banks, saved, lookupAccount, setDraft, removeSaved } = useStore();
   const { hideBalance, update } = useSettings();
   const user = useUser();
 
-  const [kind, setKind] = useState<TransferKind>('NAPAS');
   const [bankCode, setBankCode] = useState<string | null>(null);
   const [account, setAccount] = useState('');
   const [result, setResult] = useState<{ key: string; name: string | null } | null>(null);
@@ -47,26 +47,30 @@ export default function TransferFormScreen() {
   const [save, setSave] = useState(false);
   const [picking, setPicking] = useState(false);
 
-  const effectiveBank = kind === 'INTERNAL' ? ACCOUNT.bankCode : bankCode;
-  const bank = banks.find((b) => b.code === effectiveBank);
+  // Our own bank in the list means an internal transfer; any other goes through NAPAS.
+  const kind: TransferKind = bankCode === ACCOUNT.bankCode ? 'INTERNAL' : 'NAPAS';
+  const bank = banks.find((b) => b.code === bankCode);
   const amount = parseVnd(amountText);
-  const alreadySaved = saved.some((r) => r.bankCode === effectiveBank && r.account === account);
+  const alreadySaved = saved.some((r) => r.bankCode === bankCode && r.account === account);
+  const toSelf = kind === 'INTERNAL' && account === accountNumber;
 
-  const lookupKey = effectiveBank && account.length >= 6 ? `${effectiveBank}|${account}` : null;
+  const lookupKey = bankCode && account.length >= 6 && !toSelf ? `${bankCode}|${account}` : null;
   useEffect(() => {
-    if (!lookupKey || !effectiveBank) return;
+    if (!lookupKey || !bankCode) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const name = await lookupAccount(effectiveBank, account);
+      const name = await lookupAccount(bankCode, account).catch(() => null);
       if (!cancelled) setResult({ key: lookupKey, name });
     }, 400);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [lookupKey, effectiveBank, account, lookupAccount]);
+  }, [lookupKey, bankCode, account, lookupAccount]);
 
-  const lookup: Lookup = !lookupKey
+  const lookup: Lookup = toSelf
+    ? { state: 'self' }
+    : !lookupKey
     ? { state: 'idle' }
     : result?.key !== lookupKey
       ? { state: 'checking' }
@@ -79,16 +83,15 @@ export default function TransferFormScreen() {
   const valid = lookup.state === 'found' && amount >= MIN_AMOUNT && !amountError && content.trim().length > 0;
 
   const pickSaved = (r: Recipient) => {
-    setKind(r.bankCode === ACCOUNT.bankCode ? 'INTERNAL' : 'NAPAS');
-    setBankCode(r.bankCode === ACCOUNT.bankCode ? null : r.bankCode);
+    setBankCode(r.bankCode);
     setAccount(r.account);
   };
 
   const next = () => {
-    if (lookup.state !== 'found' || !effectiveBank) return;
+    if (lookup.state !== 'found' || !bankCode) return;
     setDraft({
       kind,
-      to: { bankCode: effectiveBank, account, name: lookup.name },
+      to: { bankCode, account, name: lookup.name },
       amount,
       content: content.trim(),
       save: save && !alreadySaved,
@@ -103,7 +106,7 @@ export default function TransferFormScreen() {
           <LinearGradient colors={[c.cardFrom, c.cardTo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.source}>
             <Text style={styles.sourceLabel}>From account</Text>
             <Text style={styles.sourceNumber}>
-              {ACCOUNT.label} · {ACCOUNT.number}
+              {ACCOUNT.label} · {printAccount(accountNumber)}
             </Text>
             <View style={styles.sourceRow}>
               <View>
@@ -117,40 +120,25 @@ export default function TransferFormScreen() {
           </LinearGradient>
         </FadeInUp>
 
-        <FadeInUp delay={stagger(1)}>
-          <View style={[styles.segment, { backgroundColor: c.surfaceAlt }]}>
-            {(
-              [
-                ['INTERNAL', 'Same bank'],
-                ['NAPAS', 'Other bank 24/7'],
-              ] as [TransferKind, string][]
-            ).map(([k, label]) => {
-              const on = k === kind;
-              return (
-                <Pressable
-                  key={k}
-                  onPress={() => setKind(k)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  style={[styles.segmentItem, on && { backgroundColor: c.surface }]}>
-                  <Text style={{ color: on ? c.text : c.muted, fontWeight: '700', fontSize: 14 }}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </FadeInUp>
-
         {saved.length > 0 && (
           <FadeInUp delay={stagger(2)}>
             <Text style={[styles.section, { color: c.text }]}>Saved recipients</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.md }}>
               {saved.map((r) => {
-                const on = r.account === account && r.bankCode === effectiveBank;
+                const on = r.account === account && r.bankCode === bankCode;
                 return (
                   <ScalePressable
                     key={`${r.bankCode}-${r.account}`}
                     onPress={() => pickSaved(r)}
                     style={[styles.savedItem, { backgroundColor: c.surface, borderColor: on ? c.primary : 'transparent' }]}>
+                    <Pressable
+                      onPress={() => removeSaved(r)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${r.name} from saved recipients`}
+                      style={styles.savedRemove}>
+                      <Ionicons name="close-circle" size={18} color={c.muted} />
+                    </Pressable>
                     <Avatar name={r.name} size={40} />
                     <Text style={[styles.savedName, { color: c.text }]} numberOfLines={1}>
                       {r.name.split(' ').slice(-2).join(' ')}
@@ -166,20 +154,18 @@ export default function TransferFormScreen() {
         <FadeInUp delay={stagger(3)}>
           <Text style={[styles.section, { color: c.text }]}>Recipient</Text>
           <View style={[styles.card, { backgroundColor: c.surface }]}>
-            {kind === 'NAPAS' && (
-              <Field label="Bank">
-                <Pressable onPress={() => setPicking(true)} style={styles.select} accessibilityRole="button">
-                  {bank ? (
-                    <Text style={[styles.value, { color: c.text }]}>
-                      <Text style={{ fontWeight: '800' }}>{bank.code}</Text> · {bank.name}
-                    </Text>
-                  ) : (
-                    <Text style={[styles.value, { color: c.muted }]}>Choose a bank</Text>
-                  )}
-                  <Ionicons name="chevron-down" size={18} color={c.muted} />
-                </Pressable>
-              </Field>
-            )}
+            <Field label="Bank">
+              <Pressable onPress={() => setPicking(true)} style={styles.select} accessibilityRole="button">
+                {bank ? (
+                  <Text style={[styles.value, { color: c.text }]}>
+                    <Text style={{ fontWeight: '800' }}>{bank.code}</Text> · {bank.name}
+                  </Text>
+                ) : (
+                  <Text style={[styles.value, { color: c.muted }]}>Choose a bank</Text>
+                )}
+                <Ionicons name="chevron-down" size={18} color={c.muted} />
+              </Pressable>
+            </Field>
 
             <Field label="Account number">
               <TextInput
@@ -188,7 +174,7 @@ export default function TransferFormScreen() {
                 placeholder="Enter account number"
                 placeholderTextColor={c.muted}
                 keyboardType="number-pad"
-                editable={kind === 'INTERNAL' || !!bankCode}
+                editable={!!bankCode}
                 style={[styles.input, { color: c.text }]}
               />
             </Field>
@@ -206,10 +192,10 @@ export default function TransferFormScreen() {
                 </View>
               ) : lookup.state === 'notfound' ? (
                 <Text style={[styles.value, { color: c.decline }]}>Account not found</Text>
+              ) : lookup.state === 'self' ? (
+                <Text style={[styles.value, { color: c.decline }]}>This is your own account</Text>
               ) : (
-                <Text style={[styles.value, { color: c.muted }]}>
-                  {kind === 'NAPAS' && !bankCode ? 'Choose a bank first' : 'Filled in automatically'}
-                </Text>
+                <Text style={[styles.value, { color: c.muted }]}>{!bankCode ? 'Choose a bank first' : 'Filled in automatically'}</Text>
               )}
             </Field>
           </View>
@@ -284,7 +270,7 @@ export default function TransferFormScreen() {
 
       <BankPicker
         visible={picking}
-        banks={banks.filter((b) => b.code !== ACCOUNT.bankCode)}
+        banks={banks}
         selected={bankCode ?? undefined}
         onSelect={(b) => {
           setBankCode(b.code);
@@ -313,12 +299,11 @@ const styles = StyleSheet.create({
   sourceNumber: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: space.sm },
   sourceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   sourceBalance: { color: '#fff', fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 4, marginTop: space.lg },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.pill },
   section: { fontSize: 16, fontWeight: '800', marginTop: space.xl, marginBottom: space.sm },
   savedItem: { width: 108, alignItems: 'center', gap: 4, padding: space.md, borderRadius: radius.lg, borderWidth: 1.5 },
   savedName: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
   savedBank: { fontSize: 11, fontWeight: '600' },
+  savedRemove: { position: 'absolute', top: 6, right: 6 },
   card: { borderRadius: radius.lg, paddingHorizontal: space.lg },
   field: { paddingVertical: space.md, gap: 6 },
   label: { fontSize: 13 },

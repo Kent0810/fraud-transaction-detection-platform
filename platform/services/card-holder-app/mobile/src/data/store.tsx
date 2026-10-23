@@ -2,10 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import * as commands from './commands';
 import { apiEnabled } from './http';
-import { type Controls, fetchAlerts, fetchControls, fetchTransactions } from './queries';
+import { type Controls, fetchAccountHolder, fetchAlerts, fetchBalance, fetchControls, fetchRecipients, fetchTransactions } from './queries';
 import { useUser } from './auth';
 
-import { ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, SAVED_RECIPIENTS, TRANSACTIONS } from './mock';
+import { ACCOUNT, ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, TRANSACTIONS } from './mock';
 import type { Alert, Bank, Budget, MerchantRule, Period, Recipient, RuleType, Transfer, TransferKind, Txn } from './types';
 
 export type TransferDraft = { kind: TransferKind; to: Recipient; amount: number; content: string; save: boolean };
@@ -23,6 +23,7 @@ type Store = {
   rules: MerchantRule[];
   frozen: boolean;
   balance: number;
+  accountNumber: string;
   banks: Bank[];
   saved: Recipient[];
   transfers: Transfer[];
@@ -35,6 +36,7 @@ type Store = {
   setDraft: (draft: TransferDraft | null) => void;
   lookupAccount: (bankCode: string, account: string) => Promise<string | null>;
   sendTransfer: (draft: TransferDraft) => Promise<Transfer>;
+  removeSaved: (recipient: Recipient) => void;
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -45,12 +47,27 @@ const TRANSFER_MS = 1200;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-type CardData = { transactions: Txn[]; alerts: Alert[]; controls: Controls };
+type CardData = {
+  transactions: Txn[];
+  alerts: Alert[];
+  controls: Controls;
+  balance: number;
+  accountNumber: string;
+  saved: Recipient[];
+};
 
 async function fetchCardData(cardId: string): Promise<CardData> {
-  const [transactions, alerts, controls] = await Promise.all([fetchTransactions(cardId), fetchAlerts(cardId), fetchControls(cardId)]);
-  return { transactions, alerts, controls };
+  const [transactions, alerts, controls, account, saved] = await Promise.all([
+    fetchTransactions(cardId),
+    fetchAlerts(cardId),
+    fetchControls(cardId),
+    fetchBalance(cardId),
+    fetchRecipients(cardId),
+  ]);
+  return { transactions, alerts, controls, balance: account.balance, accountNumber: account.accountNumber, saved };
 }
+
+const sameRecipient = (a: Recipient, b: Recipient) => a.bankCode === b.bankCode && a.account === b.account;
 
 const toRules = (controls: Controls): MerchantRule[] => controls.merchantRules.map((r) => ({ ...r, pending: false }));
 
@@ -66,8 +83,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [rules, setRules] = useState<MerchantRule[]>(apiEnabled ? [] : MERCHANT_RULES);
   const [frozen, setFrozen] = useState(false);
   const [balance, setBalance] = useState(user.balance);
+  const [accountNumber, setAccountNumber] = useState(ACCOUNT.number);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [saved, setSaved] = useState<Recipient[]>(SAVED_RECIPIENTS);
+  const [saved, setSaved] = useState<Recipient[]>([]);
   const [draft, setDraft] = useState<TransferDraft | null>(null);
   const [status, setStatus] = useState<DataStatus>(apiEnabled ? 'loading' : 'mock');
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +99,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAlerts(data.alerts);
         setRules(toRules(data.controls));
         setBudgetState((b) => withControls(b, data.controls));
+        setBalance(data.balance);
+        setAccountNumber(data.accountNumber);
+        setSaved(data.saved);
         setError(null);
         setStatus('ready');
       },
@@ -158,8 +179,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [cardId, reloadControls],
   );
 
+  const reloadSaved = useCallback(() => {
+    fetchRecipients(cardId).then(setSaved, (e: unknown) => setError(message(e)));
+  }, [cardId]);
+
   const lookupAccount = useCallback(
     async (bankCode: string, account: string) => {
+      // Our own bank: a real account on this platform. Other banks stay mocked, there is no interbank link.
+      if (apiEnabled && bankCode === ACCOUNT.bankCode) return fetchAccountHolder(account);
       await wait(LOOKUP_MS);
       if (account.length < 6) return null;
       const known = saved.find((r) => r.bankCode === bankCode && r.account === account);
@@ -186,12 +213,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTransfers((ts) => [transfer, ...ts]);
     setBalance((b) => b - d.amount);
     if (d.save) {
-      setSaved((rs) =>
-        rs.some((r) => r.bankCode === d.to.bankCode && r.account === d.to.account) ? rs : [d.to, ...rs],
-      );
+      setSaved((rs) => (rs.some((r) => sameRecipient(r, d.to)) ? rs : [d.to, ...rs]));
+      if (apiEnabled) commands.saveRecipient(cardId, d.to).catch(reloadSaved);
     }
     return transfer;
-  }, []);
+  }, [cardId, reloadSaved]);
+
+  const removeSaved = useCallback(
+    (recipient: Recipient) => {
+      setSaved((rs) => rs.filter((r) => !sameRecipient(r, recipient)));
+      if (apiEnabled) commands.removeRecipient(cardId, recipient).catch(reloadSaved);
+    },
+    [cardId, reloadSaved],
+  );
 
   const value = useMemo<Store>(
     () => ({
@@ -205,6 +239,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       rules,
       frozen,
       balance,
+      accountNumber,
       banks: BANKS,
       saved,
       transfers,
@@ -217,8 +252,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDraft,
       lookupAccount,
       sendTransfer,
+      removeSaved,
     }),
-    [status, error, cardId, refresh, transactions, alerts, effectiveBudget, rules, frozen, balance, saved, transfers, draft, toggleFrozen, setBudget, setMerchantRule, releaseMerchant, lookupAccount, sendTransfer],
+    [status, error, cardId, refresh, transactions, alerts, effectiveBudget, rules, frozen, balance, accountNumber, saved, transfers, draft, toggleFrozen, setBudget, setMerchantRule, releaseMerchant, lookupAccount, sendTransfer, removeSaved],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -1,12 +1,15 @@
-import type { Alert, Bank, Budget, MerchantRule, Recipient, Txn } from './types';
+import { BANK_NAME, BANK_SHORT } from '@/components/brand';
+
+import type { Alert, Bank, Budget, MerchantRule, Txn } from './types';
 
 const now = Date.now();
 const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
 
-export const ACCOUNT = { bankCode: 'DEMO', number: '1903 5566 7788', label: 'Payment account' };
+// number is the mock build's; with the API the real one comes from GET /cards/:id/balance.
+export const ACCOUNT = { bankCode: BANK_SHORT, number: '190300000001', label: 'Payment account' };
 
 export const BANKS: Bank[] = [
-  { code: 'DEMO', name: 'HCM Mock Banking (same bank)' },
+  { code: BANK_SHORT, name: `${BANK_NAME} (internal transfer)` },
   { code: 'VCB', name: 'Vietcombank' },
   { code: 'TCB', name: 'Techcombank' },
   { code: 'MB', name: 'MB Bank' },
@@ -16,13 +19,6 @@ export const BANKS: Bank[] = [
   { code: 'VPB', name: 'VPBank' },
   { code: 'TPB', name: 'TPBank' },
   { code: 'STB', name: 'Sacombank' },
-];
-
-export const SAVED_RECIPIENTS: Recipient[] = [
-  { bankCode: 'VCB', account: '0071000123456', name: 'NGUYEN VAN AN' },
-  { bankCode: 'TCB', account: '19033445566017', name: 'TRAN THI BICH NGOC' },
-  { bankCode: 'MB', account: '0901234567', name: 'LE MINH KHOA' },
-  { bankCode: 'DEMO', account: '190355660011', name: 'PHAM THU HA' },
 ];
 
 export const LOOKUP_NAMES = ['HOANG GIA BAO', 'VO THANH TAM', 'DANG NGOC LAN', 'BUI QUOC HUY', 'DO THI MAI'];
