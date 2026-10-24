@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { PostgresService } from '../shared/postgres/postgres.service';
+import { PostgresService } from '../../shared/postgres/postgres.service';
 import type { SessionDto } from './auth.types';
 
 type LoginRow = {

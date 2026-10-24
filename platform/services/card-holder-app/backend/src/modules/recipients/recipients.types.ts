@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 
-import { record, text } from '../common/validation';
+import { record, text } from '../../common/validation';
 
 const BANK_CODE = /^[A-Z]{2,10}$/;
 const ACCOUNT = /^\d{6,19}$/;

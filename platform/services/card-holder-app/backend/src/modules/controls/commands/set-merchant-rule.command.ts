@@ -1,9 +1,9 @@
 import { Inject } from '@nestjs/common';
 import { Command, CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 
-import type { Config } from '../../config';
-import { CONFIG } from '../../config.module';
-import { KafkaService } from '../../kafka/kafka.service';
+import type { Config } from '../../../config';
+import { CONFIG } from '../../../config.module';
+import { KafkaService } from '../../../kafka/kafka.service';
 import { controlEvent, merchantControlId, type MerchantRuleDto, type RuleType } from '../controls.types';
 
 export class SetMerchantRuleCommand extends Command<MerchantRuleDto> {

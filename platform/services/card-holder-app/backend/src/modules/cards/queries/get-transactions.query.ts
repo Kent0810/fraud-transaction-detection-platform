@@ -1,6 +1,6 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
-import type { Page } from '../../shared/cassandra/models';
+import type { Page } from '../../../shared/cassandra/models';
 import { CardsRepository } from '../cards.repository';
 import type { TxnDto } from '../cards.types';
 

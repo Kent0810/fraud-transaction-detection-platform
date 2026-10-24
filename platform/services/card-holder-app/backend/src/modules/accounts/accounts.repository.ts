@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { iso } from '../shared/cassandra/models';
-import { PostgresService } from '../shared/postgres/postgres.service';
+import { iso } from '../../shared/cassandra/models';
+import { PostgresService } from '../../shared/postgres/postgres.service';
 import type { AccountHolderDto, BalanceDto } from './accounts.types';
 
 // pg returns bigint as a string; Number is exact up to 2^53, far above any demo balance.

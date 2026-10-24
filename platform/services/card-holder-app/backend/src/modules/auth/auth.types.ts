@@ -1,4 +1,4 @@
-import { cardId, record, text } from '../common/validation';
+import { cardId, record, text } from '../../common/validation';
 
 export type SessionDto = { cardId: string; name: string; email: string };
 

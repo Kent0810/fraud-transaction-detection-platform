@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Put } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
-import { CardIdPipe } from '../common/validation';
+import { CardIdPipe } from '../../common/validation';
 import { RemoveRecipientCommand } from './commands/remove-recipient.command';
 import { SaveRecipientCommand } from './commands/save-recipient.command';
 import { GetRecipientsQuery } from './queries/get-recipients.query';

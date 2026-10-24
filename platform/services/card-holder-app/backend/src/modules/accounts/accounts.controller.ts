@@ -1,7 +1,7 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 
-import { CardIdPipe } from '../common/validation';
+import { CardIdPipe } from '../../common/validation';
 import { type AccountHolderDto, accountNumber, type BalanceDto } from './accounts.types';
 import { GetAccountHolderQuery } from './queries/get-account-holder.query';
 import { GetBalanceQuery } from './queries/get-balance.query';

@@ -2,7 +2,7 @@ import { Controller, DefaultValuePipe, Get, NotFoundException, Param, ParseIntPi
 import { QueryBus } from '@nestjs/cqrs';
 import type { Response } from 'express';
 
-import { CardIdPipe, clamp, CursorPipe, NEXT_CURSOR } from '../common/validation';
+import { CardIdPipe, clamp, CursorPipe, NEXT_CURSOR } from '../../common/validation';
 import type { AlertDto, CardStateDto, TxnDto } from './cards.types';
 import { GetAlertsQuery } from './queries/get-alerts.query';
 import { GetCardStateQuery } from './queries/get-card-state.query';

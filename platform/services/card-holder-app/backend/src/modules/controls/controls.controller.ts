@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Put } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
-import { CardIdPipe } from '../common/validation';
+import { CardIdPipe } from '../../common/validation';
 import { ReleaseMerchantCommand } from './commands/release-merchant.command';
 import { SetBudgetCommand } from './commands/set-budget.command';
 import { SetMerchantRuleCommand } from './commands/set-merchant-rule.command';

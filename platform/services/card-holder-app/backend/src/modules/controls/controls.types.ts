@@ -1,4 +1,4 @@
-import { oneOf, positive, record, text } from '../common/validation';
+import { oneOf, positive, record, text } from '../../common/validation';
 
 export const PERIODS = ['DAY', 'WEEK', 'MONTH'] as const;
 export type Period = (typeof PERIODS)[number];

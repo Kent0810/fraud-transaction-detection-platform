@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { mapping } from 'cassandra-driver';
 
-import { CassandraService } from '../shared/cassandra/cassandra.service';
-import { type AlertRow, type CardStateRow, iso, num, type Page, pageOptions, toPage, type TxnRow } from '../shared/cassandra/models';
+import { CassandraService } from '../../shared/cassandra/cassandra.service';
+import { type AlertRow, type CardStateRow, iso, num, type Page, pageOptions, toPage, type TxnRow } from '../../shared/cassandra/models';
 import type { AlertDto, AlertStatus, CardStateDto, TxnDto, Verdict } from './cards.types';
 
 type ByCard = { cardId: string };

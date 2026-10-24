@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { iso } from '../shared/cassandra/models';
-import { PostgresService } from '../shared/postgres/postgres.service';
+import { iso } from '../../shared/cassandra/models';
+import { PostgresService } from '../../shared/postgres/postgres.service';
 import type { RecipientDto } from './recipients.types';
 
 type RecipientRow = { bank_code: string; account: string; name: string; created_at: Date };
