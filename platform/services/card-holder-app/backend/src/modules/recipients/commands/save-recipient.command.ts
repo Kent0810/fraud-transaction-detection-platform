@@ -1,6 +1,6 @@
 import { Command, CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 
-import { RecipientsRepository } from '../recipients.repository';
+import { RecipientsRepository } from '../repositories/recipients.repository';
 import type { RecipientDto } from '../recipients.types';
 
 export class SaveRecipientCommand extends Command<RecipientDto> {

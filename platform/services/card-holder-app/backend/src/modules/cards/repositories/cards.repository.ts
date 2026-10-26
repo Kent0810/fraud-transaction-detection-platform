@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { mapping } from 'cassandra-driver';
 
-import { CassandraService } from '../../shared/cassandra/cassandra.service';
-import { type AlertRow, type CardStateRow, iso, num, type Page, pageOptions, toPage, type TxnRow } from '../../shared/cassandra/models';
-import type { AlertDto, AlertStatus, CardStateDto, TxnDto, Verdict } from './cards.types';
+import { CassandraService } from '../../../shared/cassandra/cassandra.service';
+import { type AlertRow, type CardStateRow, iso, num, type Page, pageOptions, toPage, type TxnRow } from '../../../shared/cassandra/models';
+import type { AlertDto, AlertStatus, CardStateDto, TxnDto, Verdict } from '../cards.types';
 
 type ByCard = { cardId: string };
 
@@ -12,25 +12,16 @@ export class CardsRepository {
   private readonly txns: mapping.ModelMapper<TxnRow>;
   private readonly alertRows: mapping.ModelMapper<AlertRow>;
   private readonly states: mapping.ModelMapper<CardStateRow>;
-  private readonly distinctCards: (doc: { limit: number }) => Promise<mapping.Result<Pick<TxnRow, 'cardId'>>>;
   private readonly txnById: (doc: ByCard & { txnId: string }) => Promise<mapping.Result<TxnRow>>;
 
   constructor(db: CassandraService) {
     this.txns = db.mapper.forModel<TxnRow>('Txn');
     this.alertRows = db.mapper.forModel<AlertRow>('Alert');
     this.states = db.mapper.forModel<CardStateRow>('CardState');
-    this.distinctCards = this.txns.mapWithQuery('SELECT DISTINCT card_id FROM txn_by_card LIMIT ?', (doc: { limit: number }) => [
-      doc.limit,
-    ]);
     this.txnById = this.txns.mapWithQuery(
       'SELECT * FROM txn_by_card WHERE card_id = ? AND txn_id = ? ALLOW FILTERING',
       (doc: ByCard & { txnId: string }) => [doc.cardId, doc.txnId],
     );
-  }
-
-  async cards(limit: number): Promise<string[]> {
-    const result = await this.distinctCards({ limit });
-    return result.toArray().map((r) => r.cardId);
   }
 
   async transactionPage(cardId: string, limit: number, cursor?: string): Promise<Page<TxnDto>> {

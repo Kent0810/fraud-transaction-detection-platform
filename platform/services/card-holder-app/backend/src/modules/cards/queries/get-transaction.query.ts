@@ -1,6 +1,6 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
-import { CardsRepository } from '../cards.repository';
+import { CardsRepository } from '../repositories/cards.repository';
 import type { TxnDto } from '../cards.types';
 
 export class GetTransactionQuery extends Query<TxnDto | null> {

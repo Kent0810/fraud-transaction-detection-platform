@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AccountsController } from './accounts.controller';
-import { AccountsRepository } from './accounts.repository';
+import { AccountsRepository } from './repositories/accounts.repository';
 import { GetAccountHolderHandler } from './queries/get-account-holder.query';
 import { GetBalanceHandler } from './queries/get-balance.query';
 

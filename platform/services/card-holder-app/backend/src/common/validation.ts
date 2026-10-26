@@ -1,56 +1,32 @@
-import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
-
-const CARD_ID = /^\d{8,19}$/;
-const CURSOR = /^[0-9a-f]{1,2048}$/i;
+import { type ArgumentMetadata, BadRequestException, Injectable, type PipeTransform } from '@nestjs/common';
+import { z } from 'zod';
 
 export const NEXT_CURSOR = 'X-Next-Cursor';
 
-@Injectable()
-export class CardIdPipe implements PipeTransform<string, string> {
-  transform(value: string): string {
-    return cardId(value);
-  }
-}
+export const CardId = z.string().regex(/^\d{8,19}$/, 'must be 8 to 19 digits');
+export const AccountNumber = z.string().regex(/^\d{6,19}$/, 'must be 6 to 19 digits');
+export const BankCode = z.string().regex(/^[A-Z]{2,10}$/, 'must be 2 to 10 capital letters');
+export const Cursor = z.string().regex(/^[0-9a-f]{1,2048}$/i, 'must be a hex string').optional();
+export const Password = z.string().min(1).max(128);
 
-@Injectable()
-export class CursorPipe implements PipeTransform<string | undefined, string | undefined> {
-  transform(value: string | undefined): string | undefined {
-    if (value !== undefined && !CURSOR.test(value)) throw new BadRequestException('invalid cursor');
-    return value;
-  }
-}
+/** Trimmed, non-empty, at most max characters. */
+export const text = (max: number) => z.string().trim().min(1).max(max);
 
-export function cardId(value: unknown): string {
-  if (typeof value !== 'string' || !CARD_ID.test(value)) throw new BadRequestException('cardId must be 8 to 19 digits');
-  return value;
+/**
+ * Validates a body, param or query value against a zod schema and passes on the parsed value.
+ * A failure is a 400 naming each bad field: `@Body(new ZodPipe(LoginRequest)) body: LoginRequest`.
+ */
+@Injectable()
+export class ZodPipe<T extends z.ZodType> implements PipeTransform<unknown, z.output<T>> {
+  constructor(private readonly schema: T) {}
+
+  transform(value: unknown, { type, data }: ArgumentMetadata): z.output<T> {
+    const result = this.schema.safeParse(value);
+    if (result.success) return result.data;
+    // A param or query has its name in data; a body field has it in the issue path.
+    const where = (path: PropertyKey[]) => [type === 'body' ? undefined : data, ...path.map(String)].filter(Boolean).join('.');
+    throw new BadRequestException(result.error.issues.map((i) => `${where(i.path) || type} ${i.message}`.trim()));
+  }
 }
 
 export const clamp = (n: number, max: number) => Math.min(Math.max(n, 1), max);
-
-export function record(value: unknown, name: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new BadRequestException(`${name} must be an object`);
-  }
-  return value as Record<string, unknown>;
-}
-
-export function text(value: unknown, name: string, max: number): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > max) {
-    throw new BadRequestException(`${name} must be a non-empty string of at most ${max} characters`);
-  }
-  return value.trim();
-}
-
-export function positive(value: unknown, name: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    throw new BadRequestException(`${name} must be a positive number`);
-  }
-  return value;
-}
-
-export function oneOf<T extends string>(value: unknown, name: string, allowed: readonly T[]): T {
-  if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new BadRequestException(`${name} must be one of ${allowed.join(', ')}`);
-  }
-  return value as T;
-}

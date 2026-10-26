@@ -1,6 +1,6 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
-import { RecipientsRepository } from '../recipients.repository';
+import { RecipientsRepository } from '../repositories/recipients.repository';
 import type { RecipientDto } from '../recipients.types';
 
 export class GetRecipientsQuery extends Query<RecipientDto[]> {

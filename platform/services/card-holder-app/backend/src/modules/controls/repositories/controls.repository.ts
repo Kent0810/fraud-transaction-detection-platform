@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { mapping } from 'cassandra-driver';
 
-import { CassandraService } from '../../shared/cassandra/cassandra.service';
-import { type ControlRow, iso, num } from '../../shared/cassandra/models';
-import type { ControlsDto, MerchantRuleDto, Period, RuleType } from './controls.types';
+import { CassandraService } from '../../../shared/cassandra/cassandra.service';
+import { type ControlRow, iso, num } from '../../../shared/cassandra/models';
+import type { ControlsDto, MerchantRuleDto, Period, RuleType } from '../controls.types';
 
 @Injectable()
 export class ControlsRepository {

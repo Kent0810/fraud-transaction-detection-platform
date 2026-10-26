@@ -21,7 +21,7 @@ async function bootstrap(): Promise<void> {
   }
 
   const app = await NestFactory.create(AppModule);
-  app.enableCors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], exposedHeaders: [NEXT_CURSOR] });
+  app.enableCors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Authorization', 'Content-Type'], exposedHeaders: [NEXT_CURSOR] });
   app.enableShutdownHooks();
   await app.listen(port, '0.0.0.0');
   log.log(`listening on :${port}`);

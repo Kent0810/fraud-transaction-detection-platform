@@ -1,6 +1,6 @@
 import { Command, CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 
-import { RecipientsRepository } from '../recipients.repository';
+import { RecipientsRepository } from '../repositories/recipients.repository';
 
 export class RemoveRecipientCommand extends Command<void> {
   constructor(

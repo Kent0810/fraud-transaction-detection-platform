@@ -1,6 +1,6 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
-import { AccountsRepository } from '../accounts.repository';
+import { AccountsRepository } from '../repositories/accounts.repository';
 import type { BalanceDto } from '../accounts.types';
 
 export class GetBalanceQuery extends Query<BalanceDto | null> {

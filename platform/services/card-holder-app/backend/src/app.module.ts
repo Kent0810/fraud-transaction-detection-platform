@@ -10,9 +10,10 @@ import { HealthController } from './health/health.controller';
 import { KafkaModule } from './kafka/kafka.module';
 import { RecipientsModule } from './modules/recipients/recipients.module';
 import { SharedModule } from './shared/shared.module';
+import { TransfersModule } from './modules/transfers/transfers.module';
 
 @Module({
-  imports: [CqrsModule.forRoot(), ConfigModule, SharedModule, KafkaModule, AuthModule, AccountsModule, CardsModule, ControlsModule, RecipientsModule],
+  imports: [CqrsModule.forRoot(), ConfigModule, SharedModule, KafkaModule, AuthModule, AccountsModule, CardsModule, ControlsModule, RecipientsModule, TransfersModule],
   controllers: [HealthController],
 })
 export class AppModule {}

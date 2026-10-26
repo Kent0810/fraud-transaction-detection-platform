@@ -1,24 +1,27 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import type React from 'react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp } from '@/components/motion';
 import { Button, Empty } from '@/components/ui';
 import { vnd, vndInWords } from '@/components/vnd';
-import { useStore } from '@/data/store';
+import { newTransferId } from '@/data/commands';
+import { TransferError, useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
 
-const OTP_LENGTH = 6;
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function ConfirmTransferScreen() {
   const c = useColors();
   const { draft, banks, accountNumber, sendTransfer, setDraft } = useStore();
-  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [reveal, setReveal] = useState(false);
   const [sending, setSending] = useState(false);
-  const otpInput = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const [error, setError] = useState<string | null>(null);
+  // One id for this screen: pressing Confirm again after a timeout retries the same transfer, never a second one.
+  const [transferId] = useState(newTransferId);
 
   if (!draft) {
     return <Empty icon="swap-horizontal" title="No transfer to confirm" detail="Go back and start a new transfer." />;
@@ -36,10 +39,18 @@ export default function ConfirmTransferScreen() {
   ];
 
   const confirm = async () => {
+    if (!password || sending) return;
     setSending(true);
-    const transfer = await sendTransfer(draft);
-    setDraft(null);
-    router.replace({ pathname: '/transfer/done', params: { transferId: transfer.transferId } });
+    setError(null);
+    try {
+      const transfer = await sendTransfer(draft, transferId, password);
+      setDraft(null);
+      router.replace({ pathname: '/transfer/done', params: { transferId: transfer.transferId } });
+    } catch (e) {
+      setError(e instanceof TransferError ? e.message : `Could not send: ${message(e)}`);
+      setPassword('');
+      setSending(false);
+    }
   };
 
   return (
@@ -62,37 +73,39 @@ export default function ConfirmTransferScreen() {
       </FadeInUp>
 
       <FadeInUp delay={160}>
-        <View style={styles.otpHead}>
+        <View style={styles.authHead}>
           <Ionicons name="shield-checkmark" size={18} color={c.primary} />
-          <Text style={[styles.otpTitle, { color: c.text }]}>Enter Smart OTP</Text>
+          <Text style={[styles.authTitle, { color: c.text }]}>Enter your password to confirm</Text>
         </View>
-        <Pressable onPress={() => otpInput.current?.focus()} style={styles.otpBoxes} accessibilityLabel="OTP code">
-          {Array.from({ length: OTP_LENGTH }, (_, i) => {
-            const filled = i < otp.length;
-            const active = i === otp.length;
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.otpBox,
-                  { backgroundColor: c.surface, borderColor: active ? c.primary : filled ? c.border : 'transparent' },
-                ]}>
-                <Text style={[styles.otpDigit, { color: c.text }]}>{filled ? '•' : ''}</Text>
-              </View>
-            );
-          })}
-        </Pressable>
-        <TextInput
-          ref={otpInput}
-          value={otp}
-          onChangeText={(t) => setOtp(t.replace(/\D/g, '').slice(0, OTP_LENGTH))}
-          keyboardType="number-pad"
-          autoFocus
-          maxLength={OTP_LENGTH}
-          style={styles.hiddenInput}
-          accessibilityLabel="OTP code"
-        />
-        <Text style={[styles.otpHint, { color: c.muted }]}>Demo: enter any 6 digits.</Text>
+        <View style={[styles.passwordRow, { backgroundColor: c.surface }]}>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            placeholderTextColor={c.muted}
+            secureTextEntry={!reveal}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="password"
+            autoFocus
+            returnKeyType="go"
+            onSubmitEditing={confirm}
+            editable={!sending}
+            accessibilityLabel="Password"
+            style={[styles.passwordInput, { color: c.text }]}
+          />
+          <Pressable onPress={() => setReveal((r) => !r)} hitSlop={12} accessibilityLabel={reveal ? 'Hide password' : 'Show password'}>
+            <Ionicons name={reveal ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+          </Pressable>
+        </View>
+        {error ? (
+          <View style={[styles.error, { backgroundColor: c.declineBg }]}>
+            <Ionicons name="alert-circle-outline" size={18} color={c.decline} />
+            <Text style={[styles.errorText, { color: c.decline }]}>{error}</Text>
+          </View>
+        ) : (
+          <Text style={[styles.authHint, { color: c.muted }]}>Asked on every transfer, even when you are signed in.</Text>
+        )}
       </FadeInUp>
 
       <View style={{ marginTop: space.xl }}>
@@ -102,7 +115,7 @@ export default function ConfirmTransferScreen() {
             <Text style={{ color: c.onPrimary, fontWeight: '700', fontSize: 16 }}>Processing…</Text>
           </View>
         ) : (
-          <Button label="Confirm" onPress={confirm} disabled={otp.length < OTP_LENGTH} />
+          <Button label="Confirm" onPress={confirm} disabled={!password} />
         )}
       </View>
     </ScrollView>
@@ -119,12 +132,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg, paddingVertical: space.md },
   key: { fontSize: 14 },
   val: { fontSize: 14, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
-  otpHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xl, marginBottom: space.md },
-  otpTitle: { fontSize: 16, fontWeight: '800' },
-  otpBoxes: { flexDirection: 'row', justifyContent: 'space-between' },
-  otpBox: { width: 48, height: 56, borderRadius: radius.md, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  otpDigit: { fontSize: 28, fontWeight: '800' },
-  hiddenInput: { position: 'absolute', opacity: 0, width: 1, height: 1 },
-  otpHint: { fontSize: 12, textAlign: 'center', marginTop: space.sm },
+  authHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xl, marginBottom: space.md },
+  authTitle: { fontSize: 16, fontWeight: '800' },
+  passwordRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingRight: space.md },
+  passwordInput: { flex: 1, fontSize: 16, paddingHorizontal: space.md, paddingVertical: 14 },
+  authHint: { fontSize: 12, textAlign: 'center', marginTop: space.sm },
+  error: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, borderRadius: radius.md, marginTop: space.sm },
+  errorText: { flex: 1, fontSize: 14, fontWeight: '600' },
   sending: { flexDirection: 'row', gap: space.sm, borderRadius: radius.pill, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
 });

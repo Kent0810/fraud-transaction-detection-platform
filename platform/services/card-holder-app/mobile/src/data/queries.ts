@@ -1,4 +1,4 @@
-import { cardPath, HttpError, request } from './http';
+import { HttpError, ME, request } from './http';
 import type { Alert, Period, Recipient, RuleType, Txn } from './types';
 
 export type Controls = {
@@ -6,18 +6,18 @@ export type Controls = {
   merchantRules: { merchant: string; type: RuleType; createdAt: string }[];
 };
 
-export const fetchTransactions = (cardId: string) => request<Txn[]>('GET', `${cardPath(cardId)}/transactions?limit=100`);
+export const fetchTransactions = () => request<Txn[]>('GET', `${ME}/transactions?limit=100`);
 
-export const fetchAlerts = (cardId: string) => request<Alert[]>('GET', `${cardPath(cardId)}/alerts?limit=100`);
+export const fetchAlerts = () => request<Alert[]>('GET', `${ME}/alerts?limit=100`);
 
 export type Balance = { cardId: string; accountNumber: string; balance: number; currency: string; updatedAt: string };
 
-export const fetchControls = (cardId: string) => request<Controls>('GET', `${cardPath(cardId)}/controls`);
+export const fetchControls = () => request<Controls>('GET', `${ME}/controls`);
 
 // Đồng, not USD like the card amounts: the account is a VND cash account.
-export const fetchBalance = (cardId: string) => request<Balance>('GET', `${cardPath(cardId)}/balance`);
+export const fetchBalance = () => request<Balance>('GET', `${ME}/balance`);
 
-export const fetchRecipients = (cardId: string) => request<Recipient[]>('GET', `${cardPath(cardId)}/recipients`);
+export const fetchRecipients = () => request<Recipient[]>('GET', `${ME}/recipients`);
 
 // Same-bank recipient check; null when no account has that number.
 export async function fetchAccountHolder(accountNumber: string): Promise<string | null> {

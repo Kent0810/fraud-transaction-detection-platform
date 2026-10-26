@@ -26,7 +26,7 @@ export default function TransferDoneScreen() {
 
   const bank = banks.find((b) => b.code === transfer.to.bankCode);
   const rows: [string, string][] = [
-    ['Reference', transfer.transferId],
+    ['Reference', transfer.reference],
     ['Recipient', transfer.to.name],
     ['Account', transfer.to.account],
     ['Bank', bank ? `${bank.code} · ${bank.name}` : transfer.to.bankCode],

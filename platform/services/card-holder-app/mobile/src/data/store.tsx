@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import * as commands from './commands';
-import { apiEnabled } from './http';
+import { apiEnabled, HttpError } from './http';
 import { type Controls, fetchAccountHolder, fetchAlerts, fetchBalance, fetchControls, fetchRecipients, fetchTransactions } from './queries';
-import { useUser } from './auth';
+import { MOCK_PASSWORD, useUser } from './auth';
 
 import { ACCOUNT, ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, TRANSACTIONS } from './mock';
 import type { Alert, Bank, Budget, MerchantRule, Period, Recipient, RuleType, Transfer, TransferKind, Txn } from './types';
@@ -35,7 +35,7 @@ type Store = {
   ruleFor: (merchant: string) => MerchantRule | undefined;
   setDraft: (draft: TransferDraft | null) => void;
   lookupAccount: (bankCode: string, account: string) => Promise<string | null>;
-  sendTransfer: (draft: TransferDraft) => Promise<Transfer>;
+  sendTransfer: (draft: TransferDraft, transferId: string, password: string) => Promise<Transfer>;
   removeSaved: (recipient: Recipient) => void;
 };
 
@@ -47,6 +47,23 @@ const TRANSFER_MS = 1200;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** A transfer the bank refused; message is safe to show as is. */
+export class TransferError extends Error {}
+
+function transferError(e: unknown): Error {
+  if (!(e instanceof HttpError)) return e instanceof Error ? e : new Error(String(e));
+  switch (e.status) {
+    case 403:
+      return new TransferError('Incorrect password');
+    case 404:
+      return new TransferError('Recipient account not found');
+    case 422:
+      return new TransferError('Transfer refused: not enough balance, or the recipient is your own account');
+    default:
+      return new TransferError('Transfer failed. Check your balance before trying again.');
+  }
+}
+
 type CardData = {
   transactions: Txn[];
   alerts: Alert[];
@@ -56,13 +73,13 @@ type CardData = {
   saved: Recipient[];
 };
 
-async function fetchCardData(cardId: string): Promise<CardData> {
+async function fetchCardData(): Promise<CardData> {
   const [transactions, alerts, controls, account, saved] = await Promise.all([
-    fetchTransactions(cardId),
-    fetchAlerts(cardId),
-    fetchControls(cardId),
-    fetchBalance(cardId),
-    fetchRecipients(cardId),
+    fetchTransactions(),
+    fetchAlerts(),
+    fetchControls(),
+    fetchBalance(),
+    fetchRecipients(),
   ]);
   return { transactions, alerts, controls, balance: account.balance, accountNumber: account.accountNumber, saved };
 }
@@ -93,7 +110,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [alerts, setAlerts] = useState<Alert[]>(apiEnabled ? [] : ALERTS);
 
   const load = useCallback(() => {
-    fetchCardData(cardId).then(
+    fetchCardData().then(
       (data) => {
         setTransactions(data.transactions);
         setAlerts(data.alerts);
@@ -110,17 +127,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setStatus('error');
       },
     );
-  }, [cardId]);
+  }, []);
 
   const reloadControls = useCallback(() => {
-    fetchControls(cardId).then(
+    fetchControls().then(
       (controls) => {
         setRules(toRules(controls));
         setBudgetState((b) => withControls(b, controls));
       },
       (e: unknown) => setError(message(e)),
     );
-  }, [cardId]);
+  }, []);
 
   useEffect(() => {
     if (apiEnabled) load();
@@ -150,9 +167,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setBudget = useCallback(
     (limit: number, period: Period) => {
       setBudgetState((b) => ({ ...b, limit, period }));
-      if (apiEnabled) commands.setBudget(cardId, limit, period).catch(reloadControls);
+      if (apiEnabled) commands.setBudget(limit, period).catch(reloadControls);
     },
-    [cardId, reloadControls],
+    [reloadControls],
   );
 
   const setMerchantRule = useCallback(
@@ -166,22 +183,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setTimeout(settle, PROPAGATION_MS);
         return;
       }
-      commands.setMerchantRule(cardId, merchant, type).then(settle, reloadControls);
+      commands.setMerchantRule(merchant, type).then(settle, reloadControls);
     },
-    [cardId, reloadControls],
+    [reloadControls],
   );
 
   const releaseMerchant = useCallback(
     (merchant: string) => {
       setRules((rs) => rs.filter((r) => r.merchant !== merchant));
-      if (apiEnabled) commands.releaseMerchant(cardId, merchant).catch(reloadControls);
+      if (apiEnabled) commands.releaseMerchant(merchant).catch(reloadControls);
     },
-    [cardId, reloadControls],
+    [reloadControls],
   );
 
   const reloadSaved = useCallback(() => {
-    fetchRecipients(cardId).then(setSaved, (e: unknown) => setError(message(e)));
-  }, [cardId]);
+    fetchRecipients().then(setSaved, (e: unknown) => setError(message(e)));
+  }, []);
 
   const lookupAccount = useCallback(
     async (bankCode: string, account: string) => {
@@ -197,34 +214,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [saved],
   );
 
-  const sendTransfer = useCallback(async (d: TransferDraft) => {
-    await wait(TRANSFER_MS);
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(2);
-    const transfer: Transfer = {
-      transferId: `FT${yy}${String(now.getTime()).slice(-9)}`,
-      kind: d.kind,
-      to: d.to,
-      amount: d.amount,
-      fee: 0,
-      content: d.content,
-      ts: now.toISOString(),
-    };
-    setTransfers((ts) => [transfer, ...ts]);
-    setBalance((b) => b - d.amount);
+  const sendTransfer = useCallback(async (d: TransferDraft, transferId: string, password: string) => {
+    let transfer: Transfer;
+    if (apiEnabled) {
+      // The server checks the password, the balance and the recipient, and moves the money in one transaction.
+      const { balance: after, ...posted } = await commands
+        .sendTransfer({ transferId, to: d.to, amount: d.amount, content: d.content, password })
+        .catch((e: unknown) => {
+          throw transferError(e);
+        });
+      transfer = posted;
+      setBalance(after);
+    } else {
+      await wait(TRANSFER_MS);
+      if (password !== MOCK_PASSWORD) throw new TransferError('Incorrect password');
+      const now = new Date();
+      transfer = {
+        transferId,
+        reference: `FT${String(now.getTime()).slice(-10)}`,
+        kind: d.kind,
+        to: d.to,
+        amount: d.amount,
+        fee: 0,
+        content: d.content,
+        ts: now.toISOString(),
+      };
+      setBalance((b) => b - d.amount);
+    }
+    setTransfers((ts) => [transfer, ...ts.filter((t) => t.transferId !== transfer.transferId)]);
     if (d.save) {
       setSaved((rs) => (rs.some((r) => sameRecipient(r, d.to)) ? rs : [d.to, ...rs]));
-      if (apiEnabled) commands.saveRecipient(cardId, d.to).catch(reloadSaved);
+      if (apiEnabled) commands.saveRecipient(d.to).catch(reloadSaved);
     }
     return transfer;
-  }, [cardId, reloadSaved]);
+  }, [reloadSaved]);
 
   const removeSaved = useCallback(
     (recipient: Recipient) => {
       setSaved((rs) => rs.filter((r) => !sameRecipient(r, recipient)));
-      if (apiEnabled) commands.removeRecipient(cardId, recipient).catch(reloadSaved);
+      if (apiEnabled) commands.removeRecipient(recipient).catch(reloadSaved);
     },
-    [cardId, reloadSaved],
+    [reloadSaved],
   );
 
   const value = useMemo<Store>(

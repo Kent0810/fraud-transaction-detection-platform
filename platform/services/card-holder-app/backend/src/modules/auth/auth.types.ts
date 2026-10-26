@@ -1,10 +1,9 @@
-import { cardId, record, text } from '../../common/validation';
+import { z } from 'zod';
 
-export type SessionDto = { cardId: string; name: string; email: string };
+import { CardId, Password } from '../../common/validation';
 
-export type LoginRequest = { cardId: string; password: string };
+// token goes in `Authorization: Bearer <token>` on every other request.
+export type SessionDto = { token: string; expiresAt: string; cardId: string; name: string; email: string };
 
-export function parseLogin(body: unknown): LoginRequest {
-  const b = record(body, 'body');
-  return { cardId: cardId(b.cardId), password: text(b.password, 'password', 128) };
-}
+export const LoginRequest = z.object({ cardId: CardId, password: Password });
+export type LoginRequest = z.infer<typeof LoginRequest>;

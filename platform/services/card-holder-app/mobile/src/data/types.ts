@@ -46,6 +46,7 @@ export type TransferKind = 'INTERNAL' | 'NAPAS';
 
 export type Transfer = {
   transferId: string;
+  reference: string;
   kind: TransferKind;
   to: Recipient;
   amount: number;

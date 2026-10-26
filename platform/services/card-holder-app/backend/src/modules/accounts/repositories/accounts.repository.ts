@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import { iso } from '../../shared/cassandra/models';
-import { PostgresService } from '../../shared/postgres/postgres.service';
-import type { AccountHolderDto, BalanceDto } from './accounts.types';
+import { iso } from '../../../shared/cassandra/models';
+import { PostgresService } from '../../../shared/postgres/postgres.service';
+import type { AccountHolderDto, BalanceDto } from '../accounts.types';
 
 // pg returns bigint as a string; Number is exact up to 2^53, far above any demo balance.
 type AccountRow = { account_number: string; balance: string; currency: string; updated_at: Date };

@@ -1,6 +1,6 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
-import { CardsRepository } from '../cards.repository';
+import { CardsRepository } from '../repositories/cards.repository';
 import type { CardStateDto } from '../cards.types';
 
 export class GetCardStateQuery extends Query<CardStateDto | null> {

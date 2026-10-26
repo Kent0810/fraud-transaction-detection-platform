@@ -216,12 +216,28 @@ services:
     volumes:
       - ./scripts:/scripts:ro
       - pg-data:/var/lib/postgresql/data
-      - ./infra/postgres/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 12
+
+  postgres-migrate:                   # Flyway: applies new infra/postgres/migrations on every up, then afterMigrate__app_role.sql
+    image: flyway/flyway:13.8.1
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-db}
+      FLYWAY_USER: ${POSTGRES_USER:-db_user}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-db_password}
+      FLYWAY_LOCATIONS: filesystem:/flyway/migrations
+      FLYWAY_PLACEHOLDERS_APP_USER: &postgres-app-user ${POSTGRES_APP_USER:-cardholder_app}
+      FLYWAY_PLACEHOLDERS_APP_PASSWORD: &postgres-app-password ${POSTGRES_APP_PASSWORD:-cardholder_app_password}
+    volumes:
+      - ./infra/postgres/migrations:/flyway/migrations:ro
+    command: migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   postgres-seed:                      # dim_card.csv -> cardholders, logins, accounts; idempotent, runs on every up
     image: postgres:17
@@ -235,8 +251,8 @@ services:
       - ../datasets/Sparkov_Data_Generation/data:/data:ro
     entrypoint: ["/bin/bash", "/seed/seed-cardholders.sh"]
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres-migrate:
+        condition: service_completed_successfully
     restart: "no"
 
   connect:
@@ -305,6 +321,8 @@ services:
       - "8080:8080"
     environment:
       <<: [*cassandra-env, *kafka-env, *postgres-env]
+      POSTGRES_USER: *postgres-app-user           # not the owner: can't alter tables or rewrite history
+      POSTGRES_PASSWORD: *postgres-app-password
       PORT: 8080
     depends_on:
       postgres-seed:

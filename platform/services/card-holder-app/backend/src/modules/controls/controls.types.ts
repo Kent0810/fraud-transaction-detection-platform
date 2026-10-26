@@ -1,4 +1,6 @@
-import { oneOf, positive, record, text } from '../../common/validation';
+import { z } from 'zod';
+
+import { text } from '../../common/validation';
 
 export const PERIODS = ['DAY', 'WEEK', 'MONTH'] as const;
 export type Period = (typeof PERIODS)[number];
@@ -48,15 +50,10 @@ export function controlEvent(action: ControlAction, controlId: string, ts: strin
   return { action, control_id: controlId, ts, ...NO_FIELDS, ...fields };
 }
 
-export function parseBudget(body: unknown): { limit: number; period: Period } {
-  const b = record(body, 'body');
-  return { limit: positive(b.limit, 'limit'), period: oneOf(b.period, 'period', PERIODS) };
-}
+export const BudgetRequest = z.object({ limit: z.number().positive(), period: z.enum(PERIODS) });
+export type BudgetRequest = z.infer<typeof BudgetRequest>;
 
-export function parseRuleType(body: unknown): RuleType {
-  return oneOf(record(body, 'body').type, 'type', RULE_TYPES);
-}
+export const MerchantRuleRequest = z.object({ type: z.enum(RULE_TYPES) });
+export type MerchantRuleRequest = z.infer<typeof MerchantRuleRequest>;
 
-export function parseMerchant(value: string): string {
-  return text(value, 'merchant', 120);
-}
+export const Merchant = text(120);

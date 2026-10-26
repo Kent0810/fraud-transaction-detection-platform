@@ -1,13 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Put } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
-import { CardIdPipe } from '../../common/validation';
+import { CurrentCard } from '../../common/decorators/session.decorator';
+import { AccountNumber, BankCode, ZodPipe } from '../../common/validation';
 import { RemoveRecipientCommand } from './commands/remove-recipient.command';
 import { SaveRecipientCommand } from './commands/save-recipient.command';
 import { GetRecipientsQuery } from './queries/get-recipients.query';
-import { account, bankCode, parseRecipientName, type RecipientDto } from './recipients.types';
+import { type RecipientDto, RecipientName } from './recipients.types';
 
-@Controller('cards/:cardId/recipients')
+@Controller('me/recipients')
 export class RecipientsController {
   constructor(
     private readonly commands: CommandBus,
@@ -15,28 +16,28 @@ export class RecipientsController {
   ) {}
 
   @Get()
-  recipients(@Param('cardId', CardIdPipe) cardId: string): Promise<RecipientDto[]> {
+  recipients(@CurrentCard() cardId: string): Promise<RecipientDto[]> {
     return this.queries.execute(new GetRecipientsQuery(cardId));
   }
 
   // PUT: saving the same recipient twice is a no-op, so a retry is safe.
   @Put(':bankCode/:account')
   save(
-    @Param('cardId', CardIdPipe) cardId: string,
-    @Param('bankCode') bank: string,
-    @Param('account') acct: string,
-    @Body() body: unknown,
+    @CurrentCard() cardId: string,
+    @Param('bankCode', new ZodPipe(BankCode)) bankCode: string,
+    @Param('account', new ZodPipe(AccountNumber)) account: string,
+    @Body(new ZodPipe(RecipientName)) { name }: RecipientName,
   ): Promise<RecipientDto> {
-    return this.commands.execute(new SaveRecipientCommand(cardId, bankCode(bank), account(acct), parseRecipientName(body)));
+    return this.commands.execute(new SaveRecipientCommand(cardId, bankCode, account, name));
   }
 
   @Delete(':bankCode/:account')
   @HttpCode(204)
   remove(
-    @Param('cardId', CardIdPipe) cardId: string,
-    @Param('bankCode') bank: string,
-    @Param('account') acct: string,
+    @CurrentCard() cardId: string,
+    @Param('bankCode', new ZodPipe(BankCode)) bankCode: string,
+    @Param('account', new ZodPipe(AccountNumber)) account: string,
   ): Promise<void> {
-    return this.commands.execute(new RemoveRecipientCommand(cardId, bankCode(bank), account(acct)));
+    return this.commands.execute(new RemoveRecipientCommand(cardId, bankCode, account));
   }
 }
