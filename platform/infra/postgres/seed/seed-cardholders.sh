@@ -52,14 +52,15 @@ FROM cardholders c
 WHERE NOT EXISTS (SELECT 1 FROM auth l WHERE l.card_id = c.card_id);
 
 -- Opens an account only for cards that have none, so a rerun never resets a balance that transfers have moved.
+-- The OPENING entry sets the balance (apply_ledger_entry() in V2).
 WITH opened AS (
-  INSERT INTO accounts (card_id, balance)
-  SELECT card_id, :opening_balance FROM cardholders ORDER BY card_id   -- account numbers follow card order
+  INSERT INTO accounts (card_id)
+  SELECT card_id FROM cardholders ORDER BY card_id   -- account numbers follow card order
   ON CONFLICT (card_id) DO NOTHING
-  RETURNING card_id, balance
+  RETURNING card_id
 )
 INSERT INTO ledger_entries (card_id, kind, amount)
-SELECT card_id, 'OPENING', balance FROM opened;
+SELECT card_id, 'OPENING', :opening_balance FROM opened;
 
 SELECT count(*) AS cardholders FROM cardholders;
 SQL

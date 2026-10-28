@@ -14,7 +14,7 @@ model accounts {
   card_id                                 String          @id
   account_number                          String          @unique @default(dbgenerated("('1903'::text || lpad((nextval('account_number_seq'::regclass))::text, 8, '0'::text))"))
   currency                                String          @default("VND") @db.Char(3)
-  balance                                 BigInt
+  balance                                 BigInt          @default(0)
   created_at                              DateTime        @default(now()) @db.Timestamptz(6)
   updated_at                              DateTime        @default(now()) @db.Timestamptz(6)
   cardholders                             cardholders     @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
@@ -77,14 +77,16 @@ model flyway_schema_history {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ledger_entries {
-  entry_id   BigInt   @id @default(autoincrement())
-  card_id    String   @unique(map: "ledger_entries_opening_key", where: raw("(kind = 'OPENING'::text)"))
+  entry_id   BigInt     @id @default(autoincrement())
+  card_id    String     @unique(map: "ledger_entries_opening_key", where: raw("(kind = 'OPENING'::text)"))
   kind       String
   amount     BigInt
   reference  String?
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  accounts   accounts @relation(fields: [card_id], references: [card_id], onUpdate: NoAction)
+  created_at DateTime   @default(now()) @db.Timestamptz(6)
+  accounts   accounts   @relation(fields: [card_id], references: [card_id], onUpdate: NoAction)
+  transfers  transfers? @relation(fields: [reference], references: [reference], onDelete: Restrict, onUpdate: NoAction)
 
+  @@unique([reference, card_id], map: "ledger_entries_transfer_key", where: raw("(reference IS NOT NULL)"))
   @@index([card_id, created_at(sort: Desc)], map: "ledger_entries_card_idx")
 }
 
@@ -94,6 +96,8 @@ model outbox {
   type         String
   payload      Json
   created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([aggregate_id], map: "outbox_aggregate_idx")
 }
 
 model saved_recipients {
@@ -120,8 +124,8 @@ model sessions {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model transfers {
-  transfer_id                            String    @id @db.Uuid
-  reference                              String    @unique @default(dbgenerated("('FT'::text || lpad((nextval('transfer_reference_seq'::regclass))::text, 10, '0'::text))"))
+  transfer_id                            String           @id @db.Uuid
+  reference                              String           @unique @default(dbgenerated("('FT'::text || lpad((nextval('transfer_reference_seq'::regclass))::text, 10, '0'::text))"))
   from_card                              String
   to_bank_code                           String
   to_account                             String
@@ -129,9 +133,10 @@ model transfers {
   to_card                                String?
   amount                                 BigInt
   content                                String
-  created_at                             DateTime  @default(now()) @db.Timestamptz(6)
-  accounts_transfers_from_cardToaccounts accounts  @relation("transfers_from_cardToaccounts", fields: [from_card], references: [card_id], onUpdate: NoAction)
-  accounts_transfers_to_cardToaccounts   accounts? @relation("transfers_to_cardToaccounts", fields: [to_card], references: [card_id], onDelete: Restrict, onUpdate: NoAction)
+  created_at                             DateTime         @default(now()) @db.Timestamptz(6)
+  ledger_entries                         ledger_entries[]
+  accounts_transfers_from_cardToaccounts accounts         @relation("transfers_from_cardToaccounts", fields: [from_card], references: [card_id], onUpdate: NoAction)
+  accounts_transfers_to_cardToaccounts   accounts?        @relation("transfers_to_cardToaccounts", fields: [to_card], references: [card_id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([from_card, created_at(sort: Desc)], map: "transfers_from_idx")
   @@index([to_card, created_at(sort: Desc)], map: "transfers_to_idx", where: raw("(to_card IS NOT NULL)"))

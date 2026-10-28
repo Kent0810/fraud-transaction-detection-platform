@@ -37,8 +37,8 @@ export class TransfersRepository {
   constructor(private readonly db: PrismaService) {}
 
   /**
-   * Moves the money through @platform/db's postTransfer(): the password check, then the transfer, both balances, the
-   * ledger and the outbox event in one transaction. Sending the same transferId again returns the first result.
+   * Moves the money through @platform/db's postTransfer(): the password check, then the transfer, the ledger entries
+   * and the outbox event in one transaction. Sending the same transferId again returns the first result.
    */
   async post(fromCard: string, t: TransferRequest): Promise<TransferDto> {
     try {

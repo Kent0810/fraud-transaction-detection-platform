@@ -27,9 +27,8 @@ GRANT UPDATE (last_login_at) ON auth TO "${app_user}";
 
 GRANT SELECT, INSERT, DELETE ON sessions TO "${app_user}";
 
--- Money moves through postTransfer() in @platform/db: change a balance and append history, nothing more.
+-- Money moves through postTransfer() in @platform/db: append history, nothing more. Balances follow the ledger.
 GRANT SELECT ON accounts TO "${app_user}";
-GRANT UPDATE (balance, updated_at) ON accounts TO "${app_user}";
 GRANT SELECT, INSERT ON ledger_entries TO "${app_user}";
 GRANT SELECT, INSERT ON transfers TO "${app_user}";
 GRANT USAGE ON SEQUENCE transfer_reference_seq TO "${app_user}";

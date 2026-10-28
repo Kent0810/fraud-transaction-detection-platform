@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 
-import type { PrismaClient } from './generated/prisma/client';
+import { Prisma, type PrismaClient } from './generated/prisma/client';
 
 export const OUR_BANK = 'HCMMB';
 
@@ -45,7 +45,7 @@ export class TransferRefusedError extends Error {
   }
 }
 
-/** The only way to move money: the transfer, both balances, the ledger entries and the outbox event in one transaction. */
+/** The only way to move money: the transfer, its ledger entries and the outbox event in one transaction. */
 export async function postTransfer(db: PrismaClient, t: PostTransferInput): Promise<PostedTransfer> {
   // Before the transaction: bcrypt is slow and shouldn't hold a lock.
   const login = await db.auth.findUnique({
@@ -77,45 +77,37 @@ export async function postTransfer(db: PrismaClient, t: PostTransferInput): Prom
     });
     if (!created) return replay(tx, t, amount);
 
-    // card_id order, so two opposite transfers can't deadlock. The debit checks the balance in the same UPDATE.
-    let balance = 0n;
-    const changes = [{ card: t.fromCard, by: -amount }];
-    if (to) changes.push({ card: to.cardId, by: amount });
-
-    for (const c of changes.sort((a, b) => (a.card < b.card ? -1 : 1))) {
-      if (c.by < 0n) {
-        const debited = await tx.accounts.updateManyAndReturn({
-          where: {
-            card_id: c.card,
-            balance: { gte: amount },
-          },
-          data: {
-            balance: { decrement: amount },
-            updated_at: new Date(),
-          },
-          select: { balance: true },
-        });
-        if (!debited[0]) throw new TransferRefusedError('INSUFFICIENT_FUNDS', 'insufficient funds');
-        balance = debited[0].balance;
-      } else {
-        await tx.accounts.update({
-          where: { card_id: c.card },
-          data: {
-            balance: { increment: amount },
-            updated_at: new Date(),
-          },
-          select: { card_id: true },
-        });
-      }
+    const entries = [
+      {
+        card_id: t.fromCard,
+        kind: 'TRANSFER',
+        amount: -amount,
+        reference: created.reference,
+      },
+    ];
+    if (to) {
+      entries.push({
+        card_id: to.cardId,
+        kind: 'TRANSFER',
+        amount,
+        reference: created.reference,
+      });
     }
 
-    await tx.ledger_entries.createMany({
-      data: changes.map((c) => ({
-        card_id: c.card,
-        kind: c.by < 0n ? 'DEBIT' : 'CREDIT',
-        amount: c.by,
-        reference: created.reference,
-      })),
+    // The database applies each entry to its balance (apply_ledger_entry). In card_id order, so two opposite
+    // transfers lock the same accounts in the same order and can't deadlock.
+    try {
+      await tx.ledger_entries.createMany({
+        data: entries.sort((a, b) => (a.card_id < b.card_id ? -1 : 1)),
+      });
+    } catch (e) {
+      if (isOverdraft(e)) throw new TransferRefusedError('INSUFFICIENT_FUNDS', 'insufficient funds');
+      throw e;
+    }
+
+    const { balance } = await tx.accounts.findUniqueOrThrow({
+      where: { card_id: t.fromCard },
+      select: { balance: true },
     });
 
     // createMany: no RETURNING, so the app login needs no SELECT on the outbox.
@@ -187,4 +179,11 @@ async function replay(
     select: { balance: true },
   });
   return { ...first, balance };
+}
+
+// apply_ledger_entry() took the balance below zero: CHECK (balance >= 0) on accounts, SQLSTATE 23514.
+function isOverdraft(e: unknown): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  const cause = (e.meta?.driverAdapterError as { cause?: { originalCode?: string; originalMessage?: string } })?.cause;
+  return cause?.originalCode === '23514' && !!cause.originalMessage?.includes('accounts_balance_check');
 }
