@@ -2,11 +2,30 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import * as commands from './commands';
 import { apiEnabled, HttpError } from './http';
-import { type Controls, fetchAccountHolder, fetchAlerts, fetchBalance, fetchControls, fetchRecipients, fetchTransactions } from './queries';
+import {
+  type Controls,
+  fetchAccountHolder,
+  fetchAlerts,
+  fetchBalance,
+  fetchControls,
+  fetchRecipients,
+  fetchTransactions,
+} from './queries';
 import { MOCK_PASSWORD, useUser } from './auth';
 
 import { ACCOUNT, ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, TRANSACTIONS } from './mock';
-import type { Alert, Bank, Budget, MerchantRule, Period, Recipient, RuleType, Transfer, TransferKind, Txn } from './types';
+import type {
+  Alert,
+  Bank,
+  Budget,
+  MerchantRule,
+  Period,
+  Recipient,
+  RuleType,
+  Transfer,
+  TransferKind,
+  Txn,
+} from './types';
 
 export type TransferDraft = { kind: TransferKind; to: Recipient; amount: number; content: string; save: boolean };
 
@@ -214,40 +233,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [saved],
   );
 
-  const sendTransfer = useCallback(async (d: TransferDraft, transferId: string, password: string) => {
-    let transfer: Transfer;
-    if (apiEnabled) {
-      // The server checks the password, the balance and the recipient, and moves the money in one transaction.
-      const { balance: after, ...posted } = await commands
-        .sendTransfer({ transferId, to: d.to, amount: d.amount, content: d.content, password })
-        .catch((e: unknown) => {
-          throw transferError(e);
-        });
-      transfer = posted;
-      setBalance(after);
-    } else {
-      await wait(TRANSFER_MS);
-      if (password !== MOCK_PASSWORD) throw new TransferError('Incorrect password');
-      const now = new Date();
-      transfer = {
-        transferId,
-        reference: `FT${String(now.getTime()).slice(-10)}`,
-        kind: d.kind,
-        to: d.to,
-        amount: d.amount,
-        fee: 0,
-        content: d.content,
-        ts: now.toISOString(),
-      };
-      setBalance((b) => b - d.amount);
-    }
-    setTransfers((ts) => [transfer, ...ts.filter((t) => t.transferId !== transfer.transferId)]);
-    if (d.save) {
-      setSaved((rs) => (rs.some((r) => sameRecipient(r, d.to)) ? rs : [d.to, ...rs]));
-      if (apiEnabled) commands.saveRecipient(d.to).catch(reloadSaved);
-    }
-    return transfer;
-  }, [reloadSaved]);
+  const sendTransfer = useCallback(
+    async (d: TransferDraft, transferId: string, password: string) => {
+      let transfer: Transfer;
+      if (apiEnabled) {
+        // The server checks the password, the balance and the recipient, and moves the money in one transaction.
+        const { balance: after, ...posted } = await commands
+          .sendTransfer({ transferId, to: d.to, amount: d.amount, content: d.content, password })
+          .catch((e: unknown) => {
+            throw transferError(e);
+          });
+        transfer = posted;
+        setBalance(after);
+      } else {
+        await wait(TRANSFER_MS);
+        if (password !== MOCK_PASSWORD) throw new TransferError('Incorrect password');
+        const now = new Date();
+        transfer = {
+          transferId,
+          reference: `FT${String(now.getTime()).slice(-10)}`,
+          kind: d.kind,
+          to: d.to,
+          amount: d.amount,
+          fee: 0,
+          content: d.content,
+          ts: now.toISOString(),
+        };
+        setBalance((b) => b - d.amount);
+      }
+      setTransfers((ts) => [transfer, ...ts.filter((t) => t.transferId !== transfer.transferId)]);
+      if (d.save) {
+        setSaved((rs) => (rs.some((r) => sameRecipient(r, d.to)) ? rs : [d.to, ...rs]));
+        if (apiEnabled) commands.saveRecipient(d.to).catch(reloadSaved);
+      }
+      return transfer;
+    },
+    [reloadSaved],
+  );
 
   const removeSaved = useCallback(
     (recipient: Recipient) => {
@@ -284,7 +306,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sendTransfer,
       removeSaved,
     }),
-    [status, error, cardId, refresh, transactions, alerts, effectiveBudget, rules, frozen, balance, accountNumber, saved, transfers, draft, toggleFrozen, setBudget, setMerchantRule, releaseMerchant, lookupAccount, sendTransfer, removeSaved],
+    [
+      status,
+      error,
+      cardId,
+      refresh,
+      transactions,
+      alerts,
+      effectiveBudget,
+      rules,
+      frozen,
+      balance,
+      accountNumber,
+      saved,
+      transfers,
+      draft,
+      toggleFrozen,
+      setBudget,
+      setMerchantRule,
+      releaseMerchant,
+      lookupAccount,
+      sendTransfer,
+      removeSaved,
+    ],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -74,7 +74,14 @@ export default function TransferDoneScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexGrow: 1, padding: space.lg, paddingTop: space.xxl * 1.5, paddingBottom: space.xxl, justifyContent: 'space-between', gap: space.xl },
+  wrap: {
+    flexGrow: 1,
+    padding: space.lg,
+    paddingTop: space.xxl * 1.5,
+    paddingBottom: space.xxl,
+    justifyContent: 'space-between',
+    gap: space.xl,
+  },
   receipt: { borderRadius: radius.xl, padding: space.lg, overflow: 'hidden' },
   top: { alignItems: 'center', gap: space.md, paddingVertical: space.md },
   status: { fontSize: 16, fontWeight: '800' },

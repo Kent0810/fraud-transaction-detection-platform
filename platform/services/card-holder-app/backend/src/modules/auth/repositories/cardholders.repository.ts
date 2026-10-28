@@ -1,41 +1,42 @@
 import { Injectable } from '@nestjs/common';
+import bcrypt from 'bcryptjs';
 
-import { PostgresService } from '../../../shared/postgres/postgres.service';
-
-type LoginRow = {
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  status: string | null;
-  password_ok: boolean | null;
-};
+import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export type Cardholder = { cardId: string; name: string; email: string };
 
-// Always returns one row and always runs crypt(): an unknown card hashes against a throwaway salt,
+// Same cost as the seed's gen_salt('bf', 8). An unknown card is compared against this throwaway hash,
 // so it takes as long as a wrong password and login timing can't be used to probe card numbers.
-const VERIFY_LOGIN = `
-  SELECT c.first_name, c.last_name, c.email, l.status,
-         l.password_hash = crypt($2, coalesce(l.password_hash, gen_salt('bf', 8))) AS password_ok
-  FROM (VALUES ($1::text)) AS q (card_id)
-  LEFT JOIN auth l USING (card_id)
-  LEFT JOIN cardholders c USING (card_id)`;
+const NO_SUCH_LOGIN = bcrypt.hashSync('no such login', 8);
 
 @Injectable()
 export class CardholdersRepository {
-  constructor(private readonly db: PostgresService) {}
+  constructor(private readonly db: PrismaService) {}
 
   /** The cardholder for a valid, active login, or null. Records the login time on success. */
   async login(cardId: string, password: string): Promise<Cardholder | null> {
-    const row = await this.check(cardId, password);
-    if (!row) return null;
-    await this.db.pool.query('UPDATE auth SET last_login_at = now() WHERE card_id = $1', [cardId]);
-    return { cardId, name: `${row.first_name} ${row.last_name}`, email: row.email ?? '' };
-  }
+    const login = await this.db.client.auth.findUnique({
+      where: { card_id: cardId },
+      select: {
+        password_hash: true,
+        status: true,
+        cardholders: {
+          select: {
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+      },
+    });
+    const passwordOk = await bcrypt.compare(password, login?.password_hash ?? NO_SUCH_LOGIN);
+    if (!login || !passwordOk || login.status !== 'ACTIVE') return null;
 
-  private async check(cardId: string, password: string): Promise<LoginRow | null> {
-    const { rows } = await this.db.pool.query<LoginRow>(VERIFY_LOGIN, [cardId, password]);
-    const row = rows[0];
-    return row?.password_ok && row.status === 'ACTIVE' ? row : null;
+    await this.db.client.auth.updateMany({
+      where: { card_id: cardId },
+      data: { last_login_at: new Date() },
+    });
+    const c = login.cardholders;
+    return { cardId, name: `${c.first_name} ${c.last_name}`, email: c.email };
   }
 }

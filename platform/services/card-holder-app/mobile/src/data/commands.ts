@@ -5,11 +5,13 @@ const merchantPath = (merchant: string) => `${ME}/merchant-rules/${encodeURIComp
 
 export const setBudget = (limit: number, period: Period) => request<void>('PUT', `${ME}/budget`, { limit, period });
 
-export const setMerchantRule = (merchant: string, type: RuleType) => request<void>('PUT', merchantPath(merchant), { type });
+export const setMerchantRule = (merchant: string, type: RuleType) =>
+  request<void>('PUT', merchantPath(merchant), { type });
 
 export const releaseMerchant = (merchant: string) => request<void>('DELETE', merchantPath(merchant));
 
-const recipientPath = (r: Recipient) => `${ME}/recipients/${encodeURIComponent(r.bankCode)}/${encodeURIComponent(r.account)}`;
+const recipientPath = (r: Recipient) =>
+  `${ME}/recipients/${encodeURIComponent(r.bankCode)}/${encodeURIComponent(r.account)}`;
 
 export const saveRecipient = (r: Recipient) => request<void>('PUT', recipientPath(r), { name: r.name });
 

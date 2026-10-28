@@ -1,5 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Platform, Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 export const NATIVE = Platform.OS !== 'web';
 
@@ -42,9 +50,14 @@ export function ScalePressable({
   style,
   scaleTo = 0.96,
   ...rest
-}: Omit<PressableProps, 'style' | 'children'> & { children: ReactNode; style?: StyleProp<ViewStyle>; scaleTo?: number }) {
+}: Omit<PressableProps, 'style' | 'children'> & {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  scaleTo?: number;
+}) {
   const scale = useState(() => new Animated.Value(1))[0];
-  const to = (v: number) => Animated.spring(scale, { toValue: v, speed: 40, bounciness: 6, useNativeDriver: NATIVE }).start();
+  const to = (v: number) =>
+    Animated.spring(scale, { toValue: v, speed: 40, bounciness: 6, useNativeDriver: NATIVE }).start();
   return (
     <Pressable {...rest} onPressIn={() => to(scaleTo)} onPressOut={() => to(1)}>
       <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>

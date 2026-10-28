@@ -46,7 +46,12 @@ export function merchantControlId(merchant: string): string {
   return `${MERCHANT_PREFIX}${merchant}`;
 }
 
-export function controlEvent(action: ControlAction, controlId: string, ts: string, fields: Partial<ControlFields> = {}): ControlEvent {
+export function controlEvent(
+  action: ControlAction,
+  controlId: string,
+  ts: string,
+  fields: Partial<ControlFields> = {},
+): ControlEvent {
   return { action, control_id: controlId, ts, ...NO_FIELDS, ...fields };
 }
 

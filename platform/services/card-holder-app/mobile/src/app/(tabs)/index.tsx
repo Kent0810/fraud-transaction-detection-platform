@@ -50,7 +50,12 @@ export default function HomeScreen() {
 
   const actions: { icon: IconName; label: string; onPress: () => void; active?: boolean }[] = [
     { icon: 'paper-plane-outline', label: 'Transfer', onPress: () => router.push('/transfer') },
-    { icon: frozen ? 'snow' : 'snow-outline', label: frozen ? 'Unfreeze' : 'Freeze', onPress: toggleFrozen, active: frozen },
+    {
+      icon: frozen ? 'snow' : 'snow-outline',
+      label: frozen ? 'Unfreeze' : 'Freeze',
+      onPress: toggleFrozen,
+      active: frozen,
+    },
     { icon: 'pie-chart-outline', label: 'Budget', onPress: () => router.navigate('/budget') },
     { icon: 'storefront-outline', label: 'Merchants', onPress: () => router.navigate('/merchants') },
   ];
@@ -61,7 +66,8 @@ export default function HomeScreen() {
         status === 'mock' ? undefined : (
           <RefreshControl refreshing={status === 'loading'} onRefresh={refresh} tintColor={c.primary} />
         )
-      }>
+      }
+    >
       <FadeInUp>
         <View style={styles.brand}>
           <Wordmark size={26} />
@@ -77,13 +83,15 @@ export default function HomeScreen() {
           <ScalePressable
             accessibilityLabel={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             onPress={() => update('theme', theme === 'dark' ? 'light' : 'dark')}
-            style={[styles.bell, { backgroundColor: c.surface }]}>
+            style={[styles.bell, { backgroundColor: c.surface }]}
+          >
             <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={22} color={c.text} />
           </ScalePressable>
           <ScalePressable
             accessibilityLabel="Alerts"
             onPress={() => router.navigate('/alerts')}
-            style={[styles.bell, { backgroundColor: c.surface }]}>
+            style={[styles.bell, { backgroundColor: c.surface }]}
+          >
             <Ionicons name="notifications-outline" size={22} color={c.text} />
             {openAlerts > 0 && <View style={[styles.dot, { backgroundColor: c.decline, borderColor: c.surface }]} />}
           </ScalePressable>
@@ -97,7 +105,8 @@ export default function HomeScreen() {
           <Pressable
             onPress={() => update('hideBalance', !hideBalance)}
             accessibilityLabel={hideBalance ? 'Show balance' : 'Hide balance'}
-            hitSlop={12}>
+            hitSlop={12}
+          >
             <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={22} color={c.muted} />
           </Pressable>
         </View>
@@ -140,7 +149,8 @@ export default function HomeScreen() {
                     styles.transfer,
                     i > 0 && [styles.divider, { borderTopColor: c.border }],
                     { opacity: pressed ? 0.6 : 1 },
-                  ]}>
+                  ]}
+                >
                   <Avatar name={t.merchant} size={44} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.transferName, { color: c.text }]} numberOfLines={1}>
@@ -161,7 +171,11 @@ export default function HomeScreen() {
       <FadeInUp delay={480}>
         <SectionHeader title="Recent activity" />
         {status === 'error' && (
-          <Pressable onPress={refresh} style={[styles.banner, { backgroundColor: c.declineBg }]} accessibilityRole="button">
+          <Pressable
+            onPress={refresh}
+            style={[styles.banner, { backgroundColor: c.declineBg }]}
+            accessibilityRole="button"
+          >
             <Ionicons name="cloud-offline-outline" size={20} color={c.decline} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.bannerTitle, { color: c.decline }]}>Could not load your activity</Text>

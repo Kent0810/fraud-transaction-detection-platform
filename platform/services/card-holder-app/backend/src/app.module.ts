@@ -13,7 +13,18 @@ import { SharedModule } from './shared/shared.module';
 import { TransfersModule } from './modules/transfers/transfers.module';
 
 @Module({
-  imports: [CqrsModule.forRoot(), ConfigModule, SharedModule, KafkaModule, AuthModule, AccountsModule, CardsModule, ControlsModule, RecipientsModule, TransfersModule],
+  imports: [
+    CqrsModule.forRoot(),
+    ConfigModule,
+    SharedModule,
+    KafkaModule,
+    AuthModule,
+    AccountsModule,
+    CardsModule,
+    ControlsModule,
+    RecipientsModule,
+    TransfersModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}

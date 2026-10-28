@@ -41,7 +41,8 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + space.xxl * 2 }]}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <FadeInUp style={styles.brand}>
           <Logo size={80} />
           <Text style={[styles.title, { color: c.text }]}>{BANK_NAME}</Text>
@@ -81,7 +82,8 @@ export default function LoginScreen() {
               <Pressable
                 onPress={() => setReveal((r) => !r)}
                 hitSlop={12}
-                accessibilityLabel={reveal ? 'Hide password' : 'Show password'}>
+                accessibilityLabel={reveal ? 'Hide password' : 'Show password'}
+              >
                 <Ionicons name={reveal ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
               </Pressable>
             </View>
@@ -94,7 +96,12 @@ export default function LoginScreen() {
             )}
 
             <View style={styles.gap}>
-              <Button label={busy ? 'Signing in…' : 'Log in'} icon="log-in-outline" onPress={submit} disabled={!valid || busy} />
+              <Button
+                label={busy ? 'Signing in…' : 'Log in'}
+                icon="log-in-outline"
+                onPress={submit}
+                disabled={!valid || busy}
+              />
             </View>
           </Surface>
         </FadeInUp>
@@ -114,6 +121,13 @@ const styles = StyleSheet.create({
   input: { fontSize: 16, paddingHorizontal: space.md, paddingVertical: 14, borderRadius: radius.md },
   passwordRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingRight: space.md },
   passwordInput: { flex: 1 },
-  error: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, borderRadius: radius.md, marginTop: space.sm },
+  error: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
+    marginTop: space.sm,
+  },
   errorText: { flex: 1, fontSize: 14, fontWeight: '600' },
 });

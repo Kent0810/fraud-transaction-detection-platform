@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
-import { PostgresService } from '../../../shared/postgres/postgres.service';
+import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 // Absolute lifetime; the app signs in again after this.
 const SESSION_HOURS = 12;
@@ -13,31 +13,48 @@ export type NewSession = { token: string; expiresAt: Date };
 
 @Injectable()
 export class SessionsRepository {
-  constructor(private readonly db: PostgresService) {}
+  constructor(private readonly db: PrismaService) {}
 
   /** 256 random bits; only the hash is stored. Also clears this card's expired sessions. */
   async create(cardId: string): Promise<NewSession> {
     const token = randomBytes(32).toString('base64url');
-    const { rows } = await this.db.pool.query<{ expires_at: Date }>(
-      `WITH gone AS (DELETE FROM sessions WHERE card_id = $2 AND expires_at <= now())
-       INSERT INTO sessions (token_hash, card_id, expires_at) VALUES ($1, $2, now() + make_interval(hours => $3))
-       RETURNING expires_at`,
-      [hash(token), cardId, SESSION_HOURS],
-    );
-    return { token, expiresAt: rows[0].expires_at };
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + SESSION_HOURS * 3_600_000);
+    await this.db.client.$transaction([
+      this.db.client.sessions.deleteMany({
+        where: {
+          card_id: cardId,
+          expires_at: { lte: now },
+        },
+      }),
+      this.db.client.sessions.create({
+        data: {
+          token_hash: hash(token),
+          card_id: cardId,
+          expires_at: expiresAt,
+        },
+        select: { card_id: true },
+      }),
+    ]);
+    return { token, expiresAt };
   }
 
   /** The card for a live session whose login is still ACTIVE, so locking a card signs it out everywhere. */
   async cardFor(token: string): Promise<string | null> {
-    const { rows } = await this.db.pool.query<{ card_id: string }>(
-      `SELECT s.card_id FROM sessions s JOIN auth a USING (card_id)
-       WHERE s.token_hash = $1 AND s.expires_at > now() AND a.status = 'ACTIVE'`,
-      [hash(token)],
-    );
-    return rows[0]?.card_id ?? null;
+    const row = await this.db.client.sessions.findFirst({
+      where: {
+        token_hash: hash(token),
+        expires_at: { gt: new Date() },
+        cardholders: {
+          auth: { status: 'ACTIVE' },
+        },
+      },
+      select: { card_id: true },
+    });
+    return row?.card_id ?? null;
   }
 
   async revoke(token: string): Promise<void> {
-    await this.db.pool.query('DELETE FROM sessions WHERE token_hash = $1', [hash(token)]);
+    await this.db.client.sessions.deleteMany({ where: { token_hash: hash(token) } });
   }
 }

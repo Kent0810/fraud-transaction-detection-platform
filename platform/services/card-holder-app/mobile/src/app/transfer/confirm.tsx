@@ -54,7 +54,11 @@ export default function ConfirmTransferScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <FadeInUp style={styles.hero}>
         <Text style={[styles.heroLabel, { color: c.muted }]}>Amount</Text>
         <Text style={[styles.amount, { color: c.primary }]}>{vnd(draft.amount)}</Text>
@@ -64,7 +68,10 @@ export default function ConfirmTransferScreen() {
       <FadeInUp delay={80}>
         <View style={[styles.card, { backgroundColor: c.surface }]}>
           {rows.map(([k, v], i) => (
-            <View key={k} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
+            <View
+              key={k}
+              style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}
+            >
               <Text style={[styles.key, { color: c.muted }]}>{k}</Text>
               <Text style={[styles.val, { color: k === 'Fee' ? c.allow : c.text }]}>{v}</Text>
             </View>
@@ -94,7 +101,11 @@ export default function ConfirmTransferScreen() {
             accessibilityLabel="Password"
             style={[styles.passwordInput, { color: c.text }]}
           />
-          <Pressable onPress={() => setReveal((r) => !r)} hitSlop={12} accessibilityLabel={reveal ? 'Hide password' : 'Show password'}>
+          <Pressable
+            onPress={() => setReveal((r) => !r)}
+            hitSlop={12}
+            accessibilityLabel={reveal ? 'Hide password' : 'Show password'}
+          >
             <Ionicons name={reveal ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
           </Pressable>
         </View>
@@ -104,7 +115,9 @@ export default function ConfirmTransferScreen() {
             <Text style={[styles.errorText, { color: c.decline }]}>{error}</Text>
           </View>
         ) : (
-          <Text style={[styles.authHint, { color: c.muted }]}>Asked on every transfer, even when you are signed in.</Text>
+          <Text style={[styles.authHint, { color: c.muted }]}>
+            Asked on every transfer, even when you are signed in.
+          </Text>
         )}
       </FadeInUp>
 
@@ -137,7 +150,21 @@ const styles = StyleSheet.create({
   passwordRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingRight: space.md },
   passwordInput: { flex: 1, fontSize: 16, paddingHorizontal: space.md, paddingVertical: 14 },
   authHint: { fontSize: 12, textAlign: 'center', marginTop: space.sm },
-  error: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, borderRadius: radius.md, marginTop: space.sm },
+  error: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
+    marginTop: space.sm,
+  },
   errorText: { flex: 1, fontSize: 14, fontWeight: '600' },
-  sending: { flexDirection: 'row', gap: space.sm, borderRadius: radius.pill, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
+  sending: {
+    flexDirection: 'row',
+    gap: space.sm,
+    borderRadius: radius.pill,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

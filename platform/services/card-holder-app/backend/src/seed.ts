@@ -39,7 +39,18 @@ async function main(): Promise<void> {
   for (const [minutes, txnId, merchant, category, amount, decision, score, rules] of TXNS) {
     const ts = new Date(now - minutes * 60_000);
     const amt = types.BigDecimal.fromString(amount);
-    await txns.insert({ cardId, ts, txnId, merchant, category, amount: amt, decision, score, firedRules: rules, decidedAt: ts });
+    await txns.insert({
+      cardId,
+      ts,
+      txnId,
+      merchant,
+      category,
+      amount: amt,
+      decision,
+      score,
+      firedRules: rules,
+      decidedAt: ts,
+    });
     for (const rule of rules) {
       const status = decision !== 'ALLOW' ? 'OPEN' : 'CLEARED';
       await alerts.insert({ cardId, ts, alertId: `${txnId}:${rule}`, txnId, ruleId: rule, score, amount: amt, status });

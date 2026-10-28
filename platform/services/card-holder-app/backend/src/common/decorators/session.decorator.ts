@@ -16,5 +16,6 @@ export const CurrentCard = createParamDecorator((_: unknown, ctx: ExecutionConte
 });
 
 export const SessionToken = createParamDecorator(
-  (_: unknown, ctx: ExecutionContext): string | undefined => ctx.switchToHttp().getRequest<SessionRequest>().sessionToken,
+  (_: unknown, ctx: ExecutionContext): string | undefined =>
+    ctx.switchToHttp().getRequest<SessionRequest>().sessionToken,
 );

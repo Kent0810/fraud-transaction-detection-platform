@@ -1,16 +1,16 @@
 import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
-import { Pool } from 'pg';
+import { createPrismaClient, type PrismaClient } from '@platform/db';
 
 import type { Config } from '../../config';
 import { CONFIG } from '../../config.module';
 
 @Injectable()
-export class PostgresService implements OnModuleInit, OnApplicationShutdown {
-  private readonly log = new Logger(PostgresService.name);
-  readonly pool: Pool;
+export class PrismaService implements OnModuleInit, OnApplicationShutdown {
+  private readonly log = new Logger(PrismaService.name);
+  readonly client: PrismaClient;
 
   constructor(@Inject(CONFIG) private readonly cfg: Config) {
-    this.pool = new Pool({
+    this.client = createPrismaClient({
       host: cfg.postgresHost,
       port: cfg.postgresPort,
       database: cfg.postgresDb,
@@ -20,11 +20,13 @@ export class PostgresService implements OnModuleInit, OnApplicationShutdown {
   }
 
   async onModuleInit(): Promise<void> {
-    this.log.log(`connecting to postgres ${this.cfg.postgresHost}:${this.cfg.postgresPort} (db ${this.cfg.postgresDb})`);
-    await this.pool.query('SELECT 1');
+    this.log.log(
+      `connecting to postgres ${this.cfg.postgresHost}:${this.cfg.postgresPort} (db ${this.cfg.postgresDb})`,
+    );
+    await this.client.$connect();
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await this.pool.end();
+    await this.client.$disconnect();
   }
 }

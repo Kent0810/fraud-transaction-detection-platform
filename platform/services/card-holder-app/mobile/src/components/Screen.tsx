@@ -10,7 +10,8 @@ export function Screen({ children, ...rest }: { children: ReactNode } & ScrollVi
     <ScrollView
       {...rest}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + space.md }, rest.contentContainerStyle]}
-      showsVerticalScrollIndicator={false}>
+      showsVerticalScrollIndicator={false}
+    >
       {children}
     </ScrollView>
   );

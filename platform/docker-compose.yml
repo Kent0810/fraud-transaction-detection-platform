@@ -316,7 +316,9 @@ services:
   #       condition: service_completed_successfully
 
   cardholder-backend:
-    build: ./services/card-holder-app/backend
+    build:
+      context: .
+      dockerfile: services/card-holder-app/backend/Dockerfile
     ports:
       - "8080:8080"
     environment:

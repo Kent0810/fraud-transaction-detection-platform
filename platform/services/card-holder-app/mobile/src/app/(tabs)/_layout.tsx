@@ -30,7 +30,8 @@ export default function TabLayout() {
         tabBarStyle: { backgroundColor: c.surface, borderTopWidth: 0 },
         tabBarBadgeStyle: { backgroundColor: c.decline, fontSize: 11 },
         sceneStyle: { backgroundColor: c.bg },
-      }}>
+      }}
+    >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home-outline', 'home') }} />
       <Tabs.Screen
         name="alerts"

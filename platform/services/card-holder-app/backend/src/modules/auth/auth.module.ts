@@ -10,6 +10,12 @@ import { SessionsRepository } from './repositories/sessions.repository';
 
 @Module({
   controllers: [AuthController],
-  providers: [CardholdersRepository, SessionsRepository, LoginHandler, LogoutHandler, { provide: APP_GUARD, useClass: SessionGuard }],
+  providers: [
+    CardholdersRepository,
+    SessionsRepository,
+    LoginHandler,
+    LogoutHandler,
+    { provide: APP_GUARD, useClass: SessionGuard },
+  ],
 })
 export class AuthModule {}

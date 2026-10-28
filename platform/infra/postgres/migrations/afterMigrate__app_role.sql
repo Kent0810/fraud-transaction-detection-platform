@@ -1,5 +1,5 @@
 -- A Flyway callback, not a versioned migration: it runs after every migrate, so the password stays in sync with the
--- environment and abtles added by later migrations get their grants here. ${app_user} and ${app_password} are Flyway
+-- environment and tables added by later migrations get their grants here. ${app_user} and ${app_password} are Flyway
 -- placeholders (FLYWAY_PLACEHOLDERS_APP_USER / _APP_PASSWORD); Flyway refuses to run if either is missing.
 
 DO $$
@@ -27,12 +27,13 @@ GRANT UPDATE (last_login_at) ON auth TO "${app_user}";
 
 GRANT SELECT, INSERT, DELETE ON sessions TO "${app_user}";
 
--- Read only: balances, ledger entries, transfers and outbox events are written by post_transfer() alone.
--- No grant at all on outbox; Debezium reads it with its own replication login.
+-- Money moves through postTransfer() in @platform/db: change a balance and append history, nothing more.
 GRANT SELECT ON accounts TO "${app_user}";
-GRANT SELECT ON ledger_entries TO "${app_user}";
-GRANT SELECT ON transfers TO "${app_user}";
-GRANT EXECUTE ON FUNCTION post_transfer(text, text, uuid, text, text, text, bigint, text) TO "${app_user}";
+GRANT UPDATE (balance, updated_at) ON accounts TO "${app_user}";
+GRANT SELECT, INSERT ON ledger_entries TO "${app_user}";
+GRANT SELECT, INSERT ON transfers TO "${app_user}";
+GRANT USAGE ON SEQUENCE transfer_reference_seq TO "${app_user}";
+GRANT INSERT ON outbox TO "${app_user}";
 
 GRANT SELECT, INSERT, DELETE ON saved_recipients TO "${app_user}";
 GRANT UPDATE (name) ON saved_recipients TO "${app_user}";

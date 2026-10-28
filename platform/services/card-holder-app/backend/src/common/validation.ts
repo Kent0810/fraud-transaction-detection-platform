@@ -6,7 +6,10 @@ export const NEXT_CURSOR = 'X-Next-Cursor';
 export const CardId = z.string().regex(/^\d{8,19}$/, 'must be 8 to 19 digits');
 export const AccountNumber = z.string().regex(/^\d{6,19}$/, 'must be 6 to 19 digits');
 export const BankCode = z.string().regex(/^[A-Z]{2,10}$/, 'must be 2 to 10 capital letters');
-export const Cursor = z.string().regex(/^[0-9a-f]{1,2048}$/i, 'must be a hex string').optional();
+export const Cursor = z
+  .string()
+  .regex(/^[0-9a-f]{1,2048}$/i, 'must be a hex string')
+  .optional();
 export const Password = z.string().min(1).max(128);
 
 /** Trimmed, non-empty, at most max characters. */
@@ -24,7 +27,8 @@ export class ZodPipe<T extends z.ZodType> implements PipeTransform<unknown, z.ou
     const result = this.schema.safeParse(value);
     if (result.success) return result.data;
     // A param or query has its name in data; a body field has it in the issue path.
-    const where = (path: PropertyKey[]) => [type === 'body' ? undefined : data, ...path.map(String)].filter(Boolean).join('.');
+    const where = (path: PropertyKey[]) =>
+      [type === 'body' ? undefined : data, ...path.map(String)].filter(Boolean).join('.');
     throw new BadRequestException(result.error.issues.map((i) => `${where(i.path) || type} ${i.message}`.trim()));
   }
 }

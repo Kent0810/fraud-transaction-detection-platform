@@ -39,80 +39,92 @@ export default function BudgetScreen() {
         <ScreenTitle title="Budget" subtitle="Spending" />
 
         <FadeInUp>
-        <Surface style={styles.overview}>
-          <Ring value={pct}>
-            <Text style={[styles.pct, { color: c.text }]}>{Math.round(pct * 100)}%</Text>
-            <Text style={[styles.pctLabel, { color: c.muted }]}>used</Text>
-          </Ring>
-          <View style={styles.stats}>
-            <Stat label="Spent" value={money(budget.spent)} />
-            <View style={[styles.statDivider, { backgroundColor: c.border }]} />
-            <Stat
-              label={left >= 0 ? 'Left' : 'Over'}
-              value={money(Math.abs(left))}
-              color={left >= 0 ? c.allow : c.decline}
-            />
-            <View style={[styles.statDivider, { backgroundColor: c.border }]} />
-            <Stat label={`Per ${PERIOD_LABEL[budget.period]}`} value={money(budget.limit)} />
-          </View>
-        </Surface>
+          <Surface style={styles.overview}>
+            <Ring value={pct}>
+              <Text style={[styles.pct, { color: c.text }]}>{Math.round(pct * 100)}%</Text>
+              <Text style={[styles.pctLabel, { color: c.muted }]}>used</Text>
+            </Ring>
+            <View style={styles.stats}>
+              <Stat label="Spent" value={money(budget.spent)} />
+              <View style={[styles.statDivider, { backgroundColor: c.border }]} />
+              <Stat
+                label={left >= 0 ? 'Left' : 'Over'}
+                value={money(Math.abs(left))}
+                color={left >= 0 ? c.allow : c.decline}
+              />
+              <View style={[styles.statDivider, { backgroundColor: c.border }]} />
+              <Stat label={`Per ${PERIOD_LABEL[budget.period]}`} value={money(budget.limit)} />
+            </View>
+          </Surface>
         </FadeInUp>
 
         <FadeInUp delay={150}>
-        <SectionHeader title="Set a new budget" />
-        <Surface style={{ gap: space.lg }}>
-          <View style={[styles.amountBox, { backgroundColor: c.surfaceAlt, borderColor: valid ? 'transparent' : c.decline }]}>
-            <TextInput
-              value={limitText}
-              onChangeText={(t) => {
-                const n = parseVnd(t);
-                edit(() => setLimitText(n ? groupThousands(Math.min(n, 999_999_999_999)) : ''));
+          <SectionHeader title="Set a new budget" />
+          <Surface style={{ gap: space.lg }}>
+            <View
+              style={[
+                styles.amountBox,
+                { backgroundColor: c.surfaceAlt, borderColor: valid ? 'transparent' : c.decline },
+              ]}
+            >
+              <TextInput
+                value={limitText}
+                onChangeText={(t) => {
+                  const n = parseVnd(t);
+                  edit(() => setLimitText(n ? groupThousands(Math.min(n, 999_999_999_999)) : ''));
+                }}
+                keyboardType="number-pad"
+                accessibilityLabel="Budget limit in dong"
+                style={[styles.amountInput, { color: c.text }]}
+              />
+              <Text style={[styles.currency, { color: c.muted }]}>VND</Text>
+            </View>
+
+            <View style={styles.presets}>
+              {PRESETS.map((p) => {
+                const on = limit === p;
+                return (
+                  <Pressable
+                    key={p}
+                    onPress={() => edit(() => setLimitText(groupThousands(p)))}
+                    style={[styles.preset, { backgroundColor: on ? c.primarySoft : c.surfaceAlt }]}
+                  >
+                    <Text style={{ color: on ? c.primary : c.text, fontWeight: '700' }}>{p / 1_000_000}M đ</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={[styles.segment, { backgroundColor: c.surfaceAlt }]}>
+              {PERIODS.map((p) => {
+                const on = p === period;
+                return (
+                  <Pressable
+                    key={p}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => edit(() => setPeriod(p))}
+                    style={[styles.segmentItem, on && { backgroundColor: c.surface }]}
+                  >
+                    <Text style={{ color: on ? c.text : c.muted, fontWeight: '700' }}>{PERIOD_ADJECTIVE[p]}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Button
+              label={saved ? 'Saved' : 'Save budget'}
+              icon={saved ? 'checkmark' : undefined}
+              onPress={() => {
+                setBudget(toUsd(limit), period);
+                setSaved(true);
               }}
-              keyboardType="number-pad"
-              accessibilityLabel="Budget limit in dong"
-              style={[styles.amountInput, { color: c.text }]}
+              disabled={!changed && !saved}
             />
-            <Text style={[styles.currency, { color: c.muted }]}>VND</Text>
-          </View>
-
-          <View style={styles.presets}>
-            {PRESETS.map((p) => {
-              const on = limit === p;
-              return (
-                <Pressable
-                  key={p}
-                  onPress={() => edit(() => setLimitText(groupThousands(p)))}
-                  style={[styles.preset, { backgroundColor: on ? c.primarySoft : c.surfaceAlt }]}>
-                  <Text style={{ color: on ? c.primary : c.text, fontWeight: '700' }}>{p / 1_000_000}M đ</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={[styles.segment, { backgroundColor: c.surfaceAlt }]}>
-            {PERIODS.map((p) => {
-              const on = p === period;
-              return (
-                <Pressable
-                  key={p}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  onPress={() => edit(() => setPeriod(p))}
-                  style={[styles.segmentItem, on && { backgroundColor: c.surface }]}>
-                  <Text style={{ color: on ? c.text : c.muted, fontWeight: '700' }}>{PERIOD_ADJECTIVE[p]}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Button label={saved ? 'Saved' : 'Save budget'} icon={saved ? 'checkmark' : undefined} onPress={() => {
-            setBudget(toUsd(limit), period);
-            setSaved(true);
-          }} disabled={!changed && !saved} />
-          <Text style={[styles.note, { color: c.muted }]}>
-            Going over budget sends you an alert. It never declines a payment.
-          </Text>
-        </Surface>
+            <Text style={[styles.note, { color: c.muted }]}>
+              Going over budget sends you an alert. It never declines a payment.
+            </Text>
+          </Surface>
         </FadeInUp>
       </Screen>
     </KeyboardAvoidingView>
@@ -138,9 +150,22 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 13 },
   statValue: { fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
   statDivider: { width: StyleSheet.hairlineWidth },
-  amountBox: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, borderWidth: 1.5, paddingHorizontal: space.lg },
+  amountBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    paddingHorizontal: space.lg,
+  },
   currency: { fontSize: 16, fontWeight: '700' },
-  amountInput: { flex: 1, minWidth: 0, fontSize: 32, fontWeight: '800', paddingVertical: space.md, marginRight: space.sm },
+  amountInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 32,
+    fontWeight: '800',
+    paddingVertical: space.md,
+    marginRight: space.sm,
+  },
   presets: { flexDirection: 'row', gap: space.sm },
   preset: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.pill },
   segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 4 },

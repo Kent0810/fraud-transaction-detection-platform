@@ -1,11 +1,11 @@
 import { Global, Module } from '@nestjs/common';
 
 import { CassandraService } from './cassandra/cassandra.service';
-import { PostgresService } from './postgres/postgres.service';
+import { PrismaService } from './prisma/prisma.service';
 
 @Global()
 @Module({
-  providers: [CassandraService, PostgresService],
-  exports: [CassandraService, PostgresService],
+  providers: [CassandraService, PrismaService],
+  exports: [CassandraService, PrismaService],
 })
 export class SharedModule {}

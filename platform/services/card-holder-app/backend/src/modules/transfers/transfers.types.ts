@@ -2,9 +2,7 @@ import { z } from 'zod';
 
 import { AccountNumber, BankCode, Password, text } from '../../common/validation';
 
-// This platform's bank code. A transfer to it moves money between two accounts here; any other bank goes out through NAPAS.
-// post_transfer() (V6__post_transfer.sql) has the same constant.
-export const OUR_BANK = 'HCMMB';
+export { OUR_BANK } from '@platform/db';
 
 export type TransferKind = 'INTERNAL' | 'NAPAS';
 

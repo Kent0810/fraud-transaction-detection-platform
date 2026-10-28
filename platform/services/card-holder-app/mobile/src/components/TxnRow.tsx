@@ -16,30 +16,32 @@ export function TxnRow({ txn }: { txn: Txn }) {
     <Pressable
       accessibilityRole="button"
       onPress={() => router.push({ pathname: '/txn/[id]', params: { id: txn.txnId } })}
-      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}>
-        <IconBubble
-          name={categoryIcon(txn.category)}
-          tint={flagged ? tone.fg : c.primary}
-          bg={flagged ? tone.bg : c.primarySoft}
-        />
-        <View style={styles.main}>
-          <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
-            {txn.merchant}
-          </Text>
-          <Text style={[styles.meta, { color: c.muted }]} numberOfLines={1}>
-            {category(txn.category)} · {time(txn.ts)}
-          </Text>
-        </View>
-        <View style={styles.side}>
-          <Text
-            style={[
-              styles.amount,
-              { color: declined ? c.muted : c.text, textDecorationLine: declined ? 'line-through' : 'none' },
-            ]}>
-            -{money(txn.amount)}
-          </Text>
-          {flagged && <StatusPill decision={txn.decision} compact />}
-        </View>
+      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
+    >
+      <IconBubble
+        name={categoryIcon(txn.category)}
+        tint={flagged ? tone.fg : c.primary}
+        bg={flagged ? tone.bg : c.primarySoft}
+      />
+      <View style={styles.main}>
+        <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
+          {txn.merchant}
+        </Text>
+        <Text style={[styles.meta, { color: c.muted }]} numberOfLines={1}>
+          {category(txn.category)} · {time(txn.ts)}
+        </Text>
+      </View>
+      <View style={styles.side}>
+        <Text
+          style={[
+            styles.amount,
+            { color: declined ? c.muted : c.text, textDecorationLine: declined ? 'line-through' : 'none' },
+          ]}
+        >
+          -{money(txn.amount)}
+        </Text>
+        {flagged && <StatusPill decision={txn.decision} compact />}
+      </View>
     </Pressable>
   );
 }

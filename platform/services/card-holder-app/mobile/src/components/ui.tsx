@@ -35,13 +35,26 @@ export function ScreenTitle({ title, subtitle }: { title: string; subtitle?: str
 
 export function IconBubble({ name, tint, bg, size = 44 }: { name: IconName; tint: string; bg: string; size?: number }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: bg,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       <Ionicons name={name} size={size * 0.46} color={tint} />
     </View>
   );
 }
 
-const VERDICT_LABEL: Record<Verdict, string> = { ALLOW: 'Approved', STEP_UP: 'Needs verification', DECLINE: 'Declined' };
+const VERDICT_LABEL: Record<Verdict, string> = {
+  ALLOW: 'Approved',
+  STEP_UP: 'Needs verification',
+  DECLINE: 'Declined',
+};
 
 export function useVerdictTone() {
   const c = useColors();
@@ -85,7 +98,17 @@ export function ProgressBar({ value }: { value: number }) {
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-export function Ring({ value, size = 180, stroke = 16, children }: { value: number; size?: number; stroke?: number; children?: ReactNode }) {
+export function Ring({
+  value,
+  size = 180,
+  stroke = 16,
+  children,
+}: {
+  value: number;
+  size?: number;
+  stroke?: number;
+  children?: ReactNode;
+}) {
   const c = useColors();
   const pct = Math.max(0, Math.min(1, value));
   const r = (size - stroke) / 2;
@@ -93,7 +116,12 @@ export function Ring({ value, size = 180, stroke = 16, children }: { value: numb
   const color = pct >= 1 ? c.decline : pct >= 0.8 ? c.stepUp : c.primary;
   const progress = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
-    Animated.timing(progress, { toValue: pct, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    Animated.timing(progress, {
+      toValue: pct,
+      duration: 900,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
   }, [pct, progress]);
   const offset = progress.interpolate({ inputRange: [0, 1], outputRange: [circumference, 0] });
   return (
@@ -140,8 +168,13 @@ export function Button({ label, onPress, variant = 'primary', icon, disabled }: 
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: look.bg, opacity: disabled ? 0.4 : pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
-      ]}>
+        {
+          backgroundColor: look.bg,
+          opacity: disabled ? 0.4 : pressed ? 0.8 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+        },
+      ]}
+    >
       {icon && <Ionicons name={icon} size={18} color={look.fg} />}
       <Text style={[styles.buttonText, { color: look.fg }]}>{label}</Text>
     </Pressable>
@@ -161,16 +194,37 @@ export function Empty({ icon, title, detail }: { icon: IconName; title: string; 
 
 const styles = StyleSheet.create({
   surface: { borderRadius: radius.lg, padding: space.lg },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space.xl, marginBottom: space.md },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: space.xl,
+    marginBottom: space.md,
+  },
   sectionTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.2 },
   screenTitle: { paddingTop: space.sm, paddingBottom: space.lg },
   screenSubtitle: { fontSize: 15, marginBottom: 2 },
   screenTitleText: { fontSize: 30, fontWeight: '800', letterSpacing: -0.6 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
   pillText: { fontSize: 12, fontWeight: '700' },
   track: { height: 8, borderRadius: radius.pill, overflow: 'hidden' },
   fill: { height: 8, borderRadius: radius.pill },
-  button: { flexDirection: 'row', gap: space.sm, borderRadius: radius.pill, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
+  button: {
+    flexDirection: 'row',
+    gap: space.sm,
+    borderRadius: radius.pill,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonText: { fontSize: 16, fontWeight: '700' },
   empty: { alignItems: 'center', paddingVertical: space.xxl * 2, paddingHorizontal: space.xl, gap: space.sm },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginTop: space.sm },

@@ -1,0 +1,13 @@
+*
+!packages/db/package.json
+!packages/db/package-lock.json
+!packages/db/tsconfig.json
+!packages/db/prisma.config.ts
+!packages/db/prisma/
+!packages/db/src/
+packages/db/src/generated/
+!services/card-holder-app/backend/package.json
+!services/card-holder-app/backend/package-lock.json
+!services/card-holder-app/backend/tsconfig.json
+!services/card-holder-app/backend/nest-cli.json
+!services/card-holder-app/backend/src/

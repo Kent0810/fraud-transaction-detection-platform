@@ -66,10 +66,20 @@ export default function SettingsScreen() {
         <Surface style={styles.group}>
           {toggle('hideBalance', 'Hide balance', 'eye-off-outline', 'Show •••• on the home screen')}
           <Divider />
-          {toggle('biometrics', 'Face ID / fingerprint', 'finger-print-outline', 'Unlock the app and approve transfers')}
+          {toggle(
+            'biometrics',
+            'Face ID / fingerprint',
+            'finger-print-outline',
+            'Unlock the app and approve transfers',
+          )}
           <Divider />
           <Row icon="snow-outline" label="Freeze card" detail={frozen ? 'Card is frozen' : 'Stops new card payments'}>
-            <Switch value={frozen} onValueChange={toggleFrozen} trackColor={{ true: c.primary, false: c.border }} accessibilityLabel="Freeze card" />
+            <Switch
+              value={frozen}
+              onValueChange={toggleFrozen}
+              trackColor={{ true: c.primary, false: c.border }}
+              accessibilityLabel="Freeze card"
+            />
           </Row>
         </Surface>
       </FadeInUp>
@@ -93,7 +103,11 @@ export default function SettingsScreen() {
           <Row
             icon="document-text-outline"
             label="Card data"
-            detail={apiEnabled ? `Live from ${apiUrl} (queries: Cassandra, commands: Kafka)` : 'Mock data (set EXPO_PUBLIC_API_URL to go live)'}
+            detail={
+              apiEnabled
+                ? `Live from ${apiUrl} (queries: Cassandra, commands: Kafka)`
+                : 'Mock data (set EXPO_PUBLIC_API_URL to go live)'
+            }
           />
           <Divider />
           <Row icon="swap-horizontal-outline" label="Transfers, budget, merchants" detail="Mock data for now" />
@@ -107,7 +121,17 @@ export default function SettingsScreen() {
   );
 }
 
-function Row({ icon, label, detail, children }: { icon: IconName; label: string; detail?: string; children?: ReactNode }) {
+function Row({
+  icon,
+  label,
+  detail,
+  children,
+}: {
+  icon: IconName;
+  label: string;
+  detail?: string;
+  children?: ReactNode;
+}) {
   const c = useColors();
   return (
     <View style={styles.row}>

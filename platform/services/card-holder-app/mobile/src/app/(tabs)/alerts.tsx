@@ -39,7 +39,8 @@ export default function AlertsScreen() {
               onPress={() => setFilter(f)}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
-              style={[styles.segmentItem, on && { backgroundColor: c.surface }]}>
+              style={[styles.segmentItem, on && { backgroundColor: c.surface }]}
+            >
               <Text style={[styles.segmentText, { color: on ? c.text : c.muted }]}>
                 {f === 'OPEN' ? 'Needs review' : 'All alerts'}
               </Text>
@@ -49,23 +50,24 @@ export default function AlertsScreen() {
       </View>
 
       {shown.length === 0 ? (
-        <Empty icon="shield-checkmark" title="All clear" detail="We'll notify you right away if something looks unusual." />
+        <Empty
+          icon="shield-checkmark"
+          title="All clear"
+          detail="We'll notify you right away if something looks unusual."
+        />
       ) : (
         <View style={{ gap: space.md }}>
           {shown.map((a, i) => {
             const t = tone[a.status];
             return (
               <FadeInUp key={`${filter}-${a.alertId}`} delay={stagger(i, 60)}>
-              <ScalePressable
-                accessibilityRole="button"
-                scaleTo={0.97}
-                onPress={() => router.push({ pathname: '/txn/[id]', params: { id: a.txnId } })}>
+                <ScalePressable
+                  accessibilityRole="button"
+                  scaleTo={0.97}
+                  onPress={() => router.push({ pathname: '/txn/[id]', params: { id: a.txnId } })}
+                >
                   <Surface style={styles.alert}>
-                    <IconBubble
-                      name={a.status === 'CLEARED' ? 'shield-checkmark' : 'warning'}
-                      tint={t.fg}
-                      bg={t.bg}
-                    />
+                    <IconBubble name={a.status === 'CLEARED' ? 'shield-checkmark' : 'warning'} tint={t.fg} bg={t.bg} />
                     <View style={{ flex: 1, gap: 4 }}>
                       <View style={styles.head}>
                         <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>
@@ -83,7 +85,7 @@ export default function AlertsScreen() {
                       </View>
                     </View>
                   </Surface>
-              </ScalePressable>
+                </ScalePressable>
               </FadeInUp>
             );
           })}

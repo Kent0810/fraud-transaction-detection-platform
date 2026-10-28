@@ -71,12 +71,12 @@ export default function TransferFormScreen() {
   const lookup: Lookup = toSelf
     ? { state: 'self' }
     : !lookupKey
-    ? { state: 'idle' }
-    : result?.key !== lookupKey
-      ? { state: 'checking' }
-      : result.name
-        ? { state: 'found', name: result.name }
-        : { state: 'notfound' };
+      ? { state: 'idle' }
+      : result?.key !== lookupKey
+        ? { state: 'checking' }
+        : result.name
+          ? { state: 'found', name: result.name }
+          : { state: 'notfound' };
 
   const amountError =
     amount > balance ? 'Insufficient balance' : amount > 0 && amount < MIN_AMOUNT ? `Minimum ${vnd(MIN_AMOUNT)}` : null;
@@ -101,9 +101,18 @@ export default function TransferFormScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <FadeInUp>
-          <LinearGradient colors={[c.cardFrom, c.cardTo]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.source}>
+          <LinearGradient
+            colors={[c.cardFrom, c.cardTo]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.source}
+          >
             <Text style={styles.sourceLabel}>From account</Text>
             <Text style={styles.sourceNumber}>
               {ACCOUNT.label} · {printAccount(accountNumber)}
@@ -113,8 +122,16 @@ export default function TransferFormScreen() {
                 <Text style={styles.sourceLabel}>Available balance</Text>
                 <Text style={styles.sourceBalance}>{hideBalance ? '•••••• đ' : vnd(balance)}</Text>
               </View>
-              <Pressable onPress={() => update('hideBalance', !hideBalance)} hitSlop={12} accessibilityLabel={hideBalance ? 'Show balance' : 'Hide balance'}>
-                <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={22} color="rgba(255,255,255,0.9)" />
+              <Pressable
+                onPress={() => update('hideBalance', !hideBalance)}
+                hitSlop={12}
+                accessibilityLabel={hideBalance ? 'Show balance' : 'Hide balance'}
+              >
+                <Ionicons
+                  name={hideBalance ? 'eye-off-outline' : 'eye-outline'}
+                  size={22}
+                  color="rgba(255,255,255,0.9)"
+                />
               </Pressable>
             </View>
           </LinearGradient>
@@ -130,13 +147,18 @@ export default function TransferFormScreen() {
                   <ScalePressable
                     key={`${r.bankCode}-${r.account}`}
                     onPress={() => pickSaved(r)}
-                    style={[styles.savedItem, { backgroundColor: c.surface, borderColor: on ? c.primary : 'transparent' }]}>
+                    style={[
+                      styles.savedItem,
+                      { backgroundColor: c.surface, borderColor: on ? c.primary : 'transparent' },
+                    ]}
+                  >
                     <Pressable
                       onPress={() => removeSaved(r)}
                       hitSlop={8}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${r.name} from saved recipients`}
-                      style={styles.savedRemove}>
+                      style={styles.savedRemove}
+                    >
                       <Ionicons name="close-circle" size={18} color={c.muted} />
                     </Pressable>
                     <Avatar name={r.name} size={40} />
@@ -195,7 +217,9 @@ export default function TransferFormScreen() {
               ) : lookup.state === 'self' ? (
                 <Text style={[styles.value, { color: c.decline }]}>This is your own account</Text>
               ) : (
-                <Text style={[styles.value, { color: c.muted }]}>{!bankCode ? 'Choose a bank first' : 'Filled in automatically'}</Text>
+                <Text style={[styles.value, { color: c.muted }]}>
+                  {!bankCode ? 'Choose a bank first' : 'Filled in automatically'}
+                </Text>
               )}
             </Field>
           </View>
@@ -229,7 +253,8 @@ export default function TransferFormScreen() {
                   <Pressable
                     key={q}
                     onPress={() => setAmountText(groupThousands(q))}
-                    style={[styles.chip, { backgroundColor: amount === q ? c.primarySoft : c.surfaceAlt }]}>
+                    style={[styles.chip, { backgroundColor: amount === q ? c.primarySoft : c.surfaceAlt }]}
+                  >
                     <Text style={{ color: amount === q ? c.primary : c.text, fontWeight: '700', fontSize: 13 }}>
                       {groupThousands(q)}
                     </Text>
@@ -320,6 +345,12 @@ const styles = StyleSheet.create({
   words: { fontSize: 13, fontStyle: 'italic' },
   quick: { gap: space.sm, paddingTop: space.xs },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill },
-  saveRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, marginTop: space.md },
+  saveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingVertical: space.md,
+    marginTop: space.md,
+  },
   demo: { textAlign: 'center', fontSize: 12, marginTop: space.lg },
 });

@@ -18,7 +18,10 @@ export const accountNumber = (digits: string) => digits.replace(/(\d{4})(?=\d)/g
 
 export function category(raw: string): string {
   const suffix = raw.match(/_(net|pos)$/)?.[1];
-  const label = raw.replace(/_(net|pos)$/, '').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+  const label = raw
+    .replace(/_(net|pos)$/, '')
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase());
   return suffix === 'net' ? `${label} · Online` : suffix === 'pos' ? `${label} · In store` : label;
 }
 

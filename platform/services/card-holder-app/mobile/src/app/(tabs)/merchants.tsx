@@ -45,27 +45,33 @@ function RuleSection({ title, type, rules }: { title: string; type: RuleType; ru
         ) : (
           rules.map((r, i) => (
             <FadeInUp key={r.merchant} delay={stagger(i, 60)}>
-            <View style={[styles.rule, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
-              <IconBubble
-                name={blocked ? 'ban' : 'checkmark-done'}
-                tint={blocked ? c.decline : c.allow}
-                bg={blocked ? c.declineBg : c.allowBg}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
-                  {r.merchant}
-                </Text>
-                <Text style={[styles.meta, { color: r.pending ? c.stepUp : c.muted }]}>
-                  {r.pending ? 'Taking effect…' : `Added ${relative(r.createdAt).toLowerCase()}`}
-                </Text>
+              <View
+                style={[styles.rule, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}
+              >
+                <IconBubble
+                  name={blocked ? 'ban' : 'checkmark-done'}
+                  tint={blocked ? c.decline : c.allow}
+                  bg={blocked ? c.declineBg : c.allowBg}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
+                    {r.merchant}
+                  </Text>
+                  <Text style={[styles.meta, { color: r.pending ? c.stepUp : c.muted }]}>
+                    {r.pending ? 'Taking effect…' : `Added ${relative(r.createdAt).toLowerCase()}`}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => releaseMerchant(r.merchant)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.release,
+                    { backgroundColor: c.surfaceAlt, opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Text style={[styles.releaseText, { color: c.text }]}>Remove</Text>
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() => releaseMerchant(r.merchant)}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.release, { backgroundColor: c.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}>
-                <Text style={[styles.releaseText, { color: c.text }]}>Remove</Text>
-              </Pressable>
-            </View>
             </FadeInUp>
           ))
         )}

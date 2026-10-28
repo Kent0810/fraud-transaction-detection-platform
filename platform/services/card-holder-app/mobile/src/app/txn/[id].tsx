@@ -42,8 +42,12 @@ export default function TxnScreen() {
         <Text
           style={[
             styles.amount,
-            { color: txn.decision === 'DECLINE' ? c.muted : c.text, textDecorationLine: txn.decision === 'DECLINE' ? 'line-through' : 'none' },
-          ]}>
+            {
+              color: txn.decision === 'DECLINE' ? c.muted : c.text,
+              textDecorationLine: txn.decision === 'DECLINE' ? 'line-through' : 'none',
+            },
+          ]}
+        >
           -{money(txn.amount)}
         </Text>
         <View>
@@ -73,7 +77,10 @@ export default function TxnScreen() {
       <SectionHeader title="Details" />
       <Surface style={styles.list}>
         {details.map(([k, v], i) => (
-          <View key={k} style={[styles.detailRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
+          <View
+            key={k}
+            style={[styles.detailRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}
+          >
             <Text style={[styles.detailKey, { color: c.muted }]}>{k}</Text>
             <Text style={[styles.detailValue, { color: c.text }]} numberOfLines={1}>
               {v}
@@ -92,7 +99,9 @@ export default function TxnScreen() {
               bg={rule.type === 'BLOCK' ? c.declineBg : c.allowBg}
             />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.reasonTitle, { color: c.text }]}>{rule.type === 'BLOCK' ? 'Blocked' : 'Trusted'}</Text>
+              <Text style={[styles.reasonTitle, { color: c.text }]}>
+                {rule.type === 'BLOCK' ? 'Blocked' : 'Trusted'}
+              </Text>
               <Text style={[styles.reasonDetail, { color: rule.pending ? c.stepUp : c.muted }]}>
                 {rule.pending
                   ? 'Taking effect…'
@@ -106,8 +115,18 @@ export default function TxnScreen() {
         </Surface>
       ) : (
         <View style={{ gap: space.sm }}>
-          <Button label="Block this merchant" icon="ban" variant="danger" onPress={() => setMerchantRule(txn.merchant, 'BLOCK')} />
-          <Button label="Trust this merchant" icon="checkmark-done" variant="secondary" onPress={() => setMerchantRule(txn.merchant, 'ALLOW')} />
+          <Button
+            label="Block this merchant"
+            icon="ban"
+            variant="danger"
+            onPress={() => setMerchantRule(txn.merchant, 'BLOCK')}
+          />
+          <Button
+            label="Trust this merchant"
+            icon="checkmark-done"
+            variant="secondary"
+            onPress={() => setMerchantRule(txn.merchant, 'ALLOW')}
+          />
         </View>
       )}
     </ScrollView>

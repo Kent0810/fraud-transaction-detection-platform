@@ -30,7 +30,11 @@ export function BankCard({ last4, holder, spent, limit, period, frozen }: Props)
   const lift = flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.94, 1] });
 
   return (
-    <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel={back ? 'Show spending' : 'Show card details'}>
+    <Pressable
+      onPress={toggle}
+      accessibilityRole="button"
+      accessibilityLabel={back ? 'Show spending' : 'Show card details'}
+    >
       <Animated.View style={{ transform: [{ scale: lift }] }}>
         <Animated.View style={[styles.face, { transform: [{ perspective: 1000 }, { rotateY: frontRotate }] }]}>
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
@@ -47,7 +51,12 @@ export function BankCard({ last4, holder, spent, limit, period, frozen }: Props)
                   <Text style={styles.tagText}>Frozen</Text>
                 </View>
               ) : (
-                <Ionicons name="wifi" size={20} color="rgba(255,255,255,0.8)" style={{ transform: [{ rotate: '90deg' }] }} />
+                <Ionicons
+                  name="wifi"
+                  size={20}
+                  color="rgba(255,255,255,0.8)"
+                  style={{ transform: [{ rotate: '90deg' }] }}
+                />
               )}
             </View>
             <Text style={styles.label}>Spent this {PERIOD_LABEL[period]}</Text>
@@ -56,19 +65,20 @@ export function BankCard({ last4, holder, spent, limit, period, frozen }: Props)
               <View style={[styles.fill, { width: `${pct * 100}%` }]} />
             </View>
             <View style={styles.bottom}>
-              <Text style={styles.number}>••••  {last4}</Text>
+              <Text style={styles.number}>•••• {last4}</Text>
               <Text style={styles.small}>of {money(limit)}</Text>
             </View>
           </LinearGradient>
         </Animated.View>
 
         <Animated.View
-          style={[styles.face, styles.backFace, { transform: [{ perspective: 1000 }, { rotateY: backRotate }] }]}>
+          style={[styles.face, styles.backFace, { transform: [{ perspective: 1000 }, { rotateY: backRotate }] }]}
+        >
           <LinearGradient colors={colors} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.card}>
             <Glows />
             <View style={[styles.stripe]} />
             <Text style={styles.label}>Card number</Text>
-            <Text style={styles.fullNumber}>••••  ••••  ••••  {last4}</Text>
+            <Text style={styles.fullNumber}>•••• •••• •••• {last4}</Text>
             <View style={styles.backRow}>
               <View>
                 <Text style={styles.small}>Holder</Text>
@@ -103,23 +113,68 @@ const styles = StyleSheet.create({
   face: { backfaceVisibility: 'hidden' },
   backFace: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   card: { borderRadius: radius.xl, padding: space.xl, overflow: 'hidden', minHeight: 200 },
-  glowA: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.08)', top: -90, right: -60 },
-  glowB: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.06)', bottom: -70, left: -40 },
+  glowA: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -90,
+    right: -60,
+  },
+  glowB: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    bottom: -70,
+    left: -40,
+  },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.xl },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   brand: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 1 },
-  debit: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-  tag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  debit: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
   tagText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   label: { color: 'rgba(255,255,255,0.75)', fontSize: 14 },
-  amount: { color: '#fff', fontSize: 34, fontWeight: '800', letterSpacing: -0.8, marginTop: 2, marginBottom: space.lg, fontVariant: ['tabular-nums'] },
+  amount: {
+    color: '#fff',
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    marginTop: 2,
+    marginBottom: space.lg,
+    fontVariant: ['tabular-nums'],
+  },
   track: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3, backgroundColor: '#fff' },
   bottom: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
   number: { color: 'rgba(255,255,255,0.9)', fontSize: 15, fontWeight: '600', letterSpacing: 2 },
   small: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   stripe: { height: 36, marginHorizontal: -space.xl, backgroundColor: 'rgba(0,0,0,0.35)', marginBottom: space.lg },
-  fullNumber: { color: '#fff', fontSize: 20, fontWeight: '700', letterSpacing: 2, marginTop: 4, marginBottom: space.lg },
+  fullNumber: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginTop: 4,
+    marginBottom: space.lg,
+  },
   backRow: { flexDirection: 'row', justifyContent: 'space-between' },
   backValue: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 2 },
 });

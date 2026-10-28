@@ -1,0 +1,28 @@
+{
+  "name": "@platform/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prisma client for the platform Postgres. Flyway (infra/postgres/migrations) owns the schema; this package only reads it.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "pull": "bash scripts/pull-schema.sh",
+    "check": "bash scripts/pull-schema.sh --check",
+    "generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "prisma": "7.10.1",
+    "typescript": "6.0.2"
+  }
+}

@@ -30,7 +30,10 @@ export class ControlsController {
 
   @Put('budget')
   @HttpCode(202)
-  setBudget(@CurrentCard() cardId: string, @Body(new ZodPipe(BudgetRequest)) { limit, period }: BudgetRequest): Promise<BudgetDto> {
+  setBudget(
+    @CurrentCard() cardId: string,
+    @Body(new ZodPipe(BudgetRequest)) { limit, period }: BudgetRequest,
+  ): Promise<BudgetDto> {
     return this.commands.execute(new SetBudgetCommand(cardId, limit, period));
   }
 
@@ -46,7 +49,10 @@ export class ControlsController {
 
   @Delete('merchant-rules/:merchant')
   @HttpCode(202)
-  releaseMerchant(@CurrentCard() cardId: string, @Param('merchant', new ZodPipe(Merchant)) merchant: string): Promise<void> {
+  releaseMerchant(
+    @CurrentCard() cardId: string,
+    @Param('merchant', new ZodPipe(Merchant)) merchant: string,
+  ): Promise<void> {
     return this.commands.execute(new ReleaseMerchantCommand(cardId, merchant));
   }
 }

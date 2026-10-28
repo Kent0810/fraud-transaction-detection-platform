@@ -49,7 +49,8 @@ export function BankPicker({ visible, banks, selected, onSelect, onClose }: Prop
                   onSelect(item);
                   setQuery('');
                 }}
-                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}>
+                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
+              >
                 <View style={[styles.code, { backgroundColor: c.primarySoft }]}>
                   <Text style={[styles.codeText, { color: c.primary }]}>{item.code}</Text>
                 </View>
@@ -67,10 +68,22 @@ export function BankPicker({ visible, banks, selected, onSelect, onClose }: Prop
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { maxHeight: '75%', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: space.lg },
+  sheet: {
+    maxHeight: '75%',
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: space.lg,
+  },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginTop: space.sm, marginBottom: space.md },
   title: { fontSize: 18, fontWeight: '800', marginBottom: space.md },
-  search: { flexDirection: 'row', alignItems: 'center', gap: space.sm, borderRadius: radius.pill, paddingHorizontal: space.lg, marginBottom: space.sm },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    marginBottom: space.sm,
+  },
   searchInput: { flex: 1, fontSize: 16, paddingVertical: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
   code: { width: 56, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },

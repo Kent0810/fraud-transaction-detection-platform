@@ -35,7 +35,9 @@ function AppShell({ signedIn }: { signedIn: boolean }) {
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <View style={{ flex: 1, backgroundColor: c.surfaceAlt }}>
-        <View style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: 440, alignSelf: 'center' } : { flex: 1 }}>
+        <View
+          style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: 440, alignSelf: 'center' } : { flex: 1 }}
+        >
           <Stack
             screenOptions={{
               animation: 'slide_from_right',
@@ -44,7 +46,8 @@ function AppShell({ signedIn }: { signedIn: boolean }) {
               headerTintColor: c.text,
               headerTitleStyle: { color: c.text, fontWeight: '700' },
               contentStyle: { backgroundColor: c.bg },
-            }}>
+            }}
+          >
             <Stack.Protected guard={!signedIn}>
               <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />
             </Stack.Protected>
