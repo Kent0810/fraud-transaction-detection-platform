@@ -1,5 +1,3 @@
--- One row per transfer. transfer_id is the app's idempotency key: a retried request hits the primary key and posts nothing twice.
--- to_card is set for a transfer inside this bank; for another bank it is null and the money leaves through NAPAS.
 CREATE SEQUENCE IF NOT EXISTS transfer_reference_seq;
 
 CREATE TABLE IF NOT EXISTS transfers (
@@ -29,20 +27,6 @@ CREATE TABLE IF NOT EXISTS outbox (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
--- Ledger amounts are signed so that SUM(amount) per card is its balance: debits negative, credits positive.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ledger_entries_sign_check') THEN
-    ALTER TABLE ledger_entries ADD CONSTRAINT ledger_entries_sign_check
-      CHECK (CASE kind WHEN 'DEBIT' THEN amount < 0 WHEN 'CREDIT' THEN amount > 0 ELSE amount >= 0 END);
-  END IF;
-END $$;
-
--- History can't be deleted along with an account; close the account instead.
-ALTER TABLE ledger_entries DROP CONSTRAINT IF EXISTS ledger_entries_card_id_fkey;
-ALTER TABLE ledger_entries ADD CONSTRAINT ledger_entries_card_id_fkey
-  FOREIGN KEY (card_id) REFERENCES accounts (card_id) ON DELETE RESTRICT;
-
 -- Append-only: rows can be inserted and read, never changed or removed, whichever role is connected.
 -- A mistake is fixed with a new, reversing entry.
 CREATE OR REPLACE FUNCTION forbid_change() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -50,7 +34,7 @@ BEGIN
   RAISE EXCEPTION '% is append-only: % is not allowed', TG_TABLE_NAME, TG_OP USING ERRCODE = 'insufficient_privilege';
 END $$;
 
-DROP TRIGGER IF EXISTS ledger_entries_no_change ON ledger_entries;
+DROP TRIGGER IF EXISTS ledger_entries_no_change ON ledger_entries; -- Drop first to make sure the migration is safe to run again
 CREATE TRIGGER ledger_entries_no_change BEFORE UPDATE OR DELETE ON ledger_entries
   FOR EACH ROW EXECUTE FUNCTION forbid_change();
 

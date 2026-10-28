@@ -1,11 +1,3 @@
--- The only way to move money. The app can call it but can't update balances or write the ledger itself, so every balance
--- change comes with its transfer row, its ledger entries and its outbox event, whatever the backend does.
--- SECURITY DEFINER: runs with the owner's rights; search_path is pinned so a caller can't swap in look-alike tables.
---
--- The sender comes from the session token, not a card number, and the password is checked here,
--- so even a compromised backend can only debit a card whose owner is signed in and whose password it has.
---
--- Errors carry their own SQLSTATE (class TF) so the backend can map them to HTTP statuses.
 CREATE OR REPLACE FUNCTION post_transfer(
   p_session_token text,
   p_password      text,

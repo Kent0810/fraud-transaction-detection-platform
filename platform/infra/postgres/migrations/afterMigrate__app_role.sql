@@ -1,5 +1,5 @@
 -- A Flyway callback, not a versioned migration: it runs after every migrate, so the password stays in sync with the
--- environment and tables added by later migrations get their grants here. ${app_user} and ${app_password} are Flyway
+-- environment and abtles added by later migrations get their grants here. ${app_user} and ${app_password} are Flyway
 -- placeholders (FLYWAY_PLACEHOLDERS_APP_USER / _APP_PASSWORD); Flyway refuses to run if either is missing.
 
 DO $$
