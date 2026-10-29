@@ -3,20 +3,23 @@ CREATE KEYSPACE IF NOT EXISTS fraud
 
 USE fraud;
 
--- decisions topic
+-- decisions topic (card payments) and transfers topic (app transfers)
 CREATE TABLE IF NOT EXISTS txn_by_card (
-  card_id      text,
-  ts           timestamp,
-  txn_id       text,
-  merchant     text,
-  category     text,
-  amount       decimal,
-  merch_lat    double,
-  merch_long   double,
-  decision     text,
-  score        double,
-  fired_rules  set<text>,
-  decided_at   timestamp,
+  card_id               text,
+  ts                    timestamp,
+  txn_id                text,
+  channel               text,
+  merchant              text,
+  counterparty_account  text,
+  category              text,
+  amount                decimal,
+  currency              text,
+  merch_lat             double,
+  merch_long            double,
+  decision              text,
+  score                 double,
+  fired_rules           set<text>,
+  decided_at            timestamp,
   PRIMARY KEY ((card_id), ts, txn_id)
 ) WITH CLUSTERING ORDER BY (ts DESC, txn_id ASC)
   AND default_time_to_live = 7776000;   -- 90 days

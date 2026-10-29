@@ -35,12 +35,13 @@ GRANT UPDATE (last_login_at) ON auth TO "${app_user}";
 
 GRANT SELECT, INSERT, DELETE ON sessions TO "${app_user}";
 
--- Money moves through postTransfer() in @platform/db: append history, nothing more. Balances follow the ledger.
+-- Money moves through @platform/db: append history, nothing more. Balances follow the ledger.
 -- The only column the app writes is status: freeze and unfreeze, together with the outbox event.
 GRANT SELECT ON accounts TO "${app_user}";
 GRANT UPDATE (status) ON accounts TO "${app_user}";
 GRANT SELECT, INSERT ON ledger_entries TO "${app_user}";
 GRANT SELECT, INSERT ON transfers TO "${app_user}";
+GRANT UPDATE (status, declined_for, decided_at) ON transfers TO "${app_user}";
 GRANT USAGE ON SEQUENCE transfer_reference_seq TO "${app_user}";
 GRANT INSERT ON outbox TO "${app_user}";
 

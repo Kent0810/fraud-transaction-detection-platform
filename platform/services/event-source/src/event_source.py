@@ -26,14 +26,16 @@ from datetime import datetime, timezone
 from confluent_kafka import KafkaException, Producer
 
 from config import Config, ConfigError
-from constants.float_fields import FLOAT_FIELDS
+from constants.float_fields import FLOAT_FIELDS, INT_FIELDS
 
 log = logging.getLogger("event-source")
 
 def to_event(row):
-    event = dict(row)
+    event = {k: (v if v != "" else None) for k, v in row.items()}
     for field in FLOAT_FIELDS:
         event[field] = float(event[field])
+    for field in INT_FIELDS:
+        event[field] = int(event[field])
     return event
 
 

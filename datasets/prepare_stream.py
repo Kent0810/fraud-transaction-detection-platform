@@ -12,14 +12,17 @@ CARD_COLS = [
 ]
 DIM_CARD_HEADER = ["cc_num"] + CARD_COLS
 
-# The event itself: identity, time, merchant, amount, merchant location.
+# Shared with app transfers (channel TRANSFER).
 EVENT_HEADER = [
-    "txn_id", "ts", "ts_epoch", "cc_num", "merchant", "category", "amt",
-    "merch_lat", "merch_long",
+    "txn_id", "ts", "ts_epoch", "cc_num", "channel", "merchant", "counterparty_account",
+    "category", "amt", "currency", "merch_lat", "merch_long",
 ]
 GROUND_TRUTH_HEADER = ["txn_id", "is_fraud"]
 
 MERCHANT_PREFIX = "fraud_"
+
+CURRENCY = "VND"
+VND_PER_USD = 25_000
 
 # Defaults resolve next to this script, so it runs from any working directory.
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -101,9 +104,12 @@ def write_stream(src, events_path, truth_path):
                 iso(ts_epoch),
                 f"{ts_epoch:.3f}",
                 row["cc_num"],
+                "CARD",
                 merchant,
+                "",
                 row["category"],
-                row["amt"],
+                round(float(row["amt"]) * VND_PER_USD),
+                CURRENCY,
                 row["merch_lat"],
                 row["merch_long"],
             ])
@@ -160,6 +166,8 @@ def main():
         "rows": written,
         "cards": len(scan["cards"]),
         "fraud_rows": frauds,
+        "currency": CURRENCY,
+        "vnd_per_usd": VND_PER_USD,
         "source_unix_min": scan["min_unix"],
         "source_unix_max": scan["max_unix"],
         "stream_start": iso(first_ts),

@@ -31,9 +31,10 @@ export type SendTransfer = {
   password: string;
 };
 
-// balance: the sender's balance after the transfer, straight from the ledger.
+// Recorded as PENDING: the fraud check decides, then the money moves (or doesn't). Poll fetchTransfer for the outcome.
+// balance: the sender's balance now, straight from the ledger.
 export const sendTransfer = (t: SendTransfer) =>
-  request<Transfer & { reference: string; balance: number }>('POST', `${ME}/transfers`, {
+  request<Transfer & { balance: number }>('POST', `${ME}/transfers`, {
     transferId: t.transferId,
     toBankCode: t.to.bankCode,
     toAccount: t.to.account,

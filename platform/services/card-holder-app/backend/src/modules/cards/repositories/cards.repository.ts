@@ -12,7 +12,7 @@ import {
   toPage,
   type TxnRow,
 } from '../../../shared/cassandra/models';
-import type { AlertDto, AlertStatus, CardStateDto, TxnDto, Verdict } from '../types/cards.types';
+import type { AlertDto, AlertStatus, CardStateDto, Channel, TxnDto, Verdict } from '../types/cards.types';
 
 type ByCard = { cardId: string };
 
@@ -83,9 +83,12 @@ function toTxn(r: TxnRow): TxnDto {
   return {
     txnId: r.txnId,
     ts: iso(r.ts) ?? '',
+    channel: (r.channel as Channel | null) ?? 'CARD',
     merchant: r.merchant,
+    counterpartyAccount: r.counterpartyAccount,
     category: r.category,
     amount: num(r.amount),
+    currency: r.currency ?? 'VND',
     decision: (r.decision as Verdict | null) ?? 'ALLOW',
     score: num(r.score),
     firedRules: [...(r.firedRules ?? [])].sort(),

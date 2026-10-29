@@ -7,6 +7,8 @@ export const RULE_TEXT: Record<string, { title: string; detail: string }> = {
   R6: { title: 'Blocked merchant', detail: 'You blocked this merchant.' },
   BUDGET: { title: 'Over budget', detail: 'This payment takes you past your budget.' },
   FROZEN: { title: 'Card frozen', detail: 'You froze this card, so the payment was declined.' },
+  LARGE_AMOUNT: { title: 'Unusually large transfer', detail: 'Transfers this large need extra verification.' },
+  INSUFFICIENT_FUNDS: { title: 'Not enough balance', detail: 'Your balance no longer covered the transfer.' },
 };
 
 export function ruleTitle(ruleId: string): string {

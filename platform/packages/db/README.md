@@ -14,15 +14,19 @@ append-only triggers on `ledger_entries` and `transfers`, partial and expression
 ```
 
 ```ts
-import { createPrismaClient, postTransfer, TransferRefusedError } from '@platform/db';
+import { createPrismaClient, requestTransfer, settleTransfer, TransferRefusedError } from '@platform/db';
 
 const db = createPrismaClient({ host, port, database, user, password }); // the app's own login
 await db.accounts.findUnique({ where: { card_id } });
-await postTransfer(db, { fromCard, password, transferId, toBankCode, toAccount, toName, amount, content });
+await requestTransfer(db, { fromCard, password, transferId, toBankCode, toAccount, toName, amount, content });
+// …later, from the fraud detector's transfer-decisions topic:
+await settleTransfer(db, { transferId, approve, firedRules });
 ```
 
-Move money only with `postTransfer()`. It writes the transfer, both balances, the ledger entries and the outbox event in
-one transaction, locks in a fixed order and is safe to retry with the same `transferId`. Don't write those tables any
+Move money only through these two. `requestTransfer()` records the transfer as PENDING with a `TransferRequested` outbox
+event for the fraud detector, and is safe to retry with the same `transferId`. `settleTransfer()` applies the decision:
+it posts the ledger entries, both balances and `TransferPosted` in one transaction (locking in a fixed order), or closes
+the transfer with `TransferDeclined`; a decision delivered twice changes nothing. Don't write those tables any
 other way: an app login may update `accounts.balance` and insert history, so a hand-rolled write would pass the grants
 and break the ledger. Refusals arrive as `TransferRefusedError` with a code such as `INSUFFICIENT_FUNDS`.
 

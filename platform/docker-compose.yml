@@ -7,6 +7,8 @@ x-kafka-env: &kafka-env
   TOPIC_DECISIONS: decisions
   TOPIC_ALERTS: alerts
   TOPIC_CASES: cases
+  TOPIC_TRANSFER_REQUESTS: transfer-requests    # the outbox's aggregate_type in @platform/db
+  TOPIC_TRANSFER_DECISIONS: transfer-decisions
 
 x-postgres-env: &postgres-env
   POSTGRES_HOST: postgres

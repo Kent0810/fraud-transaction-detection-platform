@@ -1,5 +1,5 @@
 import { HttpError, ME, request } from './http';
-import type { Alert, Period, Recipient, RuleType, Txn } from './types';
+import type { Alert, Period, Recipient, RuleType, Transfer, Txn } from './types';
 
 export type Controls = {
   budget: { limit: number; period: Period; updatedAt: string | null } | null;
@@ -24,6 +24,10 @@ export const fetchControls = () => request<Controls>('GET', `${ME}/controls`);
 export const fetchBalance = () => request<Balance>('GET', `${ME}/balance`);
 
 export const fetchRecipients = () => request<Recipient[]>('GET', `${ME}/recipients`);
+
+// One of your transfers as it is now, with your balance now.
+export const fetchTransfer = (transferId: string) =>
+  request<Transfer & { balance: number }>('GET', `${ME}/transfers/${encodeURIComponent(transferId)}`);
 
 export type CardStatus = { frozen: boolean };
 

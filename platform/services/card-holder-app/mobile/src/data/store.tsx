@@ -11,6 +11,7 @@ import {
   fetchControls,
   fetchRecipients,
   fetchTransactions,
+  fetchTransfer,
 } from './queries';
 import { MOCK_PASSWORD, useUser } from './auth';
 
@@ -63,6 +64,7 @@ type Store = {
   setDraft: (draft: TransferDraft | null) => void;
   lookupAccount: (bankCode: string, account: string) => Promise<string | null>;
   sendTransfer: (draft: TransferDraft, transferId: string, password: string) => Promise<Transfer>;
+  refreshTransfer: (transferId: string) => Promise<Transfer | null>;
   removeSaved: (recipient: Recipient) => void;
 };
 
@@ -71,6 +73,9 @@ const StoreContext = createContext<Store | null>(null);
 const PROPAGATION_MS = 1500;
 const LOOKUP_MS = 700;
 const TRANSFER_MS = 1200;
+// How long sendTransfer waits for the fraud check before handing back a PENDING transfer.
+const DECISION_POLL_MS = 500;
+const DECISION_WAIT_MS = 10_000;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -202,7 +207,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
       })
       .reduce((sum, t) => sum + t.amount, 0);
-    return { ...budget, spent: Math.round(spent * 100) / 100 };
+    return { ...budget, spent };
   }, [budget, transactions]);
 
   // Not optimistic: the card shows as frozen only once the bank has saved it, so it never looks safer than it is.
@@ -283,18 +288,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [saved],
   );
 
+  const keepTransfer = useCallback((transfer: Transfer) => {
+    setTransfers((ts) => [transfer, ...ts.filter((t) => t.transferId !== transfer.transferId)]);
+  }, []);
+
+  const refreshTransfer = useCallback(
+    async (transferId: string) => {
+      if (!apiEnabled) return null;
+      const { balance: now, ...transfer } = await fetchTransfer(transferId);
+      keepTransfer(transfer);
+      setBalance(now);
+      return transfer;
+    },
+    [keepTransfer],
+  );
+
   const sendTransfer = useCallback(
     async (d: TransferDraft, transferId: string, password: string) => {
       let transfer: Transfer;
       if (apiEnabled) {
-        // The server checks the password, the balance and the recipient, and moves the money in one transaction.
-        const { balance: after, ...posted } = await commands
+        // The server checks the password, the balance and the recipient and records the transfer as PENDING; the fraud
+        // check then approves it (the money moves) or declines it. Wait a little for that before showing the receipt.
+        const { balance: now, ...requested } = await commands
           .sendTransfer({ transferId, to: d.to, amount: d.amount, content: d.content, password })
           .catch((e: unknown) => {
             throw transferError(e);
           });
-        transfer = posted;
-        setBalance(after);
+        transfer = requested;
+        setBalance(now);
+        for (let waited = 0; transfer.status === 'PENDING' && waited < DECISION_WAIT_MS; waited += DECISION_POLL_MS) {
+          await wait(DECISION_POLL_MS);
+          transfer = (await refreshTransfer(transferId).catch(() => null)) ?? transfer;
+        }
       } else {
         await wait(TRANSFER_MS);
         if (password !== MOCK_PASSWORD) throw new TransferError('Incorrect password');
@@ -307,18 +332,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           amount: d.amount,
           fee: 0,
           content: d.content,
+          status: 'POSTED',
+          declinedFor: [],
           ts: now.toISOString(),
         };
         setBalance((b) => b - d.amount);
       }
-      setTransfers((ts) => [transfer, ...ts.filter((t) => t.transferId !== transfer.transferId)]);
-      if (d.save) {
+      keepTransfer(transfer);
+      if (d.save && transfer.status !== 'DECLINED') {
         setSaved((rs) => (rs.some((r) => sameRecipient(r, d.to)) ? rs : [d.to, ...rs]));
         if (apiEnabled) commands.saveRecipient(d.to).catch(reloadSaved);
       }
       return transfer;
     },
-    [reloadSaved],
+    [reloadSaved, refreshTransfer, keepTransfer],
   );
 
   const removeSaved = useCallback(
@@ -355,6 +382,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDraft,
       lookupAccount,
       sendTransfer,
+      refreshTransfer,
       removeSaved,
     }),
     [
@@ -379,6 +407,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       releaseMerchant,
       lookupAccount,
       sendTransfer,
+      refreshTransfer,
       removeSaved,
     ],
   );

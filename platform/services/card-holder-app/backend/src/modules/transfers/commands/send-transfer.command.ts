@@ -19,6 +19,6 @@ export class SendTransferHandler implements ICommandHandler<SendTransferCommand>
   constructor(private readonly transfers: TransfersRepository) {}
 
   execute({ cardId, request }: SendTransferCommand): Promise<TransferDto> {
-    return this.transfers.post(cardId, request);
+    return this.transfers.request(cardId, request);
   }
 }

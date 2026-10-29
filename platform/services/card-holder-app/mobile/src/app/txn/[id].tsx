@@ -21,11 +21,14 @@ export default function TxnScreen() {
 
   const tone = tones[txn.decision];
   const flagged = txn.decision !== 'ALLOW';
+  const transfer = txn.channel === 'TRANSFER';
   const rule = ruleFor(txn.merchant);
 
   const details: [string, string][] = [
     ['Date', `${day(txn.ts)}, ${time(txn.ts)}`],
-    ['Category', category(txn.category)],
+    ...(transfer
+      ? [['To account', (txn.counterpartyAccount ?? '').replace(':', ' · ')] as [string, string]]
+      : [['Category', category(txn.category)] as [string, string]]),
     ['Reference', txn.txnId],
   ];
 
@@ -59,7 +62,9 @@ export default function TxnScreen() {
         <Surface style={[styles.why, { backgroundColor: tone.bg }]}>
           <View style={styles.whyHead}>
             <Ionicons name="shield-half" size={18} color={tone.fg} />
-            <Text style={[styles.whyTitle, { color: tone.fg }]}>Why we flagged this</Text>
+            <Text style={[styles.whyTitle, { color: tone.fg }]}>
+              {transfer ? 'Why this transfer was declined' : 'Why we flagged this'}
+            </Text>
           </View>
           {txn.firedRules.map((r) => (
             <View key={r} style={styles.reason}>
@@ -70,7 +75,7 @@ export default function TxnScreen() {
               </View>
             </View>
           ))}
-          <Text style={[styles.score, { color: c.muted }]}>Risk score {txn.score.toFixed(1)} / 1.0</Text>
+          {!transfer && <Text style={[styles.score, { color: c.muted }]}>Risk score {txn.score.toFixed(1)} / 1.0</Text>}
         </Surface>
       )}
 
@@ -89,45 +94,49 @@ export default function TxnScreen() {
         ))}
       </Surface>
 
-      <SectionHeader title="This merchant" />
-      {rule ? (
-        <Surface style={{ gap: space.lg }}>
-          <View style={styles.ruleRow}>
-            <IconBubble
-              name={rule.type === 'BLOCK' ? 'ban' : 'checkmark-done'}
-              tint={rule.type === 'BLOCK' ? c.decline : c.allow}
-              bg={rule.type === 'BLOCK' ? c.declineBg : c.allowBg}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.reasonTitle, { color: c.text }]}>
-                {rule.type === 'BLOCK' ? 'Blocked' : 'Trusted'}
-              </Text>
-              <Text style={[styles.reasonDetail, { color: rule.pending ? c.stepUp : c.muted }]}>
-                {rule.pending
-                  ? 'Taking effect…'
-                  : rule.type === 'BLOCK'
-                    ? 'Future payments here will be declined.'
-                    : 'Fraud checks are skipped for this merchant.'}
-              </Text>
+      {!transfer && (
+        <>
+          <SectionHeader title="This merchant" />
+          {rule ? (
+            <Surface style={{ gap: space.lg }}>
+              <View style={styles.ruleRow}>
+                <IconBubble
+                  name={rule.type === 'BLOCK' ? 'ban' : 'checkmark-done'}
+                  tint={rule.type === 'BLOCK' ? c.decline : c.allow}
+                  bg={rule.type === 'BLOCK' ? c.declineBg : c.allowBg}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.reasonTitle, { color: c.text }]}>
+                    {rule.type === 'BLOCK' ? 'Blocked' : 'Trusted'}
+                  </Text>
+                  <Text style={[styles.reasonDetail, { color: rule.pending ? c.stepUp : c.muted }]}>
+                    {rule.pending
+                      ? 'Taking effect…'
+                      : rule.type === 'BLOCK'
+                        ? 'Future payments here will be declined.'
+                        : 'Fraud checks are skipped for this merchant.'}
+                  </Text>
+                </View>
+              </View>
+              <Button label="Remove rule" variant="secondary" onPress={() => releaseMerchant(txn.merchant)} />
+            </Surface>
+          ) : (
+            <View style={{ gap: space.sm }}>
+              <Button
+                label="Block this merchant"
+                icon="ban"
+                variant="danger"
+                onPress={() => setMerchantRule(txn.merchant, 'BLOCK')}
+              />
+              <Button
+                label="Trust this merchant"
+                icon="checkmark-done"
+                variant="secondary"
+                onPress={() => setMerchantRule(txn.merchant, 'ALLOW')}
+              />
             </View>
-          </View>
-          <Button label="Remove rule" variant="secondary" onPress={() => releaseMerchant(txn.merchant)} />
-        </Surface>
-      ) : (
-        <View style={{ gap: space.sm }}>
-          <Button
-            label="Block this merchant"
-            icon="ban"
-            variant="danger"
-            onPress={() => setMerchantRule(txn.merchant, 'BLOCK')}
-          />
-          <Button
-            label="Trust this merchant"
-            icon="checkmark-done"
-            variant="secondary"
-            onPress={() => setMerchantRule(txn.merchant, 'ALLOW')}
-          />
-        </View>
+          )}
+        </>
       )}
     </ScrollView>
   );

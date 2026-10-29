@@ -1,11 +1,15 @@
+import type Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FadeInUp, PopIn } from '@/components/motion';
 import { Button, Empty, IconBubble } from '@/components/ui';
 import { vnd, vndInWords } from '@/components/vnd';
+import { ruleTitle } from '@/data/rules';
 import { useStore } from '@/data/store';
-import { radius, space, useColors } from '@/theme';
+import type { TransferStatus } from '@/data/types';
+import { radius, space, useColors, type Colors } from '@/theme';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -14,15 +18,31 @@ function vnDateTime(iso: string): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())} · ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
+type IconName = keyof typeof Ionicons.glyphMap;
+
+const LOOK: Record<TransferStatus, (c: Colors) => { icon: IconName; title: string; tint: string; bg: string }> = {
+  POSTED: (c) => ({ icon: 'checkmark', title: 'Transfer successful', tint: c.allow, bg: c.allowBg }),
+  PENDING: (c) => ({ icon: 'hourglass-outline', title: 'Being checked', tint: c.stepUp, bg: c.stepUpBg }),
+  DECLINED: (c) => ({ icon: 'close', title: 'Transfer declined', tint: c.decline, bg: c.declineBg }),
+};
+
 export default function TransferDoneScreen() {
   const c = useColors();
   const { transferId } = useLocalSearchParams<{ transferId: string }>();
-  const { transfers, banks } = useStore();
+  const { transfers, banks, refreshTransfer } = useStore();
+  const [checking, setChecking] = useState(false);
   const transfer = transfers.find((t) => t.transferId === transferId);
 
   if (!transfer) {
     return <Empty icon="receipt-outline" title="Transfer not found" detail="Check your recent transfers on Home." />;
   }
+
+  const look = LOOK[transfer.status](c);
+  const checkAgain = async () => {
+    setChecking(true);
+    await refreshTransfer(transfer.transferId).catch(() => null);
+    setChecking(false);
+  };
 
   const bank = banks.find((b) => b.code === transfer.to.bankCode);
   const rows: [string, string][] = [
@@ -39,14 +59,23 @@ export default function TransferDoneScreen() {
       <View style={[styles.receipt, { backgroundColor: c.surface }]}>
         <View style={styles.top}>
           <PopIn>
-            <IconBubble name="checkmark" tint={c.allow} bg={c.allowBg} size={80} />
+            <IconBubble name={look.icon} tint={look.tint} bg={look.bg} size={80} />
           </PopIn>
           <FadeInUp delay={200} style={{ alignItems: 'center', gap: 4 }}>
-            <Text style={[styles.status, { color: c.allow }]}>Transfer successful</Text>
+            <Text style={[styles.status, { color: look.tint }]}>{look.title}</Text>
             <Text style={[styles.amount, { color: c.text }]}>{vnd(transfer.amount)}</Text>
             <Text style={[styles.words, { color: c.muted }]}>{vndInWords(transfer.amount)}</Text>
             <Text style={[styles.time, { color: c.muted }]}>{vnDateTime(transfer.ts)}</Text>
           </FadeInUp>
+          {transfer.status !== 'POSTED' && (
+            <View style={[styles.note, { backgroundColor: look.bg }]}>
+              <Text style={[styles.noteText, { color: c.text }]}>
+                {transfer.status === 'PENDING'
+                  ? 'Our fraud check is still looking at this transfer. No money has left your account yet.'
+                  : `No money left your account. Reason: ${transfer.declinedFor.map(ruleTitle).join(', ')}.`}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.tear}>
@@ -66,6 +95,15 @@ export default function TransferDoneScreen() {
       </View>
 
       <FadeInUp delay={450} style={styles.actions}>
+        {transfer.status === 'PENDING' && (
+          <Button
+            label={checking ? 'Checking…' : 'Check again'}
+            icon="refresh"
+            variant="secondary"
+            onPress={checkAgain}
+            disabled={checking}
+          />
+        )}
         <Button label="Back to Home" onPress={() => router.dismissAll()} />
         <Button label="New transfer" variant="secondary" onPress={() => router.replace('/transfer')} />
       </FadeInUp>
@@ -88,6 +126,8 @@ const styles = StyleSheet.create({
   amount: { fontSize: 34, fontWeight: '800', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
   words: { fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
   time: { fontSize: 13, marginTop: 2 },
+  note: { borderRadius: radius.md, padding: space.md, alignSelf: 'stretch' },
+  noteText: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
   tear: { height: 24, justifyContent: 'center', marginHorizontal: -space.lg, marginVertical: space.sm },
   dashes: { marginHorizontal: space.lg, borderTopWidth: 1.5, borderStyle: 'dashed' },
   notch: { position: 'absolute', width: 24, height: 24, borderRadius: 12 },

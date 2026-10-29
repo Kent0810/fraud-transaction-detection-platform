@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { money, PERIOD_LABEL, toUsd, toVnd } from '@/components/format';
+import { money, PERIOD_LABEL } from '@/components/format';
 import { FadeInUp } from '@/components/motion';
 import { Screen } from '@/components/Screen';
 import { Button, Ring, ScreenTitle, SectionHeader, Surface } from '@/components/ui';
@@ -12,19 +12,18 @@ import { radius, space, useColors } from '@/theme';
 
 const PERIODS: Period[] = ['DAY', 'WEEK', 'MONTH'];
 const PERIOD_ADJECTIVE: Record<Period, string> = { DAY: 'Daily', WEEK: 'Weekly', MONTH: 'Monthly' };
-// In đồng; the budget itself is stored and sent in dollars, like the card amounts it is compared with.
 const PRESETS = [10_000_000, 25_000_000, 40_000_000, 60_000_000];
 
 export default function BudgetScreen() {
   const c = useColors();
   const { budget, setBudget } = useStore();
-  const [limitText, setLimitText] = useState(groupThousands(toVnd(budget.limit)));
+  const [limitText, setLimitText] = useState(groupThousands(budget.limit));
   const [period, setPeriod] = useState<Period>(budget.period);
   const [saved, setSaved] = useState(false);
 
   const limit = parseVnd(limitText);
-  const valid = toUsd(limit) > 0;
-  const changed = valid && (toUsd(limit) !== budget.limit || period !== budget.period);
+  const valid = limit > 0;
+  const changed = valid && (limit !== budget.limit || period !== budget.period);
   const left = budget.limit - budget.spent;
   const pct = budget.spent / budget.limit;
 
@@ -116,7 +115,7 @@ export default function BudgetScreen() {
               label={saved ? 'Saved' : 'Save budget'}
               icon={saved ? 'checkmark' : undefined}
               onPress={() => {
-                setBudget(toUsd(limit), period);
+                setBudget(limit, period);
                 setSaved(true);
               }}
               disabled={!changed && !saved}

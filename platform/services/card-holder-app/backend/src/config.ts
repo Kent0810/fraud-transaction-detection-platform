@@ -10,6 +10,7 @@ export type CassandraConfig = {
 export type KafkaConfig = {
   kafkaBrokers: string[];
   controlTopic: string;
+  transferDecisionsTopic: string;
 };
 
 export type PostgresConfig = {
@@ -58,6 +59,7 @@ export function loadKafkaConfig(): KafkaConfig {
   return {
     kafkaBrokers: list('KAFKA_BOOTSTRAP_SERVERS'),
     controlTopic: required('TOPIC_CONTROL'),
+    transferDecisionsTopic: required('TOPIC_TRANSFER_DECISIONS'),
   };
 }
 

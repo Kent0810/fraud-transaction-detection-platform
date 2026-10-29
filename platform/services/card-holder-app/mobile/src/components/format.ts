@@ -2,15 +2,8 @@ import type Ionicons from '@expo/vector-icons/Ionicons';
 
 import { vnd } from './vnd';
 
-// Card amounts come from the backend in US dollars (the fraud dataset's currency); the app shows đồng.
-export const VND_PER_USD = 25_000;
-
-export const toVnd = (usd: number) => Math.round(usd * VND_PER_USD);
-
-export const toUsd = (dong: number) => Math.round((dong / VND_PER_USD) * 100) / 100;
-
-export function money(usd: number): string {
-  return vnd(toVnd(usd));
+export function money(dong: number): string {
+  return vnd(dong);
 }
 
 // 190300000001 -> 1903 0000 0001, the way account numbers are printed.
@@ -39,6 +32,7 @@ const CATEGORY_ICON: Record<string, IconName> = {
   kids: 'paw',
   home: 'home',
   misc: 'apps',
+  transfer: 'paper-plane',
 };
 
 export function categoryIcon(raw: string): IconName {

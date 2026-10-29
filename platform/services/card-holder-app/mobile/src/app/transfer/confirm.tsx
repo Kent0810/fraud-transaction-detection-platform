@@ -125,7 +125,7 @@ export default function ConfirmTransferScreen() {
         {sending ? (
           <View style={[styles.sending, { backgroundColor: c.primary }]}>
             <ActivityIndicator color={c.onPrimary} />
-            <Text style={{ color: c.onPrimary, fontWeight: '700', fontSize: 16 }}>Processing…</Text>
+            <Text style={{ color: c.onPrimary, fontWeight: '700', fontSize: 16 }}>Checking…</Text>
           </View>
         ) : (
           <Button label="Confirm" onPress={confirm} disabled={!password} />

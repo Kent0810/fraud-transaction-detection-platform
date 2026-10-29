@@ -3,10 +3,14 @@ export type * from './generated/prisma/models';
 export { isCardFrozen, verifyPassword } from './cards';
 export { createPrismaClient, type DbConfig } from './client';
 export {
+  getTransfer,
   OUR_BANK,
-  postTransfer,
+  requestTransfer,
+  settleTransfer,
   TransferRefusedError,
-  type PostedTransfer,
-  type PostTransferInput,
+  type TransferDecision,
   type TransferRefusalCode,
+  type TransferRequestInput,
+  type TransferState,
+  type TransferStatus,
 } from './transfers';

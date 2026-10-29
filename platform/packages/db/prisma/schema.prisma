@@ -135,11 +135,15 @@ model transfers {
   to_card                                String?
   amount                                 BigInt
   content                                String
+  status                                 String           @default("PENDING")
+  declined_for                           String[]         @default([])
   created_at                             DateTime         @default(now()) @db.Timestamptz(6)
+  decided_at                             DateTime?        @db.Timestamptz(6)
   ledger_entries                         ledger_entries[]
   accounts_transfers_from_cardToaccounts accounts         @relation("transfers_from_cardToaccounts", fields: [from_card], references: [card_id], onUpdate: NoAction)
   accounts_transfers_to_cardToaccounts   accounts?        @relation("transfers_to_cardToaccounts", fields: [to_card], references: [card_id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([from_card, created_at(sort: Desc)], map: "transfers_from_idx")
   @@index([to_card, created_at(sort: Desc)], map: "transfers_to_idx", where: raw("(to_card IS NOT NULL)"))
+  @@index([created_at], map: "transfers_pending_idx", where: raw("(status = 'PENDING'::text)"))
 }

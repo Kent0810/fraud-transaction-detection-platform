@@ -15,9 +15,12 @@ export type TxnRow = {
   cardId: string;
   ts: Date;
   txnId: string;
+  channel: string | null;
   merchant: string;
+  counterpartyAccount: string | null;
   category: string;
   amount: types.BigDecimal | null;
+  currency: string | null;
   decision: string | null;
   score: number | null;
   firedRules: string[] | null;

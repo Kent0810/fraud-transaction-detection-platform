@@ -6,15 +6,15 @@ import { loadCassandraConfig } from './config';
 const DEFAULT_CARD = '2291163933867244';
 
 const TXNS: [number, string, string, string, string, string, number, string[]][] = [
-  [3, 't-1009', 'Kuhn LLC', 'shopping_net', '919.99', 'DECLINE', 0.8, ['R2', 'R5']],
-  [4, 't-1008', 'Kuhn LLC', 'shopping_net', '845.10', 'DECLINE', 0.8, ['R2', 'R5']],
-  [6, 't-1007', 'Kuhn LLC', 'shopping_net', '312.40', 'ALLOW', 0.3, ['R5']],
-  [95, 't-1006', 'Kirlin and Sons', 'personal_care', '2.86', 'ALLOW', 0, []],
-  [180, 't-1005', 'Sporer-Keebler', 'personal_care', '29.84', 'ALLOW', 0, []],
-  [26 * 60, 't-1004', 'Swaniawski, Nitzsche and Welch', 'health_fitness', '41.28', 'ALLOW', 0, []],
-  [27 * 60, 't-1003', 'Haley Group', 'misc_pos', '60.05', 'STEP_UP', 0.4, ['R4']],
-  [50 * 60, 't-1002', 'Johnston-Casper', 'travel', '3.19', 'ALLOW', 0, []],
-  [52 * 60, 't-1001', 'Daugherty LLC', 'kids_pets', '19.55', 'ALLOW', 0, []],
+  [3, 't-1009', 'Kuhn LLC', 'shopping_net', '22999750', 'DECLINE', 0.8, ['R2', 'R5']],
+  [4, 't-1008', 'Kuhn LLC', 'shopping_net', '21127500', 'DECLINE', 0.8, ['R2', 'R5']],
+  [6, 't-1007', 'Kuhn LLC', 'shopping_net', '7810000', 'ALLOW', 0.3, ['R5']],
+  [95, 't-1006', 'Kirlin and Sons', 'personal_care', '71500', 'ALLOW', 0, []],
+  [180, 't-1005', 'Sporer-Keebler', 'personal_care', '746000', 'ALLOW', 0, []],
+  [26 * 60, 't-1004', 'Swaniawski, Nitzsche and Welch', 'health_fitness', '1032000', 'ALLOW', 0, []],
+  [27 * 60, 't-1003', 'Haley Group', 'misc_pos', '1501250', 'STEP_UP', 0.4, ['R4']],
+  [50 * 60, 't-1002', 'Johnston-Casper', 'travel', '79750', 'ALLOW', 0, []],
+  [52 * 60, 't-1001', 'Daugherty LLC', 'kids_pets', '488750', 'ALLOW', 0, []],
 ];
 
 async function main(): Promise<void> {
@@ -43,9 +43,11 @@ async function main(): Promise<void> {
       cardId,
       ts,
       txnId,
+      channel: 'CARD',
       merchant,
       category,
       amount: amt,
+      currency: 'VND',
       decision,
       score,
       firedRules: rules,
@@ -67,7 +69,7 @@ async function main(): Promise<void> {
     cardId,
     riskScore: topScore,
     priority: topPriority,
-    amountSum: types.BigDecimal.fromString(flaggedSum.toFixed(2)),
+    amountSum: types.BigDecimal.fromString(String(flaggedSum)),
     openAlerts,
     lastDecision: 'DECLINE',
     updatedAt: new Date(now),

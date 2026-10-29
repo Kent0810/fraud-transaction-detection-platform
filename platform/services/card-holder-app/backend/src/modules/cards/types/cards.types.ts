@@ -1,11 +1,16 @@
 export type Verdict = 'ALLOW' | 'STEP_UP' | 'DECLINE';
 
+export type Channel = 'CARD' | 'TRANSFER';
+
 export type TxnDto = {
   txnId: string;
   ts: string;
+  channel: Channel;
   merchant: string;
+  counterpartyAccount: string | null;
   category: string;
   amount: number;
+  currency: string;
   decision: Verdict;
   score: number;
   firedRules: string[];

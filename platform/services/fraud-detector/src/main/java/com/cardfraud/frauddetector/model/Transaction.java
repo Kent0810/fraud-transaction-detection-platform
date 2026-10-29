@@ -5,9 +5,15 @@ public record Transaction(
         String ts,
         double tsEpoch,
         String ccNum,
+        String channel,
         String merchant,
+        String counterpartyAccount,
         String category,
-        double amt,
-        double merchLat,
-        double merchLong) {
+        long amt,
+        String currency,
+        Double merchLat,
+        Double merchLong) {
+
+    public static final String CARD = "CARD";
+    public static final String TRANSFER = "TRANSFER";
 }

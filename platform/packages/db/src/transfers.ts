@@ -1,9 +1,14 @@
 import { isCardFrozen, verifyPassword } from './cards';
-import { Prisma, type PrismaClient } from './generated/prisma/client';
+import { Prisma, type PrismaClient, type transfers } from './generated/prisma/client';
 
 export const OUR_BANK = 'HCMMB';
 
-export type PostTransferInput = {
+const REQUESTS_TOPIC = 'transfer-requests';
+const OUTCOMES_TOPIC = 'transfers';
+
+export type TransferStatus = 'PENDING' | 'POSTED' | 'DECLINED';
+
+export type TransferRequestInput = {
   /** The signed-in card. Take it from the session, never from the request body. */
   fromCard: string;
   password: string;
@@ -15,17 +20,13 @@ export type PostTransferInput = {
   content: string;
 };
 
-export type PostedTransfer = {
-  transfer_id: string;
-  reference: string;
-  to_bank_code: string;
-  to_account: string;
-  to_name: string;
-  amount: bigint;
-  content: string;
-  created_at: Date;
-  balance: bigint;
+export type TransferDecision = {
+  transferId: string;
+  approve: boolean;
+  firedRules: string[];
 };
+
+export type TransferState = transfers & { balance: bigint };
 
 export type TransferRefusalCode =
   | 'CARD_FROZEN'
@@ -45,10 +46,12 @@ export class TransferRefusedError extends Error {
   }
 }
 
-/** The only way to move money: the transfer, its ledger entries and the outbox event in one transaction. */
-export async function postTransfer(db: PrismaClient, t: PostTransferInput): Promise<PostedTransfer> {
-  if (await isCardFrozen(db, t.fromCard)) throw frozen();
-  // Before the transaction: bcrypt is slow and shouldn't hold a lock.
+/** Records the transfer as PENDING for the fraud detector; no money moves until settleTransfer(). */
+export async function requestTransfer(db: PrismaClient, t: TransferRequestInput): Promise<TransferState> {
+  if (await isCardFrozen(db, t.fromCard)) {
+    throw frozen();
+  }
+
   if (!(await verifyPassword(db, t.fromCard, t.password))) {
     throw new TransferRefusedError('INCORRECT_PASSWORD', 'incorrect password');
   }
@@ -56,20 +59,54 @@ export async function postTransfer(db: PrismaClient, t: PostTransferInput): Prom
   const to = t.toBankCode === OUR_BANK ? await internalRecipient(db, t) : null;
   const amount = BigInt(t.amount);
 
+  // Not a hold: the balance is checked again when the money moves.
+  if ((await balanceOf(db, t.fromCard)) < amount) {
+    throw insufficientFunds();
+  }
+
   // Frozen after the check above: the database refuses the transfer (forbid_frozen_sender in V6).
-  return post(db, t, to, amount).catch((e: unknown) => {
+  return record(db, t, to, amount).catch((e: unknown) => {
     throw isFrozenSender(e) ? frozen() : e;
   });
 }
 
-const frozen = () => new TransferRefusedError('CARD_FROZEN', 'your card is frozen');
+/** Posts an approved transfer or closes a declined one. Safe to repeat: a decided transfer is returned as is. */
+export async function settleTransfer(db: PrismaClient, d: TransferDecision): Promise<TransferState | null> {
+  if (!d.approve) {
+    return decline(db, d.transferId, d.firedRules);
+  }
+  try {
+    return await post(db, d.transferId);
+  } catch (e) {
+    if (isOverdraft(e)) return decline(db, d.transferId, ['INSUFFICIENT_FUNDS']);
+    if (isFrozenSender(e)) return decline(db, d.transferId, ['FROZEN']);
+    throw e;
+  }
+}
 
-function post(
+export async function getTransfer(
   db: PrismaClient,
-  t: PostTransferInput,
+  fromCard: string,
+  transferId: string,
+): Promise<TransferState | null> {
+  const t = await db.transfers.findFirst({
+    where: {
+      transfer_id: transferId,
+      from_card: fromCard,
+    },
+  });
+  return t && { ...t, balance: await balanceOf(db, fromCard) };
+}
+
+const frozen = () => new TransferRefusedError('CARD_FROZEN', 'your card is frozen');
+const insufficientFunds = () => new TransferRefusedError('INSUFFICIENT_FUNDS', 'insufficient funds');
+
+function record(
+  db: PrismaClient,
+  t: TransferRequestInput,
   to: { cardId: string; name: string } | null,
   amount: bigint,
-): Promise<PostedTransfer> {
+): Promise<TransferState> {
   return db.$transaction(async (tx) => {
     const [created] = await tx.transfers.createManyAndReturn({
       data: [
@@ -88,68 +125,131 @@ function post(
     });
     if (!created) return replay(tx, t, amount);
 
+    await tx.outbox.createMany({ data: event(REQUESTS_TOPIC, 'TransferRequested', created) });
+    return { ...created, balance: await balanceOf(tx, t.fromCard) };
+  });
+}
+
+function post(db: PrismaClient, transferId: string): Promise<TransferState | null> {
+  return db.$transaction(async (tx) => {
+    const [t] = await tx.transfers.updateManyAndReturn({
+      where: {
+        transfer_id: transferId,
+        status: 'PENDING',
+      },
+      data: {
+        status: 'POSTED',
+        decided_at: new Date(),
+      },
+    });
+    if (!t) return current(tx, transferId);
+
     const entries = [
       {
-        card_id: t.fromCard,
+        card_id: t.from_card,
         kind: 'TRANSFER',
-        amount: -amount,
-        reference: created.reference,
+        amount: -t.amount,
+        reference: t.reference,
       },
     ];
-    if (to) {
+    if (t.to_card) {
       entries.push({
-        card_id: to.cardId,
+        card_id: t.to_card,
         kind: 'TRANSFER',
-        amount,
-        reference: created.reference,
+        amount: t.amount,
+        reference: t.reference,
       });
     }
 
     // The database applies each entry to its balance (apply_ledger_entry). In card_id order, so two opposite
     // transfers lock the same accounts in the same order and can't deadlock.
-    try {
-      await tx.ledger_entries.createMany({
-        data: entries.sort((a, b) => (a.card_id < b.card_id ? -1 : 1)),
-      });
-    } catch (e) {
-      if (isOverdraft(e)) throw new TransferRefusedError('INSUFFICIENT_FUNDS', 'insufficient funds');
-      throw e;
-    }
-
-    const { balance } = await tx.accounts.findUniqueOrThrow({
-      where: { card_id: t.fromCard },
-      select: { balance: true },
+    await tx.ledger_entries.createMany({
+      data: entries.sort((a, b) => (a.card_id < b.card_id ? -1 : 1)),
     });
 
-    // createMany: no RETURNING, so the app login needs no SELECT on the outbox.
-    await tx.outbox.createMany({
-      data: {
-        aggregate_type: 'transfers',
-        aggregate_id: created.transfer_id,
-        type: 'TransferPosted',
-        payload: {
-          transferId: created.transfer_id,
-          reference: created.reference,
-          kind: to ? 'INTERNAL' : 'NAPAS',
-          fromCard: t.fromCard,
-          toCard: to?.cardId ?? null,
-          to: {
-            bankCode: created.to_bank_code,
-            account: created.to_account,
-            name: created.to_name,
-          },
-          amount: Number(created.amount),
-          content: created.content,
-          ts: created.created_at.toISOString(),
-        },
-      },
-    });
-
-    return { ...created, balance };
+    await tx.outbox.createMany({ data: event(OUTCOMES_TOPIC, 'TransferPosted', t) });
+    return { ...t, balance: await balanceOf(tx, t.from_card) };
   });
 }
 
-async function internalRecipient(db: PrismaClient, t: PostTransferInput): Promise<{ cardId: string; name: string }> {
+function decline(db: PrismaClient, transferId: string, reasons: string[]): Promise<TransferState | null> {
+  return db.$transaction(async (tx) => {
+    const [t] = await tx.transfers.updateManyAndReturn({
+      where: {
+        transfer_id: transferId,
+        status: 'PENDING',
+      },
+      data: {
+        status: 'DECLINED',
+        declined_for: reasons.length ? reasons : ['DECLINED'],
+        decided_at: new Date(),
+      },
+    });
+    if (!t) return current(tx, transferId);
+
+    await tx.outbox.createMany({ data: event(OUTCOMES_TOPIC, 'TransferDeclined', t) });
+    return { ...t, balance: await balanceOf(tx, t.from_card) };
+  });
+}
+
+type Tx = Pick<PrismaClient, 'transfers' | 'accounts'>;
+
+async function current(tx: Tx, transferId: string): Promise<TransferState | null> {
+  const t = await tx.transfers.findUnique({
+    where: { transfer_id: transferId },
+  });
+  return t && { ...t, balance: await balanceOf(tx, t.from_card) };
+}
+
+// Same shape as a card payment on the transactions topic. createMany: no RETURNING, so no SELECT on the outbox.
+function event(topic: string, type: string, t: transfers): Prisma.outboxCreateManyInput {
+  return {
+    aggregate_type: topic,
+    aggregate_id: t.from_card,
+    type,
+    payload: {
+      txn_id: t.transfer_id,
+      ts: t.created_at.toISOString(),
+      ts_epoch: t.created_at.getTime() / 1000,
+      cc_num: t.from_card,
+      channel: 'TRANSFER',
+      merchant: t.to_name,
+      counterparty_account: `${t.to_bank_code}:${t.to_account}`,
+      category: 'transfer',
+      amt: Number(t.amount),
+      currency: 'VND',
+      merch_lat: null,
+      merch_long: null,
+      reference: t.reference,
+      kind: t.to_card ? 'INTERNAL' : 'NAPAS',
+      to_card: t.to_card,
+      content: t.content,
+      status: t.status,
+      decision: VERDICT[t.status as TransferStatus],
+      fired_rules: t.declined_for,
+      decided_at: t.decided_at?.toISOString() ?? null,
+    },
+  };
+}
+
+const VERDICT: Record<TransferStatus, 'ALLOW' | 'DECLINE' | null> = {
+  PENDING: null,
+  POSTED: 'ALLOW',
+  DECLINED: 'DECLINE',
+};
+
+async function balanceOf(tx: Pick<PrismaClient, 'accounts'>, cardId: string): Promise<bigint> {
+  const { balance } = await tx.accounts.findUniqueOrThrow({
+    where: { card_id: cardId },
+    select: { balance: true },
+  });
+  return balance;
+}
+
+async function internalRecipient(
+  db: PrismaClient,
+  t: TransferRequestInput,
+): Promise<{ cardId: string; name: string }> {
   const account = await db.accounts.findUnique({
     where: { account_number: t.toAccount },
     select: {
@@ -170,11 +270,7 @@ async function internalRecipient(db: PrismaClient, t: PostTransferInput): Promis
   return { cardId: account.card_id, name: `${first_name} ${last_name}`.toUpperCase() };
 }
 
-async function replay(
-  tx: Pick<PrismaClient, 'transfers' | 'accounts'>,
-  t: PostTransferInput,
-  amount: bigint,
-): Promise<PostedTransfer> {
+async function replay(tx: Tx, t: TransferRequestInput, amount: bigint): Promise<TransferState> {
   const first = await tx.transfers.findUniqueOrThrow({
     where: { transfer_id: t.transferId },
   });
@@ -186,11 +282,7 @@ async function replay(
   ) {
     throw new TransferRefusedError('TRANSFER_ID_REUSED', 'transferId was already used for a different transfer');
   }
-  const { balance } = await tx.accounts.findUniqueOrThrow({
-    where: { card_id: t.fromCard },
-    select: { balance: true },
-  });
-  return { ...first, balance };
+  return { ...first, balance: await balanceOf(tx, t.fromCard) };
 }
 
 // apply_ledger_entry() took the balance below zero: CHECK (balance >= 0) on accounts, SQLSTATE 23514.

@@ -7,7 +7,16 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { postTransfer, type PostedTransfer, TransferRefusedError, type TransferRefusalCode } from '@platform/db';
+import {
+  getTransfer,
+  requestTransfer,
+  settleTransfer,
+  type TransferDecision,
+  TransferRefusedError,
+  type TransferRefusalCode,
+  type TransferState,
+  type TransferStatus,
+} from '@platform/db';
 
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { OUR_BANK, type TransferDto, type TransferRequest } from '../types/transfers.types';
@@ -28,15 +37,22 @@ const REFUSALS: Record<TransferRefusalCode, new (message: string) => HttpExcepti
   TRANSFER_ID_REUSED: ConflictException,
 };
 
-const toDto = (r: PostedTransfer): TransferDto => ({
+const toDto = (r: TransferState): TransferDto => ({
   transferId: r.transfer_id,
   reference: r.reference,
   kind: r.to_bank_code === OUR_BANK ? 'INTERNAL' : 'NAPAS',
-  to: { bankCode: r.to_bank_code, account: r.to_account, name: r.to_name },
+  to: {
+    bankCode: r.to_bank_code,
+    account: r.to_account,
+    name: r.to_name,
+  },
   amount: Number(r.amount),
   fee: 0,
   content: r.content,
+  status: r.status as TransferStatus,
+  declinedFor: r.declined_for,
   ts: r.created_at.toISOString(),
+  decidedAt: r.decided_at?.toISOString() ?? null,
   balance: Number(r.balance),
 });
 
@@ -44,16 +60,22 @@ const toDto = (r: PostedTransfer): TransferDto => ({
 export class TransfersRepository {
   constructor(private readonly db: PrismaService) {}
 
-  /**
-   * Moves the money through @platform/db's postTransfer(): the password check, then the transfer, the ledger entries
-   * and the outbox event in one transaction. Sending the same transferId again returns the first result.
-   */
-  async post(fromCard: string, t: TransferRequest): Promise<TransferDto> {
+  async request(fromCard: string, t: TransferRequest): Promise<TransferDto> {
     try {
-      return toDto(await postTransfer(this.db.client, { fromCard, ...t }));
+      return toDto(await requestTransfer(this.db.client, { fromCard, ...t }));
     } catch (e) {
       if (e instanceof TransferRefusedError) throw new REFUSALS[e.code](e.message);
       throw e;
     }
+  }
+
+  async settle(decision: TransferDecision): Promise<TransferDto | null> {
+    const settled = await settleTransfer(this.db.client, decision);
+    return settled && toDto(settled);
+  }
+
+  async forCard(fromCard: string, transferId: string): Promise<TransferDto | null> {
+    const t = await getTransfer(this.db.client, fromCard, transferId);
+    return t && toDto(t);
   }
 }
