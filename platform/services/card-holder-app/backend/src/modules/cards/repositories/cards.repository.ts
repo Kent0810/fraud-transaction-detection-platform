@@ -12,7 +12,7 @@ import {
   toPage,
   type TxnRow,
 } from '../../../shared/cassandra/models';
-import type { AlertDto, AlertStatus, CardStateDto, TxnDto, Verdict } from '../cards.types';
+import type { AlertDto, AlertStatus, CardStateDto, TxnDto, Verdict } from '../types/cards.types';
 
 type ByCard = { cardId: string };
 

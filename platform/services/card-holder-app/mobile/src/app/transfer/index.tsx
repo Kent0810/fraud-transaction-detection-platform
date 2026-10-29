@@ -31,7 +31,14 @@ import { radius, space, useColors } from '@/theme';
 const QUICK = [100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 const MIN_AMOUNT = 1_000;
 
-type Lookup = { state: 'idle' | 'checking' | 'notfound' | 'self' } | { state: 'found'; name: string };
+type Lookup =
+  | {
+      state: 'idle' | 'checking' | 'notfound' | 'self';
+    }
+  | {
+      state: 'found';
+      name: string;
+    };
 
 export default function TransferFormScreen() {
   const c = useColors();

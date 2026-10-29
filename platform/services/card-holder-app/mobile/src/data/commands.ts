@@ -1,5 +1,11 @@
 import { ME, request } from './http';
+import type { CardStatus } from './queries';
 import type { Period, Recipient, RuleType, Transfer } from './types';
+
+export const freezeCard = () => request<CardStatus>('POST', `${ME}/card/freeze`);
+
+// Asks for the password: unfreezing lets money move again.
+export const unfreezeCard = (password: string) => request<CardStatus>('POST', `${ME}/card/unfreeze`, { password });
 
 const merchantPath = (merchant: string) => `${ME}/merchant-rules/${encodeURIComponent(merchant)}`;
 

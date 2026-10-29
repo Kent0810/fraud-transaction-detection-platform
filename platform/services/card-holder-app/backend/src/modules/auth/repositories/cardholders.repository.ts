@@ -3,7 +3,11 @@ import bcrypt from 'bcryptjs';
 
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
-export type Cardholder = { cardId: string; name: string; email: string };
+export type Cardholder = {
+  cardId: string;
+  name: string;
+  email: string;
+};
 
 // Same cost as the seed's gen_salt('bf', 8). An unknown card is compared against this throwaway hash,
 // so it takes as long as a wrong password and login timing can't be used to probe card numbers.

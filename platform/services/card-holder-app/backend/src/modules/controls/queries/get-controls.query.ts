@@ -1,7 +1,7 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
 import { ControlsRepository } from '../repositories/controls.repository';
-import type { ControlsDto } from '../controls.types';
+import type { ControlsDto } from '../types/controls.types';
 
 export class GetControlsQuery extends Query<ControlsDto> {
   constructor(readonly cardId: string) {

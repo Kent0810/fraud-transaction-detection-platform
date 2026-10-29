@@ -1,0 +1,4 @@
+- Source: brings data into Kafka from somewhere else.
+  - outbox-source: Postgres outbox table → Kafka topics (control, transfers).
+- Sink: takes data out of Kafka into somewhere else.
+  - cassandra-sink: Kafka topics → Cassandra tables (for example controls_by_card).

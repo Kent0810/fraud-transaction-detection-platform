@@ -7,6 +7,7 @@ import {
   fetchAccountHolder,
   fetchAlerts,
   fetchBalance,
+  fetchCardStatus,
   fetchControls,
   fetchRecipients,
   fetchTransactions,
@@ -27,7 +28,13 @@ import type {
   Txn,
 } from './types';
 
-export type TransferDraft = { kind: TransferKind; to: Recipient; amount: number; content: string; save: boolean };
+export type TransferDraft = {
+  kind: TransferKind;
+  to: Recipient;
+  amount: number;
+  content: string;
+  save: boolean;
+};
 
 export type DataStatus = 'mock' | 'loading' | 'ready' | 'error';
 
@@ -47,7 +54,8 @@ type Store = {
   saved: Recipient[];
   transfers: Transfer[];
   draft: TransferDraft | null;
-  toggleFrozen: () => void;
+  freezeCard: () => Promise<void>;
+  unfreezeCard: (password: string) => Promise<void>;
   setBudget: (limit: number, period: Period) => void;
   setMerchantRule: (merchant: string, type: RuleType) => void;
   releaseMerchant: (merchant: string) => void;
@@ -69,9 +77,14 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** A transfer the bank refused; message is safe to show as is. */
 export class TransferError extends Error {}
 
+/** A freeze or unfreeze the bank refused; message is safe to show as is. */
+export class CardError extends Error {}
+
 function transferError(e: unknown): Error {
   if (!(e instanceof HttpError)) return e instanceof Error ? e : new Error(String(e));
   switch (e.status) {
+    case 423:
+      return new TransferError('Your card is frozen. Unfreeze it to send money.');
     case 403:
       return new TransferError('Incorrect password');
     case 404:
@@ -90,17 +103,27 @@ type CardData = {
   balance: number;
   accountNumber: string;
   saved: Recipient[];
+  frozen: boolean;
 };
 
 async function fetchCardData(): Promise<CardData> {
-  const [transactions, alerts, controls, account, saved] = await Promise.all([
+  const [transactions, alerts, controls, account, saved, card] = await Promise.all([
     fetchTransactions(),
     fetchAlerts(),
     fetchControls(),
     fetchBalance(),
     fetchRecipients(),
+    fetchCardStatus(),
   ]);
-  return { transactions, alerts, controls, balance: account.balance, accountNumber: account.accountNumber, saved };
+  return {
+    transactions,
+    alerts,
+    controls,
+    balance: account.balance,
+    accountNumber: account.accountNumber,
+    saved,
+    frozen: card.frozen,
+  };
 }
 
 const sameRecipient = (a: Recipient, b: Recipient) => a.bankCode === b.bankCode && a.account === b.account;
@@ -138,6 +161,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setBalance(data.balance);
         setAccountNumber(data.accountNumber);
         setSaved(data.saved);
+        setFrozen(data.frozen);
         setError(null);
         setStatus('ready');
       },
@@ -181,7 +205,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { ...budget, spent: Math.round(spent * 100) / 100 };
   }, [budget, transactions]);
 
-  const toggleFrozen = useCallback(() => setFrozen((f) => !f), []);
+  // Not optimistic: the card shows as frozen only once the bank has saved it, so it never looks safer than it is.
+  const freezeCard = useCallback(async () => {
+    if (!apiEnabled) {
+      await wait(PROPAGATION_MS / 3);
+      setFrozen(true);
+      return;
+    }
+    const status = await commands.freezeCard().catch((e: unknown) => {
+      throw new CardError(`Could not freeze the card: ${message(e)}`);
+    });
+    setFrozen(status.frozen);
+  }, []);
+
+  const unfreezeCard = useCallback(async (password: string) => {
+    if (!apiEnabled) {
+      await wait(PROPAGATION_MS / 3);
+      if (password !== MOCK_PASSWORD) throw new CardError('Incorrect password');
+      setFrozen(false);
+      return;
+    }
+    const status = await commands.unfreezeCard(password).catch((e: unknown) => {
+      throw new CardError(
+        e instanceof HttpError && e.status === 403 ? 'Incorrect password' : `Could not unfreeze: ${message(e)}`,
+      );
+    });
+    setFrozen(status.frozen);
+  }, []);
 
   const setBudget = useCallback(
     (limit: number, period: Period) => {
@@ -296,7 +346,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       saved,
       transfers,
       draft,
-      toggleFrozen,
+      freezeCard,
+      unfreezeCard,
       setBudget,
       setMerchantRule,
       releaseMerchant,
@@ -321,7 +372,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       saved,
       transfers,
       draft,
-      toggleFrozen,
+      freezeCard,
+      unfreezeCard,
       setBudget,
       setMerchantRule,
       releaseMerchant,

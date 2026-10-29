@@ -11,7 +11,14 @@ import { money, PERIOD_LABEL } from './format';
 import { Logo } from './Logo';
 import { NATIVE } from './motion';
 
-type Props = { last4: string; holder: string; spent: number; limit: number; period: Period; frozen: boolean };
+type Props = {
+  last4: string;
+  holder: string;
+  spent: number;
+  limit: number;
+  period: Period;
+  frozen: boolean;
+};
 
 export function BankCard({ last4, holder, spent, limit, period, frozen }: Props) {
   const c = useColors();

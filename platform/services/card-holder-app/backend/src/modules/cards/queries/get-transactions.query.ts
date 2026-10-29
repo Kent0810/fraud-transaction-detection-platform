@@ -2,7 +2,7 @@ import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
 import type { Page } from '../../../shared/cassandra/models';
 import { CardsRepository } from '../repositories/cards.repository';
-import type { TxnDto } from '../cards.types';
+import type { TxnDto } from '../types/cards.types';
 
 export class GetTransactionsQuery extends Query<Page<TxnDto>> {
   constructor(

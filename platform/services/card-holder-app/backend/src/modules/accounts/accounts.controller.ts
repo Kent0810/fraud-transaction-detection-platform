@@ -3,7 +3,7 @@ import { QueryBus } from '@nestjs/cqrs';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { AccountNumber, ZodPipe } from '../../common/validation';
-import type { AccountHolderDto, BalanceDto } from './accounts.types';
+import type { AccountHolderDto, BalanceDto } from './types/accounts.types';
 import { GetAccountHolderQuery } from './queries/get-account-holder.query';
 import { GetBalanceQuery } from './queries/get-balance.query';
 

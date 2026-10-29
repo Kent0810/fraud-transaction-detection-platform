@@ -55,6 +55,22 @@ public final class Rules {
             Instant.now().toString());
     }
 
+    public static Decision frozen(String cardId, Transaction txn) {
+        return new Decision(
+            txn.txnId(),
+            cardId,
+            txn.ts(),
+            txn.merchant(),
+            txn.category(),
+            txn.amt(),
+            txn.merchLat(),
+            txn.merchLong(),
+            Verdict.DECLINE,
+            1.0,
+            List.of("FROZEN"),
+            Instant.now().toString());
+    }
+
     public static Verdict verdict(double score) {
         // if (score >= DECLINE_AT) {
         //     return Verdict.DECLINE;

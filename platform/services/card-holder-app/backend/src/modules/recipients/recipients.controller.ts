@@ -6,7 +6,7 @@ import { AccountNumber, BankCode, ZodPipe } from '../../common/validation';
 import { RemoveRecipientCommand } from './commands/remove-recipient.command';
 import { SaveRecipientCommand } from './commands/save-recipient.command';
 import { GetRecipientsQuery } from './queries/get-recipients.query';
-import { type RecipientDto, RecipientName } from './recipients.types';
+import { type RecipientDto, RecipientName } from './types/recipients.types';
 
 @Controller('me/recipients')
 export class RecipientsController {

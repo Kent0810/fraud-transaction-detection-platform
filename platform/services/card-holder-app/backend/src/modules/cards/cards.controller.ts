@@ -4,7 +4,7 @@ import type { Response } from 'express';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { clamp, Cursor, NEXT_CURSOR, ZodPipe } from '../../common/validation';
-import type { AlertDto, CardStateDto, TxnDto } from './cards.types';
+import type { AlertDto, CardStateDto, TxnDto } from './types/cards.types';
 import { GetAlertsQuery } from './queries/get-alerts.query';
 import { GetCardStateQuery } from './queries/get-card-state.query';
 import { GetTransactionQuery } from './queries/get-transaction.query';

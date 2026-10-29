@@ -15,13 +15,14 @@ trap cleanup EXIT
 
 docker network create "$run" >/dev/null
 docker run -d --name "$run-pg" --network "$run" -p 127.0.0.1::5432 \
-  -e POSTGRES_USER=owner -e POSTGRES_PASSWORD=owner -e POSTGRES_DB=db postgres:17 >/dev/null
+  -e POSTGRES_USER=owner -e POSTGRES_PASSWORD=owner -e POSTGRES_DB=db postgres:17 -c wal_level=logical >/dev/null
 until docker exec "$run-pg" pg_isready -h 127.0.0.1 -U owner -d db -q; do sleep 1; done
 
 docker run --rm --network "$run" -v "$migrations:/flyway/migrations:ro" \
   -e FLYWAY_URL="jdbc:postgresql://$run-pg:5432/db" -e FLYWAY_USER=owner -e FLYWAY_PASSWORD=owner \
   -e FLYWAY_LOCATIONS=filesystem:/flyway/migrations \
   -e FLYWAY_PLACEHOLDERS_APP_USER=app -e FLYWAY_PLACEHOLDERS_APP_PASSWORD=app \
+  -e FLYWAY_PLACEHOLDERS_DEBEZIUM_USER=debezium -e FLYWAY_PLACEHOLDERS_DEBEZIUM_PASSWORD=debezium \
   flyway/flyway:13.8.1 -q migrate
 
 port="$(docker port "$run-pg" 5432/tcp | head -1 | sed 's/.*://')"

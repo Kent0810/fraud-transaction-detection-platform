@@ -10,7 +10,13 @@ export const fetchTransactions = () => request<Txn[]>('GET', `${ME}/transactions
 
 export const fetchAlerts = () => request<Alert[]>('GET', `${ME}/alerts?limit=100`);
 
-export type Balance = { cardId: string; accountNumber: string; balance: number; currency: string; updatedAt: string };
+export type Balance = {
+  cardId: string;
+  accountNumber: string;
+  balance: number;
+  currency: string;
+  updatedAt: string;
+};
 
 export const fetchControls = () => request<Controls>('GET', `${ME}/controls`);
 
@@ -18,6 +24,11 @@ export const fetchControls = () => request<Controls>('GET', `${ME}/controls`);
 export const fetchBalance = () => request<Balance>('GET', `${ME}/balance`);
 
 export const fetchRecipients = () => request<Recipient[]>('GET', `${ME}/recipients`);
+
+export type CardStatus = { frozen: boolean };
+
+// From Postgres, so a freeze shows the moment it is saved.
+export const fetchCardStatus = () => request<CardStatus>('GET', `${ME}/card`);
 
 // Same-bank recipient check; null when no account has that number.
 export async function fetchAccountHolder(accountNumber: string): Promise<string | null> {

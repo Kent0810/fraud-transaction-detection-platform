@@ -1,6 +1,6 @@
 import { Command, CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 
-import type { SessionDto } from '../auth.types';
+import type { SessionDto } from '../types/auth.types';
 import { CardholdersRepository } from '../repositories/cardholders.repository';
 import { SessionsRepository } from '../repositories/sessions.repository';
 

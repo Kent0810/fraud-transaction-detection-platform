@@ -5,7 +5,12 @@ import { clearSession, readSession, writeSession } from './session-storage';
 import { userFor, type User } from './users';
 
 // token is the backend session (absent in the mock build); email is absent in the mock build.
-type Session = { cardId: string; name: string; email?: string; token?: string };
+type Session = {
+  cardId: string;
+  name: string;
+  email?: string;
+  token?: string;
+};
 
 type AuthStore = {
   user: User | null;

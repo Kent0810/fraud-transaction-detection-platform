@@ -4,7 +4,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { ZodPipe } from '../../common/validation';
 import { SendTransferCommand } from './commands/send-transfer.command';
-import { type TransferDto, TransferRequest } from './transfers.types';
+import { type TransferDto, TransferRequest } from './types/transfers.types';
 
 @Controller('me/transfers')
 export class TransfersController {

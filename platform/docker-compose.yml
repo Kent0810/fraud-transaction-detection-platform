@@ -231,6 +231,8 @@ services:
       FLYWAY_LOCATIONS: filesystem:/flyway/migrations
       FLYWAY_PLACEHOLDERS_APP_USER: &postgres-app-user ${POSTGRES_APP_USER:-cardholder_app}
       FLYWAY_PLACEHOLDERS_APP_PASSWORD: &postgres-app-password ${POSTGRES_APP_PASSWORD:-cardholder_app_password}
+      FLYWAY_PLACEHOLDERS_DEBEZIUM_USER: &postgres-debezium-user ${POSTGRES_DEBEZIUM_USER:-debezium}
+      FLYWAY_PLACEHOLDERS_DEBEZIUM_PASSWORD: &postgres-debezium-password ${POSTGRES_DEBEZIUM_PASSWORD:-debezium_password}
     volumes:
       - ./infra/postgres/migrations:/flyway/migrations:ro
     command: migrate
@@ -273,6 +275,14 @@ services:
       KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter    # key = card_id
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      # Connector configs read ${env:NAME}, so connectors/sources/outbox-source.json holds no password.
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-db}
+      POSTGRES_DEBEZIUM_USER: *postgres-debezium-user
+      POSTGRES_DEBEZIUM_PASSWORD: *postgres-debezium-password
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8083/connectors >/dev/null"]
       interval: 10s
@@ -282,8 +292,6 @@ services:
     depends_on:
       kafka-init:
         condition: service_completed_successfully
-      # postgres:
-      #   condition: service_healthy
 
   connect-init:
     image: curlimages/curl:${CURL_VERSION:-8.21.0}
@@ -292,12 +300,14 @@ services:
       CONFIG_DIR: /config
     volumes:
       - ./scripts:/scripts:ro # bind scripts to script 
-      - ./infra/connect:/config:ro # same
+      - ./infra/connect/connectors:/config:ro # sources/ and sinks/
     entrypoint: ["/bin/sh", "/scripts/connect-init.sh"]
     depends_on:
       connect:
         condition: service_healthy
       cassandra-init:
+        condition: service_completed_successfully
+      postgres-migrate:                 # the debezium login and the outbox publication
         condition: service_completed_successfully
     restart: on-failure
 

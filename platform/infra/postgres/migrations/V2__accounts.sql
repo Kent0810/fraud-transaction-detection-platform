@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   account_number  text NOT NULL UNIQUE DEFAULT '1903' || lpad(nextval('account_number_seq')::text, 8, '0'),
   currency        char(3) NOT NULL DEFAULT 'VND',
   balance         bigint NOT NULL DEFAULT 0 CHECK (balance >= 0),   -- kept by apply_ledger_entry(), never written directly
+  status          text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'FROZEN')),  -- the cardholder can freeze it, e.g. after losing the card
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );

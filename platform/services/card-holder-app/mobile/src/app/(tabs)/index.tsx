@@ -24,7 +24,7 @@ const RECENT_MERCHANTS = 2;
 
 export default function HomeScreen() {
   const c = useColors();
-  const { transactions, budget, frozen, toggleFrozen, alerts, balance, status, error, refresh } = useStore();
+  const { transactions, budget, frozen, alerts, balance, status, error, refresh } = useStore();
   const user = useUser();
   const { hideBalance, theme, update } = useSettings();
   const openAlerts = alerts.filter((a) => a.status === 'OPEN').length;
@@ -53,7 +53,7 @@ export default function HomeScreen() {
     {
       icon: frozen ? 'snow' : 'snow-outline',
       label: frozen ? 'Unfreeze' : 'Freeze',
-      onPress: toggleFrozen,
+      onPress: () => router.push('/card/freeze'),
       active: frozen,
     },
     { icon: 'pie-chart-outline', label: 'Budget', onPress: () => router.navigate('/budget') },
@@ -122,6 +122,24 @@ export default function HomeScreen() {
           frozen={frozen}
         />
       </FadeInUp>
+
+      {frozen && (
+        <FadeInUp delay={120}>
+          <Pressable
+            onPress={() => router.push('/card/freeze')}
+            accessibilityRole="button"
+            accessibilityLabel="Card frozen. Unfreeze"
+            style={[styles.frozen, { backgroundColor: c.primarySoft }]}
+          >
+            <Ionicons name="snow" size={20} color={c.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.frozenTitle, { color: c.text }]}>Card frozen</Text>
+              <Text style={[styles.frozenDetail, { color: c.muted }]}>Card payments and transfers are blocked.</Text>
+            </View>
+            <Text style={[styles.frozenAction, { color: c.primary }]}>Unfreeze</Text>
+          </Pressable>
+        </FadeInUp>
+      )}
 
       <View style={styles.actions}>
         {actions.map((a, i) => (
@@ -217,6 +235,17 @@ const styles = StyleSheet.create({
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.lg },
   balanceLabel: { fontSize: 14 },
   balance: { fontSize: 34, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  frozen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
+    marginTop: space.md,
+  },
+  frozenTitle: { fontSize: 15, fontWeight: '700' },
+  frozenDetail: { fontSize: 13, marginTop: 2 },
+  frozenAction: { fontSize: 14, fontWeight: '700' },
   actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.lg },
   action: { alignItems: 'center', gap: space.sm, width: 72 },
   actionIcon: { width: 56, height: 56, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },

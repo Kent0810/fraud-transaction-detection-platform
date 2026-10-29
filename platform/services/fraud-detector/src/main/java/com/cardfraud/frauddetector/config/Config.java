@@ -16,6 +16,7 @@ public record Config(
         String decisionsTopic,
         String alertsTopic,
         String casesTopic,
+        String controlTopic,
         long logEvery) {
 
     public static class ConfigException extends RuntimeException {
@@ -41,6 +42,7 @@ public record Config(
                 require("TOPIC_DECISIONS"),
                 require("TOPIC_ALERTS"),
                 require("TOPIC_CASES"),
+                require("TOPIC_CONTROL"),
                 logEvery);
     }
 

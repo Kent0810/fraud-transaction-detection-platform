@@ -1,0 +1,31 @@
+{
+  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+  "tasks.max": "1",
+
+  "database.hostname": "${env:POSTGRES_HOST}",
+  "database.port": "${env:POSTGRES_PORT}",
+  "database.dbname": "${env:POSTGRES_DB}",
+  "database.user": "${env:POSTGRES_DEBEZIUM_USER}",
+  "database.password": "${env:POSTGRES_DEBEZIUM_PASSWORD}",
+
+  "topic.prefix": "platform",
+  "plugin.name": "pgoutput",
+  "slot.name": "outbox_slot",
+  "publication.name": "outbox_publication",
+  "publication.autocreate.mode": "disabled",
+  "table.include.list": "public.outbox",
+  "snapshot.mode": "initial",
+
+  "transforms": "outbox",
+  "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+  "transforms.outbox.table.field.event.id": "event_id",
+  "transforms.outbox.table.field.event.key": "aggregate_id",
+  "transforms.outbox.table.field.event.payload": "payload",
+  "transforms.outbox.table.fields.additional.placement": "type:header:type",
+  "transforms.outbox.route.by.field": "aggregate_type",
+  "transforms.outbox.route.topic.replacement": "${routedByValue}",
+  "transforms.outbox.table.op.invalid.behavior": "error",
+
+  "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+  "value.converter": "org.apache.kafka.connect.storage.StringConverter"
+}

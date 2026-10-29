@@ -2,9 +2,14 @@ import { Injectable } from '@nestjs/common';
 
 import { iso } from '../../../shared/cassandra/models';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import type { RecipientDto } from '../recipients.types';
+import type { RecipientDto } from '../types/recipients.types';
 
-type RecipientRow = { bank_code: string; account: string; name: string; created_at: Date };
+type RecipientRow = {
+  bank_code: string;
+  account: string;
+  name: string;
+  created_at: Date;
+};
 
 const columns = {
   bank_code: true,

@@ -56,6 +56,10 @@ function AppShell({ signedIn }: { signedIn: boolean }) {
               <Stack.Screen name="txn/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
               <Stack.Screen name="settings" options={{ title: 'Settings', headerBackTitle: 'Back' }} />
               <Stack.Screen
+                name="card/freeze"
+                options={{ title: '', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
                 name="transfer/index"
                 options={{ title: 'Transfer', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
               />

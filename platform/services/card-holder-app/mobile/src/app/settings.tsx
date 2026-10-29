@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -18,7 +19,7 @@ export default function SettingsScreen() {
   const settings = useSettings();
   const user = useUser();
   const { logout } = useAuth();
-  const { frozen, toggleFrozen } = useStore();
+  const { frozen } = useStore();
   const dark = settings.theme === 'dark';
 
   const toggle = (key: keyof Settings, label: string, icon: IconName, detail?: string) => (
@@ -73,10 +74,15 @@ export default function SettingsScreen() {
             'Unlock the app and approve transfers',
           )}
           <Divider />
-          <Row icon="snow-outline" label="Freeze card" detail={frozen ? 'Card is frozen' : 'Stops new card payments'}>
+          <Row
+            icon="snow-outline"
+            label="Freeze card"
+            detail={frozen ? 'Frozen: card payments and transfers are blocked' : 'Blocks card payments and transfers'}
+          >
+            {/* Opens the confirm screen; the switch flips only once the bank has saved the change. */}
             <Switch
               value={frozen}
-              onValueChange={toggleFrozen}
+              onValueChange={() => router.push('/card/freeze')}
               trackColor={{ true: c.primary, false: c.border }}
               accessibilityLabel="Freeze card"
             />

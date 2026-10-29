@@ -1,7 +1,7 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
 import { CardsRepository } from '../repositories/cards.repository';
-import type { AlertDto } from '../cards.types';
+import type { AlertDto } from '../types/cards.types';
 
 export class GetAlertsQuery extends Query<AlertDto[]> {
   constructor(

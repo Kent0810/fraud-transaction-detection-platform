@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -9,10 +10,17 @@ import {
 import { postTransfer, type PostedTransfer, TransferRefusedError, type TransferRefusalCode } from '@platform/db';
 
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { OUR_BANK, type TransferDto, type TransferRequest } from '../transfers.types';
+import { OUR_BANK, type TransferDto, type TransferRequest } from '../types/transfers.types';
+
+class CardFrozenException extends HttpException {
+  constructor(message: string) {
+    super(message, HttpStatus.LOCKED);
+  }
+}
 
 // 403, not 401, for a wrong password: the session is still valid and the app shouldn't sign out.
 const REFUSALS: Record<TransferRefusalCode, new (message: string) => HttpException> = {
+  CARD_FROZEN: CardFrozenException,
   INCORRECT_PASSWORD: ForbiddenException,
   ACCOUNT_NOT_FOUND: NotFoundException,
   OWN_ACCOUNT: UnprocessableEntityException,

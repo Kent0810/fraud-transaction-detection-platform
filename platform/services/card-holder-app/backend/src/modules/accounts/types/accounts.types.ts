@@ -8,4 +8,7 @@ export type BalanceDto = {
 };
 
 // What a sender sees before transferring: the holder's name, as banks print it (upper case), and nothing else.
-export type AccountHolderDto = { accountNumber: string; name: string };
+export type AccountHolderDto = {
+  accountNumber: string;
+  name: string;
+};

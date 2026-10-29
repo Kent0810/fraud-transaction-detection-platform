@@ -76,3 +76,17 @@ CREATE TRIGGER transfers_no_change BEFORE UPDATE OR DELETE ON transfers
 DROP TRIGGER IF EXISTS transfers_no_truncate ON transfers;
 CREATE TRIGGER transfers_no_truncate BEFORE TRUNCATE ON transfers
   FOR EACH STATEMENT EXECUTE FUNCTION forbid_change();
+
+-- A frozen account can't send money; it can still receive.
+CREATE OR REPLACE FUNCTION forbid_frozen_sender() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM accounts WHERE card_id = NEW.from_card AND status = 'FROZEN') THEN
+    RAISE EXCEPTION 'account % is frozen', NEW.from_card USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS transfers_not_frozen ON transfers;
+CREATE TRIGGER transfers_not_frozen BEFORE INSERT ON transfers
+  FOR EACH ROW EXECUTE FUNCTION forbid_frozen_sender();

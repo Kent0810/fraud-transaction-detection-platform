@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { iso } from '../../../shared/cassandra/models';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import type { AccountHolderDto, BalanceDto } from '../accounts.types';
+import type { AccountHolderDto, BalanceDto } from '../types/accounts.types';
 
 @Injectable()
 export class AccountsRepository {

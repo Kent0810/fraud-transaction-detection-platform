@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { AccountNumber, BankCode, Password, text } from '../../common/validation';
+import { AccountNumber, BankCode, Password, text } from '../../../common/validation';
 
 export { OUR_BANK } from '@platform/db';
 

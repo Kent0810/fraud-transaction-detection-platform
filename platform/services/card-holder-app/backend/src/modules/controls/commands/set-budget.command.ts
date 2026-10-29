@@ -3,8 +3,8 @@ import { Command, CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 
 import type { Config } from '../../../config';
 import { CONFIG } from '../../../config.module';
-import { KafkaService } from '../../../kafka/kafka.service';
-import { BUDGET_ID, type BudgetDto, controlEvent, type Period } from '../controls.types';
+import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { BUDGET_ID, type BudgetDto, controlEvent, type Period } from '../types/controls.types';
 
 export class SetBudgetCommand extends Command<BudgetDto> {
   constructor(
@@ -16,10 +16,11 @@ export class SetBudgetCommand extends Command<BudgetDto> {
   }
 }
 
+// Through the outbox: Debezium publishes it to the control topic, keyed by card, as if it had been sent directly.
 @CommandHandler(SetBudgetCommand)
 export class SetBudgetHandler implements ICommandHandler<SetBudgetCommand> {
   constructor(
-    private readonly kafka: KafkaService,
+    private readonly db: PrismaService,
     @Inject(CONFIG) private readonly cfg: Config,
   ) {}
 
@@ -31,7 +32,14 @@ export class SetBudgetHandler implements ICommandHandler<SetBudgetCommand> {
       budget_period: period,
       updated_at: ts,
     });
-    await this.kafka.publish(this.cfg.controlTopic, cardId, event);
+    await this.db.client.outbox.createMany({
+      data: {
+        aggregate_type: this.cfg.controlTopic,
+        aggregate_id: cardId,
+        type: event.action,
+        payload: event,
+      },
+    });
     return { limit, period, updatedAt: ts };
   }
 }

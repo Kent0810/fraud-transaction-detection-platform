@@ -1,7 +1,7 @@
 import { type IQueryHandler, Query, QueryHandler } from '@nestjs/cqrs';
 
 import { AccountsRepository } from '../repositories/accounts.repository';
-import type { AccountHolderDto } from '../accounts.types';
+import type { AccountHolderDto } from '../types/accounts.types';
 
 export class GetAccountHolderQuery extends Query<AccountHolderDto | null> {
   constructor(readonly accountNumber: string) {

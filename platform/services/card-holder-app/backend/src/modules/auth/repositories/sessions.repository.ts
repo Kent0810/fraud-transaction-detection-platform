@@ -9,7 +9,10 @@ const SESSION_HOURS = 12;
 
 const hash = (token: string) => createHash('sha256').update(token).digest();
 
-export type NewSession = { token: string; expiresAt: Date };
+export type NewSession = {
+  token: string;
+  expiresAt: Date;
+};
 
 @Injectable()
 export class SessionsRepository {

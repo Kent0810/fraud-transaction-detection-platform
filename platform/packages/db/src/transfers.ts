@@ -1,5 +1,4 @@
-import bcrypt from 'bcryptjs';
-
+import { isCardFrozen, verifyPassword } from './cards';
 import { Prisma, type PrismaClient } from './generated/prisma/client';
 
 export const OUR_BANK = 'HCMMB';
@@ -29,6 +28,7 @@ export type PostedTransfer = {
 };
 
 export type TransferRefusalCode =
+  | 'CARD_FROZEN'
   | 'INCORRECT_PASSWORD'
   | 'ACCOUNT_NOT_FOUND'
   | 'OWN_ACCOUNT'
@@ -47,18 +47,29 @@ export class TransferRefusedError extends Error {
 
 /** The only way to move money: the transfer, its ledger entries and the outbox event in one transaction. */
 export async function postTransfer(db: PrismaClient, t: PostTransferInput): Promise<PostedTransfer> {
+  if (await isCardFrozen(db, t.fromCard)) throw frozen();
   // Before the transaction: bcrypt is slow and shouldn't hold a lock.
-  const login = await db.auth.findUnique({
-    where: { card_id: t.fromCard },
-    select: { password_hash: true },
-  });
-  if (!login || !(await bcrypt.compare(t.password, login.password_hash))) {
+  if (!(await verifyPassword(db, t.fromCard, t.password))) {
     throw new TransferRefusedError('INCORRECT_PASSWORD', 'incorrect password');
   }
 
   const to = t.toBankCode === OUR_BANK ? await internalRecipient(db, t) : null;
   const amount = BigInt(t.amount);
 
+  // Frozen after the check above: the database refuses the transfer (forbid_frozen_sender in V6).
+  return post(db, t, to, amount).catch((e: unknown) => {
+    throw isFrozenSender(e) ? frozen() : e;
+  });
+}
+
+const frozen = () => new TransferRefusedError('CARD_FROZEN', 'your card is frozen');
+
+function post(
+  db: PrismaClient,
+  t: PostTransferInput,
+  to: { cardId: string; name: string } | null,
+  amount: bigint,
+): Promise<PostedTransfer> {
   return db.$transaction(async (tx) => {
     const [created] = await tx.transfers.createManyAndReturn({
       data: [
@@ -113,6 +124,7 @@ export async function postTransfer(db: PrismaClient, t: PostTransferInput): Prom
     // createMany: no RETURNING, so the app login needs no SELECT on the outbox.
     await tx.outbox.createMany({
       data: {
+        aggregate_type: 'transfers',
         aggregate_id: created.transfer_id,
         type: 'TransferPosted',
         payload: {
@@ -183,7 +195,17 @@ async function replay(
 
 // apply_ledger_entry() took the balance below zero: CHECK (balance >= 0) on accounts, SQLSTATE 23514.
 function isOverdraft(e: unknown): boolean {
-  if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return false;
-  const cause = (e.meta?.driverAdapterError as { cause?: { originalCode?: string; originalMessage?: string } })?.cause;
+  const cause = postgresError(e);
   return cause?.originalCode === '23514' && !!cause.originalMessage?.includes('accounts_balance_check');
+}
+
+// forbid_frozen_sender() refused the transfer: SQLSTATE 55000 (object_not_in_prerequisite_state).
+function isFrozenSender(e: unknown): boolean {
+  return postgresError(e)?.originalCode === '55000';
+}
+
+// Prisma wraps a Postgres error; its own SQLSTATE and message are on the driver adapter's cause.
+function postgresError(e: unknown): { originalCode?: string; originalMessage?: string } | undefined {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return undefined;
+  return (e.meta?.driverAdapterError as { cause?: { originalCode?: string; originalMessage?: string } })?.cause;
 }

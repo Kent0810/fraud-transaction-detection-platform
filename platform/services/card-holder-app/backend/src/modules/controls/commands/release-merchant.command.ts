@@ -4,7 +4,7 @@ import { Command, CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 import type { Config } from '../../../config';
 import { CONFIG } from '../../../config.module';
 import { KafkaService } from '../../../kafka/kafka.service';
-import { controlEvent, merchantControlId } from '../controls.types';
+import { controlEvent, merchantControlId } from '../types/controls.types';
 
 export class ReleaseMerchantCommand extends Command<void> {
   constructor(
