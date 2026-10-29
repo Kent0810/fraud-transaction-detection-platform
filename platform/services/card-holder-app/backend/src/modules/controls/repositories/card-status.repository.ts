@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import type { Config } from '../../../config';
 import { CONFIG } from '../../../config.module';
+import { auditEntry, type StaffAudit } from '../../../shared/prisma/audit';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { type CardStatusDto, controlEvent, FREEZE_ID } from '../types/controls.types';
 
@@ -23,10 +24,10 @@ export class CardStatusRepository {
 
   /**
    * Saves the account's new status and its control event in one transaction; Debezium publishes the event to the
-   * control topic, where the fraud detector declines a frozen card's payments. Nothing is written when the status
-   * doesn't change.
+   * control topic, where the fraud detector declines a frozen card's payments. A change from the console is audited in
+   * the same transaction. Nothing is written when the status doesn't change.
    */
-  async setFrozen(cardId: string, frozen: boolean): Promise<CardStatusDto> {
+  async setFrozen(cardId: string, frozen: boolean, by?: StaffAudit): Promise<CardStatusDto> {
     const ts = new Date().toISOString();
     // Unfreeze carries no fields, so the Cassandra sink deletes the card's freeze row (as for a released merchant).
     const event = frozen
@@ -50,6 +51,7 @@ export class CardStatusRepository {
           payload: event,
         },
       });
+      if (by) await tx.audit_log.createMany({ data: auditEntry(by, frozen ? 'FREEZE_CARD' : 'UNFREEZE_CARD', cardId) });
     });
     return this.forCard(cardId);
   }

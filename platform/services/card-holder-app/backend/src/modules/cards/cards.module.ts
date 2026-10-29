@@ -10,5 +10,6 @@ import { GetTransactionsHandler } from './queries/get-transactions.query';
 @Module({
   controllers: [CardsController],
   providers: [CardsRepository, GetTransactionsHandler, GetTransactionHandler, GetAlertsHandler, GetCardStateHandler],
+  exports: [CardsRepository],
 })
 export class CardsModule {}

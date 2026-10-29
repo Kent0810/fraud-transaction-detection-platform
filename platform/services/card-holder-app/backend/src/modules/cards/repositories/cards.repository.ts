@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { mapping } from 'cassandra-driver';
+import { mapping } from 'cassandra-driver';
 
 import { CassandraService } from '../../../shared/cassandra/cassandra.service';
 import {
@@ -39,6 +39,11 @@ export class CardsRepository {
 
   async transactions(cardId: string, limit: number): Promise<TxnDto[]> {
     const result = await this.txns.find({ cardId }, { limit });
+    return result.toArray().map(toTxn);
+  }
+
+  async transactionsSince(cardId: string, since: Date, limit: number): Promise<TxnDto[]> {
+    const result = await this.txns.find({ cardId, ts: mapping.q.gte(since) }, { limit });
     return result.toArray().map(toTxn);
   }
 

@@ -48,6 +48,11 @@ GRANT INSERT ON outbox TO "${app_user}";
 GRANT SELECT, INSERT, DELETE ON saved_recipients TO "${app_user}";
 GRANT UPDATE (name) ON saved_recipients TO "${app_user}";
 
+-- Staff accounts are written by the seed only; the console signs them in and appends to the audit log.
+GRANT SELECT ON staff TO "${app_user}";
+GRANT SELECT, INSERT, DELETE ON staff_sessions TO "${app_user}";
+GRANT SELECT, INSERT ON audit_log TO "${app_user}";
+
 -- Debezium reads the outbox (the snapshot on first start, then the WAL) and no other table.
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM "${debezium_user}";
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM "${debezium_user}";

@@ -91,21 +91,21 @@ public final class FraudTopology {
                 .peek((cardId, d) -> log.info("transfer {} {} {}", d.txnId(), d.decision(), d.firedRules()))
                 .to(cfg.transferDecisionsTopic(), Produced.with(keys, transferDecisionSerde));
 
-        // // 4. Every fired rule -> one alert (details: Alert.fromDecision)
-        // decisions.flatMapValues(Alert::fromDecision)
-        //         .to(cfg.alertsTopic(), Produced.with(keys, alertSerde));
+        // 4. Every fired rule -> one alert (details: Alert.fromDecision)
+        decisions.flatMapValues(Alert::fromDecision)
+                .to(cfg.alertsTopic(), Produced.with(keys, alertSerde));
 
-        // // 5. Every non-ALLOW decision updates the card's case (details: CaseSummary.update).
-        // //    The key (card id) never changes, so no repartition.
-        // decisions.filter((cardId, d) -> d.decision() != Decision.Verdict.ALLOW)
-        //         .groupByKey(Grouped.with(keys, decisionSerde))
-        //         .aggregate(() -> CaseSummary.EMPTY,
-        //                 (cardId, d, summary) -> summary.update(cardId, d),
-        //                 Materialized.<String, CaseSummary, KeyValueStore<Bytes, byte[]>>as("case-summaries")
-        //                         .withKeySerde(keys)
-        //                         .withValueSerde(caseSerde))
-        //         .toStream()
-        //         .to(cfg.casesTopic(), Produced.with(keys, caseSerde));
+        // 5. Every non-ALLOW decision updates the card's case (details: CaseSummary.update).
+        //    The key (card id) never changes, so no repartition.
+        decisions.filter((cardId, d) -> d.decision() != Decision.Verdict.ALLOW)
+                .groupByKey(Grouped.with(keys, decisionSerde))
+                .aggregate(() -> CaseSummary.EMPTY,
+                        (cardId, d, summary) -> summary.update(cardId, d),
+                        Materialized.<String, CaseSummary, KeyValueStore<Bytes, byte[]>>as("case-summaries")
+                                .withKeySerde(keys)
+                                .withValueSerde(caseSerde))
+                .toStream()
+                .to(cfg.casesTopic(), Produced.with(keys, caseSerde));
 
         return builder.build();
     }

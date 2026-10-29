@@ -8,6 +8,7 @@ import { ConfigModule } from './config.module';
 import { ControlsModule } from './modules/controls/controls.module';
 import { HealthController } from './health/health.controller';
 import { KafkaModule } from './kafka/kafka.module';
+import { OpsModule } from './modules/ops/ops.module';
 import { RecipientsModule } from './modules/recipients/recipients.module';
 import { SharedModule } from './shared/shared.module';
 import { TransfersModule } from './modules/transfers/transfers.module';
@@ -23,6 +24,7 @@ import { TransfersModule } from './modules/transfers/transfers.module';
     CardsModule,
     ControlsModule,
     RecipientsModule,
+    OpsModule,
     TransfersModule,
   ],
   controllers: [HealthController],

@@ -10,6 +10,7 @@ export type CassandraConfig = {
 export type KafkaConfig = {
   kafkaBrokers: string[];
   controlTopic: string;
+  decisionsTopic: string;
   transferDecisionsTopic: string;
 };
 
@@ -59,6 +60,7 @@ export function loadKafkaConfig(): KafkaConfig {
   return {
     kafkaBrokers: list('KAFKA_BOOTSTRAP_SERVERS'),
     controlTopic: required('TOPIC_CONTROL'),
+    decisionsTopic: required('TOPIC_DECISIONS'),
     transferDecisionsTopic: required('TOPIC_TRANSFER_DECISIONS'),
   };
 }

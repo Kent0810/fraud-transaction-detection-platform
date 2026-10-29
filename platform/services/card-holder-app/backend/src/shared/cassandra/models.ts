@@ -7,6 +7,7 @@ export const MODELS: mapping.MappingOptions = {
     Txn: { tables: ['txn_by_card'], mappings: camelCase },
     Alert: { tables: ['alerts_by_card'], mappings: camelCase },
     CardState: { tables: ['card_state'], mappings: camelCase },
+    Triage: { tables: ['triage_queue'], mappings: camelCase },
     Control: { tables: ['controls_by_card'], mappings: camelCase },
   },
 };
@@ -41,6 +42,17 @@ export type CardStateRow = {
   cardId: string;
   riskScore: number | null;
   priority: number | null;
+  amountSum: types.BigDecimal | null;
+  openAlerts: number | null;
+  lastDecision: string | null;
+  updatedAt: Date | null;
+};
+
+export type TriageRow = {
+  bucket: string;
+  cardId: string;
+  priority: number | null;
+  riskScore: number | null;
   amountSum: types.BigDecimal | null;
   openAlerts: number | null;
   lastDecision: string | null;

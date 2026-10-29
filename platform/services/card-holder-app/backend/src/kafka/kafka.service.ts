@@ -19,8 +19,14 @@ export class KafkaService implements OnApplicationShutdown {
   }
 
   // A message is redelivered if handle() throws, so handle() must be safe to repeat.
-  async consume(groupId: string, topic: string, handle: (key: string, value: string) => Promise<void>): Promise<void> {
-    const consumer = this.kafka.consumer({ kafkaJS: { groupId, fromBeginning: true } });
+  // fromBeginning applies only to a group with no committed offsets yet.
+  async consume(
+    groupId: string,
+    topic: string,
+    handle: (key: string, value: string) => Promise<void>,
+    fromBeginning = true,
+  ): Promise<void> {
+    const consumer = this.kafka.consumer({ kafkaJS: { groupId, fromBeginning } });
     this.consumers.push(consumer);
     await consumer.connect();
     await consumer.subscribe({ topics: [topic] });

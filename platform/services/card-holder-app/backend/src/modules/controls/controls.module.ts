@@ -24,5 +24,6 @@ import { GetControlsHandler } from './queries/get-controls.query';
     GetControlsHandler,
     GetCardStatusHandler,
   ],
+  exports: [ControlsRepository, CardStatusRepository],
 })
 export class ControlsModule {}

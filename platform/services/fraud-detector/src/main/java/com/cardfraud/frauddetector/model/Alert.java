@@ -8,11 +8,20 @@ public record Alert(
         String txnId,
         String ruleId,
         double score,
-        double amount,
+        long amount,
         String ts) {
 
+    // One alert per fired rule; none when nothing fired.
     public static List<Alert> fromDecision(Decision d) {
-        // TODO one Alert per entry in d.firedRules(); an empty list when nothing fired.
-        throw new UnsupportedOperationException("TODO Alert.fromDecision");
+        return d.firedRules().stream()
+                .map(rule -> new Alert(
+                        d.txnId() + ":" + rule,
+                        d.cardId(),
+                        d.txnId(),
+                        rule,
+                        d.score(),
+                        d.amount(),
+                        d.ts()))
+                .toList();
     }
 }

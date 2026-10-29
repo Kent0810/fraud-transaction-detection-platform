@@ -314,18 +314,14 @@ services:
     restart: on-failure
 
   # # ───────────────────────── Applications ─────────────────────────
-  # ops-console:                        # analysts/agents: reads Cassandra, writes blocks + outbox to Postgres
-  #   build: ./services/ops-console
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     <<: [*postgres-env, *cassandra-env]
-  #     PORT: 3000
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     cassandra-init:
-  #       condition: service_completed_successfully
+  ops-console:                        # analysts and agents: the cardholder backend's /ops routes
+    build:
+      context: ./services/ops-console
+    ports:
+      - "3000:80"
+    depends_on:
+      cardholder-backend:
+        condition: service_started
 
   cardholder-backend:
     build:
