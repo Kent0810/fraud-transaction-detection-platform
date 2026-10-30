@@ -25,6 +25,7 @@ import com.cardfraud.frauddetector.model.ControlEvent;
 import com.cardfraud.frauddetector.model.Decision;
 import com.cardfraud.frauddetector.model.Transaction;
 import com.cardfraud.frauddetector.model.TransferDecision;
+import com.cardfraud.frauddetector.rules.MockRepeatTransferRule;
 import com.cardfraud.frauddetector.rules.Rules;
 import com.cardfraud.frauddetector.rules.TransferRules;
 import com.cardfraud.frauddetector.serde.JsonSerde;
@@ -94,6 +95,9 @@ public final class FraudTopology {
         // 4. Every fired rule -> one alert (details: Alert.fromDecision)
         decisions.flatMapValues(Alert::fromDecision)
                 .to(cfg.alertsTopic(), Produced.with(keys, alertSerde));
+
+        // TEST ONLY: repeated same-amount transfers to one account -> MOCK_REPEAT alert. Delete with its file.
+        MockRepeatTransferRule.wire(transfers, keys, transactionSerde, alertSerde, cfg.alertsTopic());
 
         // 5. Every non-ALLOW decision updates the card's case (details: CaseSummary.update).
         //    The key (card id) never changes, so no repartition.
