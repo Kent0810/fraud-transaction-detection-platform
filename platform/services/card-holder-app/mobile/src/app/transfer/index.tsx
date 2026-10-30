@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
@@ -18,7 +17,6 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { BankPicker } from '@/components/BankPicker';
 import { accountNumber as printAccount } from '@/components/format';
-import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Button } from '@/components/ui';
 import { groupThousands, parseVnd, toAccountName, vnd, vndInWords } from '@/components/vnd';
 import { ACCOUNT } from '@/data/mock';
@@ -113,51 +111,36 @@ export default function TransferFormScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <FadeInUp>
-          <LinearGradient
-            colors={[c.cardFrom, c.cardTo]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.source}
-          >
-            <Text style={styles.sourceLabel}>From account</Text>
-            <Text style={styles.sourceNumber}>
-              {ACCOUNT.label} · {printAccount(accountNumber)}
+        <View style={[styles.card, styles.source, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <Text style={[styles.label, { color: c.muted }]}>From</Text>
+          <Text style={[styles.value, { color: c.text }]}>
+            {ACCOUNT.label} · {printAccount(accountNumber)}
+          </Text>
+          <View style={styles.sourceRow}>
+            <Text style={[styles.sourceBalance, { color: c.text }]}>
+              {hideBalance ? '•••••• đ' : vnd(balance)} <Text style={{ color: c.muted, fontSize: 13 }}>available</Text>
             </Text>
-            <View style={styles.sourceRow}>
-              <View>
-                <Text style={styles.sourceLabel}>Available balance</Text>
-                <Text style={styles.sourceBalance}>{hideBalance ? '•••••• đ' : vnd(balance)}</Text>
-              </View>
-              <Pressable
-                onPress={() => update('hideBalance', !hideBalance)}
-                hitSlop={12}
-                accessibilityLabel={hideBalance ? 'Show balance' : 'Hide balance'}
-              >
-                <Ionicons
-                  name={hideBalance ? 'eye-off-outline' : 'eye-outline'}
-                  size={22}
-                  color="rgba(255,255,255,0.9)"
-                />
-              </Pressable>
-            </View>
-          </LinearGradient>
-        </FadeInUp>
+            <Pressable
+              onPress={() => update('hideBalance', !hideBalance)}
+              hitSlop={12}
+              accessibilityLabel={hideBalance ? 'Show balance' : 'Hide balance'}
+            >
+              <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+            </Pressable>
+          </View>
+        </View>
 
         {saved.length > 0 && (
-          <FadeInUp delay={stagger(2)}>
-            <Text style={[styles.section, { color: c.text }]}>Saved recipients</Text>
+          <View>
+            <Text style={[styles.section, { color: c.muted }]}>Saved recipients</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.md }}>
               {saved.map((r) => {
                 const on = r.account === account && r.bankCode === bankCode;
                 return (
-                  <ScalePressable
+                  <Pressable
                     key={`${r.bankCode}-${r.account}`}
                     onPress={() => pickSaved(r)}
-                    style={[
-                      styles.savedItem,
-                      { backgroundColor: c.surface, borderColor: on ? c.primary : 'transparent' },
-                    ]}
+                    style={[styles.savedItem, { backgroundColor: c.surface, borderColor: on ? c.text : c.border }]}
                   >
                     <Pressable
                       onPress={() => removeSaved(r)}
@@ -173,21 +156,21 @@ export default function TransferFormScreen() {
                       {r.name.split(' ').slice(-2).join(' ')}
                     </Text>
                     <Text style={[styles.savedBank, { color: c.muted }]}>{r.bankCode}</Text>
-                  </ScalePressable>
+                  </Pressable>
                 );
               })}
             </ScrollView>
-          </FadeInUp>
+          </View>
         )}
 
-        <FadeInUp delay={stagger(3)}>
-          <Text style={[styles.section, { color: c.text }]}>Recipient</Text>
-          <View style={[styles.card, { backgroundColor: c.surface }]}>
+        <View>
+          <Text style={[styles.section, { color: c.muted }]}>Recipient</Text>
+          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
             <Field label="Bank">
               <Pressable onPress={() => setPicking(true)} style={styles.select} accessibilityRole="button">
                 {bank ? (
                   <Text style={[styles.value, { color: c.text }]}>
-                    <Text style={{ fontWeight: '800' }}>{bank.code}</Text> · {bank.name}
+                    <Text style={{ fontWeight: '600' }}>{bank.code}</Text> · {bank.name}
                   </Text>
                 ) : (
                   <Text style={[styles.value, { color: c.muted }]}>Choose a bank</Text>
@@ -211,13 +194,13 @@ export default function TransferFormScreen() {
             <Field label="Account name" last>
               {lookup.state === 'checking' ? (
                 <View style={styles.lookup}>
-                  <ActivityIndicator size="small" color={c.primary} />
+                  <ActivityIndicator size="small" color={c.muted} />
                   <Text style={[styles.value, { color: c.muted }]}>Checking…</Text>
                 </View>
               ) : lookup.state === 'found' ? (
                 <View style={styles.lookup}>
-                  <Ionicons name="checkmark-circle" size={20} color={c.allow} />
-                  <Text style={[styles.value, { color: c.text, fontWeight: '800' }]}>{lookup.name}</Text>
+                  <Text style={[styles.value, { color: c.text, fontWeight: '600' }]}>{lookup.name}</Text>
+                  <Ionicons name="checkmark" size={18} color={c.allow} />
                 </View>
               ) : lookup.state === 'notfound' ? (
                 <Text style={[styles.value, { color: c.decline }]}>Account not found</Text>
@@ -230,11 +213,11 @@ export default function TransferFormScreen() {
               )}
             </Field>
           </View>
-        </FadeInUp>
+        </View>
 
-        <FadeInUp delay={stagger(4)}>
-          <Text style={[styles.section, { color: c.text }]}>Transfer details</Text>
-          <View style={[styles.card, { backgroundColor: c.surface }]}>
+        <View>
+          <Text style={[styles.section, { color: c.muted }]}>Transfer details</Text>
+          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
             <Field label="Amount">
               <View style={styles.amountRow}>
                 <TextInput
@@ -253,16 +236,16 @@ export default function TransferFormScreen() {
               {amountError ? (
                 <Text style={[styles.hint, { color: c.decline }]}>{amountError}</Text>
               ) : amount > 0 ? (
-                <Text style={[styles.words, { color: c.primary }]}>{vndInWords(amount)}</Text>
+                <Text style={[styles.words, { color: c.muted }]}>{vndInWords(amount)}</Text>
               ) : null}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quick}>
                 {QUICK.map((q) => (
                   <Pressable
                     key={q}
                     onPress={() => setAmountText(groupThousands(q))}
-                    style={[styles.chip, { backgroundColor: amount === q ? c.primarySoft : c.surfaceAlt }]}
+                    style={[styles.chip, { borderColor: amount === q ? c.text : c.border }]}
                   >
-                    <Text style={{ color: amount === q ? c.primary : c.text, fontWeight: '700', fontSize: 13 }}>
+                    <Text style={{ color: c.text, fontWeight: amount === q ? '600' : '400', fontSize: 13 }}>
                       {groupThousands(q)}
                     </Text>
                   </Pressable>
@@ -282,16 +265,13 @@ export default function TransferFormScreen() {
               <Text style={[styles.counter, { color: c.muted }]}>{content.length}/100</Text>
             </Field>
           </View>
-        </FadeInUp>
+        </View>
 
         {!alreadySaved && lookup.state === 'found' && (
-          <FadeInUp>
-            <View style={[styles.card, styles.saveRow, { backgroundColor: c.surface }]}>
-              <Ionicons name="bookmark-outline" size={20} color={c.primary} />
-              <Text style={[styles.value, { color: c.text, flex: 1 }]}>Save recipient</Text>
-              <Switch value={save} onValueChange={setSave} trackColor={{ true: c.primary, false: c.border }} />
-            </View>
-          </FadeInUp>
+          <View style={[styles.card, styles.saveRow, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <Text style={[styles.value, { color: c.text, flex: 1 }]}>Save recipient</Text>
+            <Switch value={save} onValueChange={setSave} trackColor={{ true: c.primary, false: c.border }} />
+          </View>
         )}
 
         <View style={{ marginTop: space.xl }}>
@@ -326,17 +306,15 @@ function Field({ label, children, last }: { label: string; children: ReactNode; 
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl },
-  source: { borderRadius: radius.lg, padding: space.lg, gap: 4 },
-  sourceLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13 },
-  sourceNumber: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: space.sm },
-  sourceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  sourceBalance: { color: '#fff', fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  section: { fontSize: 16, fontWeight: '800', marginTop: space.xl, marginBottom: space.sm },
-  savedItem: { width: 108, alignItems: 'center', gap: 4, padding: space.md, borderRadius: radius.lg, borderWidth: 1.5 },
-  savedName: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  savedBank: { fontSize: 11, fontWeight: '600' },
+  source: { paddingVertical: space.md, gap: 4 },
+  sourceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  sourceBalance: { fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  section: { fontSize: 13, fontWeight: '600', marginTop: space.xl, marginBottom: space.sm },
+  savedItem: { width: 108, alignItems: 'center', gap: 4, padding: space.md, borderRadius: radius.lg, borderWidth: 1 },
+  savedName: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  savedBank: { fontSize: 11 },
   savedRemove: { position: 'absolute', top: 6, right: 6 },
-  card: { borderRadius: radius.lg, paddingHorizontal: space.lg },
+  card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: space.lg },
   field: { paddingVertical: space.md, gap: 6 },
   label: { fontSize: 13 },
   value: { fontSize: 16 },
@@ -346,12 +324,12 @@ const styles = StyleSheet.create({
   counter: { fontSize: 11, alignSelf: 'flex-end' },
   lookup: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  amountInput: { flex: 1, fontSize: 26, fontWeight: '800', paddingVertical: 2, fontVariant: ['tabular-nums'] },
-  currency: { fontSize: 14, fontWeight: '700' },
+  amountInput: { flex: 1, fontSize: 26, fontWeight: '600', paddingVertical: 2, fontVariant: ['tabular-nums'] },
+  currency: { fontSize: 14, fontWeight: '600' },
   hint: { fontSize: 13 },
-  words: { fontSize: 13, fontStyle: 'italic' },
+  words: { fontSize: 13 },
   quick: { gap: space.sm, paddingTop: space.xs },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1 },
   saveRow: {
     flexDirection: 'row',
     alignItems: 'center',

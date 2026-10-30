@@ -51,11 +51,11 @@ export function BankPicker({ visible, banks, selected, onSelect, onClose }: Prop
                 }}
                 style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
               >
-                <View style={[styles.code, { backgroundColor: c.primarySoft }]}>
-                  <Text style={[styles.codeText, { color: c.primary }]}>{item.code}</Text>
+                <View style={[styles.code, { backgroundColor: c.surfaceAlt }]}>
+                  <Text style={[styles.codeText, { color: c.text }]}>{item.code}</Text>
                 </View>
                 <Text style={[styles.name, { color: c.text }]}>{item.name}</Text>
-                {on && <Ionicons name="checkmark-circle" size={22} color={c.primary} />}
+                {on && <Ionicons name="checkmark-circle" size={22} color={c.text} />}
               </Pressable>
             );
           }}
@@ -75,19 +75,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
   },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginTop: space.sm, marginBottom: space.md },
-  title: { fontSize: 18, fontWeight: '800', marginBottom: space.md },
+  title: { fontSize: 18, fontWeight: '600', marginBottom: space.md },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
     marginBottom: space.sm,
   },
   searchInput: { flex: 1, fontSize: 16, paddingVertical: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
   code: { width: 56, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  codeText: { fontSize: 13, fontWeight: '800' },
+  codeText: { fontSize: 13, fontWeight: '600' },
   name: { flex: 1, fontSize: 16, fontWeight: '600' },
   none: { textAlign: 'center', paddingVertical: space.xl },
 });

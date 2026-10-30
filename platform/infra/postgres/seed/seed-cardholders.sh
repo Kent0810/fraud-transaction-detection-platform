@@ -65,8 +65,8 @@ SELECT card_id, 'OPENING', :opening_balance FROM opened;
 -- One demo login per console role, same password as the cardholders.
 INSERT INTO staff (email, name, role, password_hash)
 SELECT s.email, s.name, s.role, crypt(:'password', gen_salt('bf', 8))
-FROM (VALUES ('analyst@hcmmb.vn', 'Linh Tran', 'ANALYST'),
-             ('agent@hcmmb.vn', 'Minh Nguyen', 'AGENT')) AS s (email, name, role)
+FROM (VALUES ('analyst@hcmmb.vn', 'Kent Bui', 'ANALYST'),
+             ('agent@hcmmb.vn', 'Kent Bui', 'AGENT')) AS s (email, name, role)
 WHERE NOT EXISTS (SELECT 1 FROM staff t WHERE lower(t.email) = s.email);
 
 SELECT count(*) AS cardholders FROM cardholders;

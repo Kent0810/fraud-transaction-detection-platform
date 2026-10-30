@@ -111,3 +111,7 @@ export type LiveAlert = {
   score: number;
   firedRules: string[];
 };
+
+export type ReceivedAlert = LiveAlert & {
+  receivedAt: number;
+};

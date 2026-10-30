@@ -36,3 +36,32 @@ export function ago(iso: string | null): string {
 export const score = (n: number) => n.toFixed(2);
 
 export const accountNumber = (digits: string) => digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+
+export const cardNumber = (digits: string) => digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+
+export function compactVnd(amount: number): string {
+  const abs = Math.abs(amount);
+  const units: [number, string][] = [
+    [1e9, 'B'],
+    [1e6, 'M'],
+    [1e3, 'K'],
+  ];
+  for (const [size, suffix] of units) {
+    if (abs >= size) return `${(amount / size).toFixed(abs >= size * 100 ? 0 : 1)}${suffix} đ`;
+  }
+  return vnd(amount);
+}
+
+export function clock(iso: string | number): string {
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+export function shortDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+}

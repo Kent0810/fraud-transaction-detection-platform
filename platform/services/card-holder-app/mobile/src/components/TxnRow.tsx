@@ -4,12 +4,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Txn } from '@/data/types';
 import { space, useColors } from '@/theme';
 
-import { category, categoryIcon, money, time } from './format';
-import { IconBubble, StatusPill, useVerdictTone } from './ui';
+import { category, money, time } from './format';
+import { StatusPill } from './ui';
 
 export function TxnRow({ txn }: { txn: Txn }) {
   const c = useColors();
-  const tone = useVerdictTone()[txn.decision];
   const declined = txn.decision === 'DECLINE';
   const flagged = txn.decision !== 'ALLOW';
   return (
@@ -18,11 +17,6 @@ export function TxnRow({ txn }: { txn: Txn }) {
       onPress={() => router.push({ pathname: '/txn/[id]', params: { id: txn.txnId } })}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
     >
-      <IconBubble
-        name={categoryIcon(txn.category)}
-        tint={flagged ? tone.fg : c.primary}
-        bg={flagged ? tone.bg : c.primarySoft}
-      />
       <View style={styles.main}>
         <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
           {txn.merchant}
@@ -49,8 +43,8 @@ export function TxnRow({ txn }: { txn: Txn }) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.md, gap: space.md },
   main: { flex: 1 },
-  merchant: { fontSize: 16, fontWeight: '600' },
-  meta: { fontSize: 13, marginTop: 3 },
-  side: { alignItems: 'flex-end', gap: 6 },
-  amount: { fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  merchant: { fontSize: 16, fontWeight: '500' },
+  meta: { fontSize: 13, marginTop: 2 },
+  side: { alignItems: 'flex-end', gap: 4 },
+  amount: { fontSize: 16, fontWeight: '500', fontVariant: ['tabular-nums'] },
 });

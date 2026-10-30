@@ -1,18 +1,56 @@
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { type FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { RuleChip, VerdictBadge } from '../components/Badges';
+import { type Bucket, Gauge, type Series, StackedColumns } from '../components/Charts';
+import { Icon, type IconName } from '../components/Icons';
 import { ReasonAction } from '../components/Reason';
 import * as api from '../data/api';
 import { useAuth } from '../data/auth';
-import { accountNumber, ago, category, dateTime, score, vnd } from '../data/format';
+import {
+  accountNumber,
+  ago,
+  cardNumber,
+  category,
+  compactVnd,
+  dateTime,
+  initials,
+  score,
+  shortDateTime,
+  vnd,
+} from '../data/format';
 import { useLive } from '../data/live';
-import { ACTION_LABEL } from '../data/rules';
+import { rememberCard } from '../data/recent';
+import { ACTION_LABEL, ruleTitle } from '../data/rules';
 import type { Activity, AuditEntry, CardView, CaseAlert, RuleType } from '../data/types';
+import { Kpi, SkeletonTable } from './Queue';
 
 const RANGES = [7, 30, 90];
 
 // The Cassandra sink and the outbox relay take a moment; re-read after a change or a live alert for this card.
 const SETTLE_MS = 2_500;
+
+const SERIES: Series[] = [
+  { key: 'ALLOW', label: 'Allowed', color: 'var(--c-allow)' },
+  { key: 'STEP_UP', label: 'Stepped up', color: 'var(--c-step)' },
+  { key: 'DECLINE', label: 'Declined', color: 'var(--c-decline)' },
+];
+
+const AUDIT_ICON: Record<string, IconName> = {
+  VIEW_CARDHOLDER: 'eye',
+  BLOCK_MERCHANT: 'ban',
+  ALLOW_MERCHANT: 'check',
+  RELEASE_MERCHANT: 'x',
+  FREEZE_CARD: 'snow',
+  UNFREEZE_CARD: 'unlock',
+  CONFIRM_ALERT: 'shield',
+  CLEAR_ALERT: 'check',
+};
+
+type Channel = 'ALL' | 'CARD' | 'TRANSFER';
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
 
 export function Card({ cardId }: { cardId: string }) {
   const { session } = useAuth();
@@ -25,6 +63,9 @@ export function Card({ cardId }: { cardId: string }) {
   const [days, setDays] = useState(30);
   const [error, setError] = useState<string | null>(null);
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const [channel, setChannel] = useState<Channel>('ALL');
+  const [search, setSearch] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const loadActivity = useCallback(async () => {
     const [a, log] = await Promise.all([api.fetchActivity(cardId, days), api.fetchAudit(cardId)]);
@@ -34,7 +75,9 @@ export function Card({ cardId }: { cardId: string }) {
 
   const loadCard = useCallback(async () => {
     try {
-      setView(await api.openCard(cardId));
+      const v = await api.openCard(cardId);
+      setView(v);
+      rememberCard(v.cardId, v.holder.name);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -67,14 +110,74 @@ export function Card({ cardId }: { cardId: string }) {
     }, SETTLE_MS);
   }, [cardId, loadActivity]);
 
-  if (error && !view) return <p className="error">{error}</p>;
-  if (!view) return <p className="muted">Opening card…</p>;
+  const buckets = useMemo<Bucket[]>(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (days - 1));
+    const index = new Map<string, number>();
+    const list: Bucket[] = Array.from({ length: days }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      index.set(dayKey(d), i);
+      return {
+        label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+        detail: d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }),
+        values: { ALLOW: 0, STEP_UP: 0, DECLINE: 0 },
+      };
+    });
+    for (const t of activity ?? []) {
+      const i = index.get(dayKey(new Date(t.ts)));
+      if (i !== undefined) list[i].values[t.decision] += t.amount;
+    }
+    return list;
+  }, [activity, days]);
+
+  if (error && !view) {
+    return (
+      <section className="page">
+        <div className="empty">
+          <h3>Could not open this card</h3>
+          <p className="error">{error}</p>
+          <button type="button" className="btn ghost" onClick={() => history.back()}>
+            Go back
+          </button>
+        </div>
+      </section>
+    );
+  }
+  if (!view) {
+    return (
+      <section className="page">
+        <div className="hero skeleton-hero" aria-busy="true">
+          <span className="avatar big sk" />
+          <div className="sk-lines">
+            <span style={{ width: '40%' }} />
+            <span style={{ width: '60%' }} />
+          </div>
+        </div>
+        <SkeletonTable rows={5} />
+      </section>
+    );
+  }
 
   const rules = new Map(view.controls.merchantRules.map((r) => [r.merchant, r.type]));
-  const rows = (activity ?? []).filter((t) => !onlyFlagged || t.decision !== 'ALLOW' || t.alerts.length > 0);
+  const needle = search.trim().toLowerCase();
+  const all = activity ?? [];
+  const rows = all.filter(
+    (t) =>
+      (!onlyFlagged || t.decision !== 'ALLOW' || t.alerts.length > 0) &&
+      (channel === 'ALL' || t.channel === channel) &&
+      (!needle || t.merchant.toLowerCase().includes(needle) || category(t.category).toLowerCase().includes(needle)),
+  );
+  const openCount = all.reduce((n, t) => n + t.alerts.filter((a) => a.status === 'OPEN').length, 0);
+  const frozen = view.account?.frozen ?? false;
 
   async function review(alert: CaseAlert, status: 'CONFIRMED' | 'CLEARED', reason: string | null) {
     await api.reviewAlert(cardId, alert, status, reason);
+  }
+
+  async function reviewAll(alerts: CaseAlert[], status: 'CONFIRMED' | 'CLEARED', reason: string | null) {
+    for (const a of alerts) await review(a, status, reason);
     await loadActivity();
   }
 
@@ -88,227 +191,514 @@ export function Card({ cardId }: { cardId: string }) {
     await refreshSoon();
   }
 
-  async function freeze(frozen: boolean, reason: string | null) {
-    const { frozen: now } = await api.setFrozen(cardId, frozen, reason);
+  async function freeze(next: boolean, reason: string | null) {
+    const { frozen: now } = await api.setFrozen(cardId, next, reason);
     setView((v) => (v && v.account ? { ...v, account: { ...v.account, frozen: now } } : v));
     await loadActivity();
   }
 
+  function toggle(txnId: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(txnId)) next.delete(txnId);
+      else next.add(txnId);
+      return next;
+    });
+  }
+
   return (
-    <section>
-      <header className="page-head">
-        <div>
-          <p className="kicker mono">Card {view.cardId}</p>
-          <h1>{view.holder.name}</h1>
+    <section className="page">
+      <button type="button" className="back" onClick={() => history.back()}>
+        <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)' }} />
+        Back
+      </button>
+
+      <header className={`hero${frozen ? ' is-frozen' : ''}`}>
+        <span className="avatar big">{initials(view.holder.name)}</span>
+        <div className="hero-text">
+          <div className="hero-title">
+            <h1>{view.holder.name}</h1>
+            {view.account && (
+              <span className={`status ${frozen ? 'frozen' : 'active'}`}>
+                <Icon name={frozen ? 'snow' : 'check'} size={13} strokeWidth={2.2} />
+                {frozen ? 'Frozen' : 'Active'}
+              </span>
+            )}
+          </div>
+          <p className="hero-card mono">
+            <Icon name="card" size={15} />
+            {cardNumber(view.cardId)}
+          </p>
           <p className="muted small">
-            {[view.holder.city, view.holder.state].filter(Boolean).join(', ')} · {view.holder.email}
+            {[view.holder.city, view.holder.state].filter(Boolean).join(', ') || 'No address'} · {view.holder.email}
             {view.holder.dob && ` · born ${view.holder.dob}`}
           </p>
+          <p className="audit-note">
+            <Icon name="eye" size={13} /> Opening this file was recorded in the audit log.
+          </p>
         </div>
-        <p className="notice">Opening this file was recorded in the audit log.</p>
+        <div className="hero-side">
+          <Gauge value={view.state?.riskScore ?? 0} label="risk score" />
+          {isAgent &&
+            view.account &&
+            (frozen ? (
+              <ReasonAction
+                label="Unfreeze card"
+                confirm="Unfreeze card"
+                title="Unfreeze this card?"
+                description={<p>Payments on this card will be checked by the fraud rules again instead of declined.</p>}
+                icon="unlock"
+                tone="primary"
+                size="normal"
+                onRun={(r) => freeze(false, r)}
+              />
+            ) : (
+              <ReasonAction
+                label="Freeze card"
+                confirm="Freeze card"
+                title="Freeze this card?"
+                description={
+                  <p>
+                    Every payment on <b className="mono">{cardNumber(view.cardId)}</b> will be declined until the card
+                    is unfrozen. The cardholder sees this in their app.
+                  </p>
+                }
+                icon="snow"
+                tone="danger"
+                size="normal"
+                onRun={(r) => freeze(true, r)}
+              />
+            ))}
+        </div>
       </header>
 
-      <div className="cards">
-        <div className="panel">
-          <h2>Account</h2>
-          {view.account ? (
-            <>
-              <dl>
+      {frozen && (
+        <div className="frozen-banner">
+          <Icon name="snow" size={16} />
+          This card is frozen. Every payment on it is declined with rule FROZEN.
+        </div>
+      )}
+
+      <div className="kpis">
+        <Kpi
+          label="Balance"
+          value={view.account ? compactVnd(view.account.balance) : '—'}
+          sub={view.account ? vnd(view.account.balance) : 'No account'}
+        />
+        <Kpi
+          label="Flagged amount"
+          value={view.state ? compactVnd(view.state.amountSum) : '—'}
+          sub={view.state ? vnd(view.state.amountSum) : 'No case'}
+          tone="ctrl"
+        />
+        <Kpi
+          label="Open alerts"
+          value={String(activity ? openCount : (view.state?.openAlerts ?? 0))}
+          sub={activity ? `in the last ${days} days` : 'on the case'}
+          tone="hl"
+        />
+        <Kpi
+          label="Last decision"
+          value={view.state?.lastDecision ? '' : '—'}
+          sub={view.state ? ago(view.state.updatedAt) : 'No case'}
+        >
+          {view.state?.lastDecision && <VerdictBadge verdict={view.state.lastDecision} />}
+        </Kpi>
+      </div>
+
+      <div className="card-layout">
+        <div className="card-main">
+          <div className="panel">
+            <div className="section-head">
+              <h2>Activity</h2>
+              <div className="seg" role="group" aria-label="Period">
+                {RANGES.map((d) => (
+                  <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)}>
+                    {d} days
+                  </button>
+                ))}
+              </div>
+            </div>
+            {activity ? (
+              <StackedColumns
+                buckets={buckets}
+                series={SERIES}
+                format={compactVnd}
+                axisEvery={days === 7 ? 1 : days === 30 ? 5 : 15}
+                height={150}
+                caption={`Amount per day by decision over the last ${days} days`}
+              />
+            ) : (
+              <div className="chart-loading" />
+            )}
+          </div>
+
+          <div className="toolbar">
+            <label className="search-box">
+              <Icon name="search" size={15} />
+              <input placeholder="Merchant or category" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </label>
+            <div className="seg" role="group" aria-label="Channel">
+              {(['ALL', 'CARD', 'TRANSFER'] as Channel[]).map((c) => (
+                <button key={c} type="button" aria-pressed={channel === c} onClick={() => setChannel(c)}>
+                  {c === 'ALL' ? 'All' : c === 'CARD' ? 'Card' : 'Transfers'}
+                </button>
+              ))}
+            </div>
+            <label className="switch">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={onlyFlagged}
+                onChange={(e) => setOnlyFlagged(e.target.checked)}
+              />
+              <span className="switch-track" aria-hidden>
+                <span />
+              </span>
+              Flagged only
+            </label>
+            <span className="muted small toolbar-hint">
+              {rows.length} of {all.length} payments
+            </span>
+          </div>
+
+          {error && <p className="error banner">{error}</p>}
+          {!activity && <SkeletonTable rows={5} />}
+          {activity && rows.length === 0 && (
+            <div className="empty">
+              <h3>Nothing in this period</h3>
+              <p className="muted">Try a longer period or clear the filters.</p>
+            </div>
+          )}
+          {rows.length > 0 && (
+            <div className="table-card">
+              <table className="grid activity">
+                <thead>
+                  <tr>
+                    <th aria-label="Details" />
+                    <th>Time</th>
+                    <th>Merchant / recipient</th>
+                    <th className="num">Amount</th>
+                    <th>Decision</th>
+                    <th>Rules</th>
+                    <th className="right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((t) => {
+                    const open = t.alerts.filter((a) => a.status === 'OPEN');
+                    const merchantRule = rules.get(t.merchant);
+                    const isOpen = expanded.has(t.txnId);
+                    return (
+                      <Fragment key={t.txnId}>
+                        <tr
+                          className={`clickable${t.decision !== 'ALLOW' ? ` flagged f-${t.decision.toLowerCase()}` : ''}`}
+                          onClick={() => toggle(t.txnId)}
+                        >
+                          <td className="expander">
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              aria-expanded={isOpen}
+                              aria-label="Show alerts"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggle(t.txnId);
+                              }}
+                            >
+                              <Icon
+                                name="chevron"
+                                size={14}
+                                style={{ transform: isOpen ? 'rotate(90deg)' : undefined }}
+                              />
+                            </button>
+                          </td>
+                          <td className="muted nowrap" title={dateTime(t.ts)}>
+                            {shortDateTime(t.ts)}
+                          </td>
+                          <td>
+                            <span className="merchant">
+                              <span
+                                className={`chan c-${t.channel.toLowerCase()}`}
+                                title={t.channel === 'CARD' ? 'Card payment' : 'Transfer'}
+                              >
+                                <Icon name={t.channel === 'CARD' ? 'card' : 'transfer'} size={14} />
+                              </span>
+                              <span>
+                                <b>{t.merchant}</b>
+                                {merchantRule && (
+                                  <span className={`rule-type ${merchantRule.toLowerCase()}`}>
+                                    {merchantRule === 'BLOCK' ? 'blocked' : 'allowed'}
+                                  </span>
+                                )}
+                                <small className="muted">
+                                  {t.channel === 'TRANSFER' ? (
+                                    <span className="mono">{t.counterpartyAccount}</span>
+                                  ) : (
+                                    category(t.category)
+                                  )}
+                                </small>
+                              </span>
+                            </span>
+                          </td>
+                          <td className="num strong">{vnd(t.amount)}</td>
+                          <td>
+                            <VerdictBadge verdict={t.decision} />
+                          </td>
+                          <td>
+                            <div className="chips">
+                              {t.alerts.length > 0
+                                ? t.alerts.map((a) => (
+                                    <RuleChip key={a.alertId} ruleId={a.ruleId} status={a.status} compact />
+                                  ))
+                                : t.firedRules.map((r) => <RuleChip key={r} ruleId={r} compact />)}
+                            </div>
+                          </td>
+                          <td className="actions" onClick={(e) => e.stopPropagation()}>
+                            {open.length > 0 && (
+                              <>
+                                <ReasonAction
+                                  label="Fraud"
+                                  confirm="Confirm fraud"
+                                  title="Confirm this payment as fraud?"
+                                  description={
+                                    <PaymentSummary
+                                      t={t}
+                                      note={`${open.length} open ${open.length === 1 ? 'alert' : 'alerts'} will be marked as fraud.`}
+                                    />
+                                  }
+                                  icon="shield"
+                                  tone="danger"
+                                  onRun={(r) => reviewAll(open, 'CONFIRMED', r)}
+                                />
+                                <ReasonAction
+                                  label="Clear"
+                                  confirm="Clear alerts"
+                                  title="Clear these alerts?"
+                                  description={
+                                    <PaymentSummary
+                                      t={t}
+                                      note="The payment was genuine; the alerts close as cleared."
+                                    />
+                                  }
+                                  icon="check"
+                                  onRun={(r) => reviewAll(open, 'CLEARED', r)}
+                                />
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="detail-row">
+                            <td />
+                            <td colSpan={6}>
+                              <div className="detail">
+                                <div className="detail-facts">
+                                  <span>
+                                    Score <b>{score(t.score)}</b>
+                                  </span>
+                                  <span>
+                                    Category <b>{category(t.category)}</b>
+                                  </span>
+                                  <span>
+                                    Currency <b>{t.currency}</b>
+                                  </span>
+                                  <span>
+                                    Payment <b className="mono">{t.txnId}</b>
+                                  </span>
+                                </div>
+                                {isAgent && t.channel === 'CARD' && (
+                                  <div className="detail-merchant">
+                                    <span className="muted small">
+                                      {merchantRule === 'BLOCK'
+                                        ? `${t.merchant} is blocked for this card.`
+                                        : merchantRule === 'ALLOW'
+                                          ? `${t.merchant} is always allowed for this card.`
+                                          : `No merchant rule for ${t.merchant}.`}
+                                    </span>
+                                    {merchantRule !== 'BLOCK' && (
+                                      <ReasonAction
+                                        label="Block merchant"
+                                        confirm="Block merchant"
+                                        title={`Block ${t.merchant}?`}
+                                        description={
+                                          <p>Every future payment from this card to {t.merchant} will be declined.</p>
+                                        }
+                                        icon="ban"
+                                        tone="danger"
+                                        onRun={(r) => rule(t.merchant, 'BLOCK', r)}
+                                      />
+                                    )}
+                                    {merchantRule !== 'ALLOW' && t.decision !== 'ALLOW' && (
+                                      <ReasonAction
+                                        label="Always allow"
+                                        confirm="Allow merchant"
+                                        title={`Always allow ${t.merchant}?`}
+                                        description={
+                                          <p>Payments from this card to {t.merchant} skip the merchant checks.</p>
+                                        }
+                                        icon="check"
+                                        onRun={(r) => rule(t.merchant, 'ALLOW', r)}
+                                      />
+                                    )}
+                                  </div>
+                                )}
+                                {t.alerts.length === 0 ? (
+                                  t.firedRules.length > 0 && (
+                                    <p className="muted small">
+                                      The rules fired but no alert was raised for this payment.
+                                    </p>
+                                  )
+                                ) : (
+                                  <ul className="alert-list">
+                                    {t.alerts.map((a) => (
+                                      <li key={a.alertId} className={`s-${a.status.toLowerCase()}`}>
+                                        <RuleChip ruleId={a.ruleId} />
+                                        <span className="muted small">
+                                          {ruleTitle(a.ruleId)} · score {score(a.score)}
+                                        </span>
+                                        <span className={`review r-${a.status.toLowerCase()}`}>
+                                          {a.status === 'OPEN'
+                                            ? 'Open'
+                                            : a.status === 'CONFIRMED'
+                                              ? 'Confirmed fraud'
+                                              : 'Cleared'}
+                                        </span>
+                                        {a.status === 'OPEN' && (
+                                          <span className="alert-actions">
+                                            <ReasonAction
+                                              label="Fraud"
+                                              confirm="Confirm fraud"
+                                              title={`Confirm ${a.ruleId} as fraud?`}
+                                              icon="shield"
+                                              tone="danger"
+                                              onRun={(r) => reviewAll([a], 'CONFIRMED', r)}
+                                            />
+                                            <ReasonAction
+                                              label="Clear"
+                                              confirm="Clear alert"
+                                              title={`Clear ${a.ruleId}?`}
+                                              icon="check"
+                                              onRun={(r) => reviewAll([a], 'CLEARED', r)}
+                                            />
+                                          </span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <aside className="card-aside">
+          <div className="panel">
+            <h2>Account</h2>
+            {view.account ? (
+              <dl className="facts">
                 <dt>Number</dt>
                 <dd className="mono">{accountNumber(view.account.accountNumber)}</dd>
                 <dt>Balance</dt>
                 <dd>{vnd(view.account.balance)}</dd>
-                <dt>Status</dt>
+                <dt>Case priority</dt>
+                <dd>{view.state ? Math.round(view.state.priority).toLocaleString('en-US') : '—'}</dd>
+                <dt>Budget</dt>
                 <dd>
-                  <span className={`status ${view.account.frozen ? 'frozen' : 'active'}`}>
-                    {view.account.frozen ? 'Frozen' : 'Active'}
-                  </span>
+                  {view.controls.budget
+                    ? `${vnd(view.controls.budget.limit)} per ${view.controls.budget.period.toLowerCase()}`
+                    : 'None set'}
                 </dd>
               </dl>
-              {isAgent &&
-                (view.account.frozen ? (
-                  <ReasonAction label="Unfreeze" confirm="Unfreeze card" onRun={(r) => freeze(false, r)} />
-                ) : (
-                  <ReasonAction
-                    label="Freeze card"
-                    confirm="Freeze card"
-                    tone="danger"
-                    onRun={(r) => freeze(true, r)}
-                  />
+            ) : (
+              <p className="muted">No account.</p>
+            )}
+          </div>
+
+          <div className="panel">
+            <h2>Merchant rules</h2>
+            {view.controls.merchantRules.length === 0 ? (
+              <p className="muted small">No merchant is blocked or allowed for this card.</p>
+            ) : (
+              <ul className="rules-list">
+                {view.controls.merchantRules.map((r) => (
+                  <li key={r.merchant}>
+                    <span className={`rule-icon ${r.type.toLowerCase()}`}>
+                      <Icon name={r.type === 'BLOCK' ? 'ban' : 'check'} size={14} />
+                    </span>
+                    <span className="grow">
+                      <b>{r.merchant}</b>
+                      <small className="muted">
+                        {r.type === 'BLOCK' ? 'Blocked' : 'Allowed'} · {ago(r.createdAt)}
+                      </small>
+                    </span>
+                    {isAgent && (
+                      <ReasonAction
+                        label="Remove"
+                        confirm="Remove rule"
+                        title={`Remove the rule for ${r.merchant}?`}
+                        icon="x"
+                        onRun={(reason) => release(r.merchant, reason)}
+                      />
+                    )}
+                  </li>
                 ))}
-            </>
-          ) : (
-            <p className="muted">No account.</p>
-          )}
-        </div>
+              </ul>
+            )}
+            {isAgent && <AddRule onAdd={rule} />}
+          </div>
 
-        <div className="panel">
-          <h2>Case</h2>
-          {view.state ? (
-            <dl>
-              <dt>Risk score</dt>
-              <dd>{score(view.state.riskScore)}</dd>
-              <dt>Priority</dt>
-              <dd>{Math.round(view.state.priority).toLocaleString('en-US')}</dd>
-              <dt>Flagged amount</dt>
-              <dd>{vnd(view.state.amountSum)}</dd>
-              <dt>Open alerts</dt>
-              <dd>{view.state.openAlerts}</dd>
-              <dt>Last decision</dt>
-              <dd>
-                <VerdictBadge verdict={view.state.lastDecision} />{' '}
-                <span className="muted">{ago(view.state.updatedAt)}</span>
-              </dd>
-            </dl>
-          ) : (
-            <p className="muted">No case for this card.</p>
-          )}
-        </div>
-
-        <div className="panel">
-          <h2>Merchant rules</h2>
-          {view.controls.merchantRules.length === 0 && <p className="muted">None.</p>}
-          <ul className="rules-list">
-            {view.controls.merchantRules.map((r) => (
-              <li key={r.merchant}>
-                <span className={`rule-type ${r.type.toLowerCase()}`}>
-                  {r.type === 'BLOCK' ? 'Blocked' : 'Allowed'}
-                </span>
-                <span className="grow">{r.merchant}</span>
-                {isAgent && (
-                  <ReasonAction label="Remove" confirm="Remove rule" onRun={(reason) => release(r.merchant, reason)} />
-                )}
-              </li>
-            ))}
-          </ul>
-          {isAgent && <AddRule onAdd={rule} />}
-          {view.controls.budget && (
-            <p className="muted small">
-              Cardholder budget: {vnd(view.controls.budget.limit)} per {view.controls.budget.period.toLowerCase()}
-            </p>
-          )}
-        </div>
+          <div className="panel">
+            <h2>Audit trail</h2>
+            {audit.length === 0 ? (
+              <p className="muted small">Nothing yet.</p>
+            ) : (
+              <ol className="timeline">
+                {audit.map((e) => (
+                  <li key={e.auditId} className={`a-${e.action.toLowerCase()}`}>
+                    <span className="tl-icon">
+                      <Icon name={AUDIT_ICON[e.action] ?? 'clock'} size={13} />
+                    </span>
+                    <div>
+                      <p>
+                        <b>{e.staffName}</b>{' '}
+                        {(ACTION_LABEL[e.action] ?? e.action).replace(/^\w/, (c) => c.toLowerCase())}
+                        {e.payload.merchant && <> · {e.payload.merchant}</>}
+                      </p>
+                      {e.payload.reason && <blockquote>{e.payload.reason}</blockquote>}
+                      <small className="muted">
+                        {dateTime(e.at)} · {e.staffRole === 'ANALYST' ? 'analyst' : 'agent'}
+                      </small>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </aside>
       </div>
-
-      <div className="section-head">
-        <h2>Activity</h2>
-        <div className="seg">
-          {RANGES.map((d) => (
-            <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)}>
-              {d} days
-            </button>
-          ))}
-        </div>
-        <label className="small">
-          <input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} /> Flagged
-          only
-        </label>
-      </div>
-      {error && <p className="error">{error}</p>}
-      {!activity && <p className="muted">Loading activity…</p>}
-      {activity && rows.length === 0 && <p className="muted">Nothing in this period.</p>}
-      {rows.length > 0 && (
-        <div className="scroll">
-          <table className="grid">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Merchant / recipient</th>
-                <th>Category</th>
-                <th className="num">Amount</th>
-                <th>Decision</th>
-                <th className="num">Score</th>
-                <th>Rules and alerts</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((t) => {
-                const open = t.alerts.filter((a) => a.status === 'OPEN');
-                const merchantRule = rules.get(t.merchant);
-                return (
-                  <tr key={t.txnId} className={t.decision !== 'ALLOW' ? 'flagged' : undefined}>
-                    <td className="muted nowrap">{dateTime(t.ts)}</td>
-                    <td>
-                      {t.merchant}
-                      {t.channel === 'TRANSFER' && <div className="muted small mono">{t.counterpartyAccount}</div>}
-                    </td>
-                    <td className="muted">{category(t.category)}</td>
-                    <td className="num">{vnd(t.amount)}</td>
-                    <td>
-                      <VerdictBadge verdict={t.decision} />
-                    </td>
-                    <td className="num">{score(t.score)}</td>
-                    <td>
-                      <div className="chips">
-                        {t.alerts.length > 0
-                          ? t.alerts.map((a) => <RuleChip key={a.alertId} ruleId={a.ruleId} status={a.status} />)
-                          : t.firedRules.map((r) => <RuleChip key={r} ruleId={r} />)}
-                      </div>
-                    </td>
-                    <td className="actions">
-                      {open.length > 0 && (
-                        <>
-                          <ReasonAction
-                            label="Confirm fraud"
-                            confirm="Confirm"
-                            tone="danger"
-                            onRun={async (r) => {
-                              for (const a of open) await review(a, 'CONFIRMED', r);
-                            }}
-                          />
-                          <ReasonAction
-                            label="Clear"
-                            confirm="Clear alert"
-                            onRun={async (r) => {
-                              for (const a of open) await review(a, 'CLEARED', r);
-                            }}
-                          />
-                        </>
-                      )}
-                      {isAgent && t.channel === 'CARD' && merchantRule !== 'BLOCK' && (
-                        <ReasonAction
-                          label="Block merchant"
-                          confirm="Block"
-                          tone="danger"
-                          onRun={(r) => rule(t.merchant, 'BLOCK', r)}
-                        />
-                      )}
-                      {isAgent && t.channel === 'CARD' && merchantRule !== 'ALLOW' && t.decision !== 'ALLOW' && (
-                        <ReasonAction
-                          label="Allow merchant"
-                          confirm="Allow"
-                          onRun={(r) => rule(t.merchant, 'ALLOW', r)}
-                        />
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <h2 className="section-title">Audit trail</h2>
-      {audit.length === 0 ? (
-        <p className="muted">Nothing yet.</p>
-      ) : (
-        <ul className="audit">
-          {audit.map((e) => (
-            <li key={e.auditId}>
-              <span className="muted nowrap">{dateTime(e.at)}</span>
-              <span>
-                <strong>{e.staffName}</strong> <span className="muted small">({e.staffRole.toLowerCase()})</span>{' '}
-                {ACTION_LABEL[e.action] ?? e.action}
-                {e.payload.merchant && <> · {e.payload.merchant}</>}
-                {e.payload.reason && <span className="muted"> — “{e.payload.reason}”</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </section>
+  );
+}
+
+function PaymentSummary({ t, note }: { t: Activity; note: string }) {
+  return (
+    <div className="pay-summary">
+      <div>
+        <b>{t.merchant}</b>
+        <span className="muted small">{dateTime(t.ts)}</span>
+      </div>
+      <span className="amount">{vnd(t.amount)}</span>
+      <p className="muted small">{note}</p>
+    </div>
   );
 }
 
@@ -336,18 +726,28 @@ function AddRule({ onAdd }: { onAdd: (merchant: string, type: RuleType, reason: 
 
   return (
     <form className="add-rule" onSubmit={submit}>
+      <div className="seg full" role="group" aria-label="Rule type">
+        {(['BLOCK', 'ALLOW'] as RuleType[]).map((r) => (
+          <button key={r} type="button" aria-pressed={type === r} onClick={() => setType(r)}>
+            <Icon name={r === 'BLOCK' ? 'ban' : 'check'} size={13} />
+            {r === 'BLOCK' ? 'Block' : 'Allow'}
+          </button>
+        ))}
+      </div>
       <input
         placeholder="Merchant name"
         value={merchant}
         maxLength={120}
         onChange={(e) => setMerchant(e.target.value)}
       />
-      <select value={type} onChange={(e) => setType(e.target.value as RuleType)}>
-        <option value="BLOCK">Block</option>
-        <option value="ALLOW">Allow</option>
-      </select>
-      <input placeholder="Reason" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
-      <button className="btn small" disabled={busy || !merchant.trim()}>
+      <input
+        placeholder="Reason (audit log)"
+        value={reason}
+        maxLength={500}
+        onChange={(e) => setReason(e.target.value)}
+      />
+      <button className="btn primary small" disabled={busy || !merchant.trim()}>
+        <Icon name="plus" size={14} />
         {busy ? 'Saving…' : 'Add rule'}
       </button>
       {error && <span className="error">{error}</span>}

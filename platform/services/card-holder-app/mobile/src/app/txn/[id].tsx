@@ -1,9 +1,8 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { category, categoryIcon, day, money, time } from '@/components/format';
-import { Button, Empty, IconBubble, SectionHeader, StatusPill, Surface, useVerdictTone } from '@/components/ui';
+import { category, day, money, time } from '@/components/format';
+import { Button, Empty, SectionHeader, StatusPill, Surface, useVerdictTone } from '@/components/ui';
 import { RULE_TEXT } from '@/data/rules';
 import { useStore } from '@/data/store';
 import { space, useColors } from '@/theme';
@@ -16,7 +15,7 @@ export default function TxnScreen() {
   const txn = transactions.find((t) => t.txnId === id);
 
   if (!txn) {
-    return <Empty icon="search" title="Transaction not found" detail="History goes back 90 days." />;
+    return <Empty title="Transaction not found" detail="History goes back 90 days." />;
   }
 
   const tone = tones[txn.decision];
@@ -35,12 +34,6 @@ export default function TxnScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
-        <IconBubble
-          name={categoryIcon(txn.category)}
-          tint={flagged ? tone.fg : c.primary}
-          bg={flagged ? tone.bg : c.primarySoft}
-          size={72}
-        />
         <Text style={[styles.merchant, { color: c.text }]}>{txn.merchant}</Text>
         <Text
           style={[
@@ -53,22 +46,16 @@ export default function TxnScreen() {
         >
           -{money(txn.amount)}
         </Text>
-        <View>
-          <StatusPill decision={txn.decision} />
-        </View>
+        <StatusPill decision={txn.decision} />
       </View>
 
       {flagged && (
-        <Surface style={[styles.why, { backgroundColor: tone.bg }]}>
-          <View style={styles.whyHead}>
-            <Ionicons name="shield-half" size={18} color={tone.fg} />
-            <Text style={[styles.whyTitle, { color: tone.fg }]}>
-              {transfer ? 'Why this transfer was declined' : 'Why we flagged this'}
-            </Text>
-          </View>
+        <Surface style={[styles.why, { backgroundColor: tone.bg, borderColor: tone.bg }]}>
+          <Text style={[styles.whyTitle, { color: tone.fg }]}>
+            {transfer ? 'Why this transfer was declined' : 'Why we flagged this'}
+          </Text>
           {txn.firedRules.map((r) => (
             <View key={r} style={styles.reason}>
-              <View style={[styles.bullet, { backgroundColor: tone.fg }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.reasonTitle, { color: c.text }]}>{RULE_TEXT[r]?.title ?? r}</Text>
                 <Text style={[styles.reasonDetail, { color: c.muted }]}>{RULE_TEXT[r]?.detail}</Text>
@@ -100,11 +87,6 @@ export default function TxnScreen() {
           {rule ? (
             <Surface style={{ gap: space.lg }}>
               <View style={styles.ruleRow}>
-                <IconBubble
-                  name={rule.type === 'BLOCK' ? 'ban' : 'checkmark-done'}
-                  tint={rule.type === 'BLOCK' ? c.decline : c.allow}
-                  bg={rule.type === 'BLOCK' ? c.declineBg : c.allowBg}
-                />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.reasonTitle, { color: c.text }]}>
                     {rule.type === 'BLOCK' ? 'Blocked' : 'Trusted'}
@@ -124,13 +106,11 @@ export default function TxnScreen() {
             <View style={{ gap: space.sm }}>
               <Button
                 label="Block this merchant"
-                icon="ban"
                 variant="danger"
                 onPress={() => setMerchantRule(txn.merchant, 'BLOCK')}
               />
               <Button
                 label="Trust this merchant"
-                icon="checkmark-done"
                 variant="secondary"
                 onPress={() => setMerchantRule(txn.merchant, 'ALLOW')}
               />
@@ -144,20 +124,18 @@ export default function TxnScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl },
-  hero: { alignItems: 'center', gap: space.sm, paddingTop: space.lg, paddingBottom: space.xl },
-  merchant: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginTop: space.sm },
-  amount: { fontSize: 44, fontWeight: '800', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
+  hero: { gap: space.xs, paddingTop: space.sm, paddingBottom: space.lg },
+  merchant: { fontSize: 17, fontWeight: '500' },
+  amount: { fontSize: 36, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'], marginBottom: 4 },
   why: { gap: space.md },
-  whyHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  whyTitle: { fontSize: 15, fontWeight: '800' },
+  whyTitle: { fontSize: 15, fontWeight: '600' },
   reason: { flexDirection: 'row', gap: space.md },
-  bullet: { width: 6, height: 6, borderRadius: 3, marginTop: 8 },
-  reasonTitle: { fontSize: 15, fontWeight: '700' },
+  reasonTitle: { fontSize: 15, fontWeight: '600' },
   reasonDetail: { fontSize: 14, lineHeight: 20, marginTop: 2 },
   score: { fontSize: 13, fontWeight: '600' },
   list: { paddingVertical: space.xs },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space.md, gap: space.lg },
   detailKey: { fontSize: 15 },
-  detailValue: { fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
+  detailValue: { fontSize: 15, flexShrink: 1, textAlign: 'right' },
   ruleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
 });
