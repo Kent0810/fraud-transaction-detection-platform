@@ -12,7 +12,6 @@ export const Cursor = z
   .optional();
 export const Password = z.string().min(1).max(128);
 
-/** Trimmed, non-empty, at most max characters. */
 export const text = (max: number) => z.string().trim().min(1).max(max);
 
 /**

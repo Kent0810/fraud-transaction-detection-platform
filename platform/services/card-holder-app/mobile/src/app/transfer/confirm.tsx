@@ -3,7 +3,9 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { BANK_NAME } from '@/components/brand';
 import { accountNumber as printAccount } from '@/components/format';
+import { FadeInUp } from '@/components/motion';
 import { Button, Empty } from '@/components/ui';
 import { vnd, vndInWords } from '@/components/vnd';
 import { newTransferId } from '@/data/commands';
@@ -14,7 +16,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function ConfirmTransferScreen() {
   const c = useColors();
-  const { draft, banks, accountNumber, sendTransfer, setDraft } = useStore();
+  const { draft, accountNumber, sendTransfer, setDraft } = useStore();
   const [password, setPassword] = useState('');
   const [reveal, setReveal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -23,16 +25,14 @@ export default function ConfirmTransferScreen() {
   const [transferId] = useState(newTransferId);
 
   if (!draft) {
-    return <Empty title="No transfer to confirm" detail="Go back and start a new transfer." />;
+    return <Empty icon="swap-horizontal" title="No transfer to confirm" detail="Go back and start a new transfer." />;
   }
 
-  const bank = banks.find((b) => b.code === draft.to.bankCode);
   const rows: [string, string][] = [
     ['From account', printAccount(accountNumber)],
     ['To account', draft.to.account],
     ['Account name', draft.to.name],
-    ['Bank', bank ? `${bank.code} · ${bank.name}` : draft.to.bankCode],
-    ['Method', draft.kind === 'NAPAS' ? 'NAPAS 247 instant transfer' : 'Internal transfer'],
+    ['Bank', BANK_NAME],
     ['Message', draft.content],
     ['Fee', 'Free'],
   ];
@@ -58,14 +58,14 @@ export default function ConfirmTransferScreen() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.hero}>
+      <FadeInUp style={styles.hero}>
         <Text style={[styles.heroLabel, { color: c.muted }]}>Amount</Text>
-        <Text style={[styles.amount, { color: c.text }]}>{vnd(draft.amount)}</Text>
+        <Text style={[styles.amount, { color: c.primary }]}>{vnd(draft.amount)}</Text>
         <Text style={[styles.words, { color: c.muted }]}>{vndInWords(draft.amount)}</Text>
-      </View>
+      </FadeInUp>
 
-      <View>
-        <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+      <FadeInUp delay={80}>
+        <View style={[styles.card, { backgroundColor: c.surface }]}>
           {rows.map(([k, v], i) => (
             <View
               key={k}
@@ -76,11 +76,14 @@ export default function ConfirmTransferScreen() {
             </View>
           ))}
         </View>
-      </View>
+      </FadeInUp>
 
-      <View>
-        <Text style={[styles.authTitle, { color: c.text }]}>Enter your password to confirm</Text>
-        <View style={[styles.passwordRow, { backgroundColor: c.surface, borderColor: c.border }]}>
+      <FadeInUp delay={160}>
+        <View style={styles.authHead}>
+          <Ionicons name="shield-checkmark" size={18} color={c.primary} />
+          <Text style={[styles.authTitle, { color: c.text }]}>Enter your password to confirm</Text>
+        </View>
+        <View style={[styles.passwordRow, { backgroundColor: c.surface }]}>
           <TextInput
             value={password}
             onChangeText={setPassword}
@@ -115,13 +118,13 @@ export default function ConfirmTransferScreen() {
             Asked on every transfer, even when you are signed in.
           </Text>
         )}
-      </View>
+      </FadeInUp>
 
       <View style={{ marginTop: space.xl }}>
         {sending ? (
           <View style={[styles.sending, { backgroundColor: c.primary }]}>
             <ActivityIndicator color={c.onPrimary} />
-            <Text style={{ color: c.onPrimary, fontWeight: '600', fontSize: 16 }}>Checking…</Text>
+            <Text style={{ color: c.onPrimary, fontWeight: '700', fontSize: 16 }}>Checking…</Text>
           </View>
         ) : (
           <Button label="Confirm" onPress={confirm} disabled={!password} />
@@ -133,24 +136,19 @@ export default function ConfirmTransferScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl },
-  hero: { gap: 4, paddingTop: space.sm, paddingBottom: space.lg },
+  hero: { alignItems: 'center', gap: 4, paddingVertical: space.lg },
   heroLabel: { fontSize: 14 },
-  amount: { fontSize: 32, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-  words: { fontSize: 13 },
-  card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: space.lg },
+  amount: { fontSize: 34, fontWeight: '800', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  words: { fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
+  card: { borderRadius: radius.lg, paddingHorizontal: space.lg },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.lg, paddingVertical: space.md },
   key: { fontSize: 14 },
-  val: { fontSize: 14, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
-  authTitle: { fontSize: 15, fontWeight: '600', marginTop: space.xl, marginBottom: space.sm },
-  passwordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingRight: space.md,
-  },
+  val: { fontSize: 14, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+  authHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xl, marginBottom: space.md },
+  authTitle: { fontSize: 16, fontWeight: '800' },
+  passwordRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, paddingRight: space.md },
   passwordInput: { flex: 1, fontSize: 16, paddingHorizontal: space.md, paddingVertical: 14 },
-  authHint: { fontSize: 13, marginTop: space.sm },
+  authHint: { fontSize: 12, textAlign: 'center', marginTop: space.sm },
   error: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -163,8 +161,8 @@ const styles = StyleSheet.create({
   sending: {
     flexDirection: 'row',
     gap: space.sm,
-    borderRadius: radius.md,
-    paddingVertical: 14,
+    borderRadius: radius.pill,
+    paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },

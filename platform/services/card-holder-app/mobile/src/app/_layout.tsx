@@ -60,6 +60,10 @@ function AppShell({ signedIn }: { signedIn: boolean }) {
                 options={{ title: '', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
               />
               <Stack.Screen
+                name="pay"
+                options={{ title: 'Pay', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
                 name="transfer/index"
                 options={{ title: 'Transfer', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
               />

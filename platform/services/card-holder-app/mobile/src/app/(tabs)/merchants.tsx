@@ -1,20 +1,26 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { relative } from '@/components/format';
+import { FadeInUp, stagger } from '@/components/motion';
 import { Screen } from '@/components/Screen';
-import { Empty, ScreenTitle, SectionHeader, Surface } from '@/components/ui';
-import { useStore } from '@/data/store';
+import { Empty, IconBubble, ScreenTitle, SectionHeader, Surface } from '@/components/ui';
+import { useFreshOnFocus, useStore } from '@/data/store';
 import type { MerchantRule, RuleType } from '@/data/types';
-import { radius, space, useColors } from '@/theme';
+import { space, useColors } from '@/theme';
 
 export default function MerchantsScreen() {
   const { rules } = useStore();
+  useFreshOnFocus();
 
   return (
     <Screen>
-      <ScreenTitle title="Merchants" />
+      <ScreenTitle title="Merchants" subtitle="Controls" />
       {rules.length === 0 ? (
-        <Empty title="No merchant rules" detail="Open any transaction to block a merchant or mark it as trusted." />
+        <Empty
+          icon="storefront"
+          title="No merchant rules"
+          detail="Open any transaction to block a merchant or mark it as trusted."
+        />
       ) : (
         <>
           <RuleSection title="Blocked" type="BLOCK" rules={rules.filter((r) => r.type === 'BLOCK')} />
@@ -39,26 +45,35 @@ function RuleSection({ title, type, rules }: { title: string; type: RuleType; ru
           </Text>
         ) : (
           rules.map((r, i) => (
-            <View
-              key={r.merchant}
-              style={[styles.rule, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
-                  {r.merchant}
-                </Text>
-                <Text style={[styles.meta, { color: r.pending ? c.stepUp : c.muted }]}>
-                  {r.pending ? 'Taking effect…' : `Added ${relative(r.createdAt).toLowerCase()}`}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => releaseMerchant(r.merchant)}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.release, { borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+            <FadeInUp key={r.merchant} delay={stagger(i, 60)}>
+              <View
+                style={[styles.rule, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}
               >
-                <Text style={[styles.releaseText, { color: c.text }]}>Remove</Text>
-              </Pressable>
-            </View>
+                <IconBubble
+                  name={blocked ? 'ban' : 'checkmark-done'}
+                  tint={blocked ? c.decline : c.allow}
+                  bg={blocked ? c.declineBg : c.allowBg}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
+                    {r.merchant}
+                  </Text>
+                  <Text style={[styles.meta, { color: r.pending ? c.stepUp : c.muted }]}>
+                    {r.pending ? 'Taking effect…' : `Added ${relative(r.createdAt).toLowerCase()}`}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => releaseMerchant(r.merchant)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.release,
+                    { backgroundColor: c.surfaceAlt, opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Text style={[styles.releaseText, { color: c.text }]}>Remove</Text>
+                </Pressable>
+              </View>
+            </FadeInUp>
           ))
         )}
       </Surface>
@@ -67,11 +82,11 @@ function RuleSection({ title, type, rules }: { title: string; type: RuleType; ru
 }
 
 const styles = StyleSheet.create({
-  list: { paddingVertical: 0 },
+  list: { paddingVertical: space.xs },
   rule: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
-  merchant: { fontSize: 16, fontWeight: '500' },
-  meta: { fontSize: 13, marginTop: 2 },
-  release: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1 },
-  releaseText: { fontSize: 13, fontWeight: '600' },
+  merchant: { fontSize: 16, fontWeight: '600' },
+  meta: { fontSize: 13, marginTop: 3 },
+  release: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
+  releaseText: { fontSize: 13, fontWeight: '700' },
   none: { fontSize: 14, paddingVertical: space.md },
 });

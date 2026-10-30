@@ -7,7 +7,7 @@ public record Transaction(
         String ccNum,
         String channel,
         String merchant,
-        String counterpartyAccount,
+        String recipientAccount,
         String category,
         long amt,
         String currency,

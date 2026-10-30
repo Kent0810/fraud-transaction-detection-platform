@@ -1,12 +1,17 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Put } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { z } from 'zod';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { AccountNumber, BankCode, ZodPipe } from '../../common/validation';
+import { OUR_BANK } from '../transfers/types/transfers.types';
 import { RemoveRecipientCommand } from './commands/remove-recipient.command';
 import { SaveRecipientCommand } from './commands/save-recipient.command';
 import { GetRecipientsQuery } from './queries/get-recipients.query';
 import { type RecipientDto, RecipientName } from './types/recipients.types';
+
+// Only this bank's accounts can be saved; the app may still send the bank code in the path.
+const OurBank = z.literal(OUR_BANK);
 
 @Controller('me/recipients')
 export class RecipientsController {
@@ -24,7 +29,7 @@ export class RecipientsController {
   @Put(':bankCode/:account')
   save(
     @CurrentCard() cardId: string,
-    @Param('bankCode', new ZodPipe(BankCode)) bankCode: string,
+    @Param('bankCode', new ZodPipe(OurBank)) bankCode: string,
     @Param('account', new ZodPipe(AccountNumber)) account: string,
     @Body(new ZodPipe(RecipientName)) { name }: RecipientName,
   ): Promise<RecipientDto> {

@@ -1,5 +1,5 @@
 import { ruleTitle } from '../data/rules';
-import type { ReviewStatus, Verdict } from '../data/types';
+import type { PostingStatus, ReviewStatus, Verdict } from '../data/types';
 import { Icon, type IconName } from './Icons';
 
 const VERDICT: Record<Verdict, { label: string; icon: IconName }> = {
@@ -14,6 +14,18 @@ export function VerdictBadge({ verdict }: { verdict: Verdict | null }) {
     <span className={`verdict v-${verdict.toLowerCase()}`}>
       <Icon name={VERDICT[verdict].icon} size={12} strokeWidth={2.2} />
       {VERDICT[verdict].label}
+    </span>
+  );
+}
+
+// Whether the ledger moved the money, shown beside the fraud verdict.
+export function PostingBadge({ status, declinedFor }: { status: PostingStatus | null; declinedFor: string[] }) {
+  if (!status) return null;
+  if (status === 'POSTED') return <span className="posting p-posted">Posted</span>;
+  const why = declinedFor.map(ruleTitle).join(', ');
+  return (
+    <span className="posting p-declined" title={why ? `Not posted: ${why}` : 'Not posted'}>
+      Not posted{why && ` · ${why}`}
     </span>
   );
 }

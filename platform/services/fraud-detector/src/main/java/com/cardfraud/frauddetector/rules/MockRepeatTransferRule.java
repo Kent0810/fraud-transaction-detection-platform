@@ -29,10 +29,10 @@ public final class MockRepeatTransferRule {
         static final Streak NONE = new Streak(null, null, null, 0, 0);
 
         Streak next(Transaction t) {
-            boolean same = t.counterpartyAccount() != null
-                    && Objects.equals(t.counterpartyAccount(), account)
+            boolean same = t.recipientAccount() != null
+                    && Objects.equals(t.recipientAccount(), account)
                     && t.amt() == amount;
-            return new Streak(t.txnId(), t.ts(), t.counterpartyAccount(), t.amt(), same ? count + 1 : 1);
+            return new Streak(t.txnId(), t.ts(), t.recipientAccount(), t.amt(), same ? count + 1 : 1);
         }
     }
 

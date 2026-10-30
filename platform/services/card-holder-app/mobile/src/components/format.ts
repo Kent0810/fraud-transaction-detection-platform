@@ -1,3 +1,5 @@
+import type Ionicons from '@expo/vector-icons/Ionicons';
+
 import { vnd } from './vnd';
 
 export function money(dong: number): string {
@@ -14,6 +16,27 @@ export function category(raw: string): string {
     .replace(/_/g, ' ')
     .replace(/^\w/, (c) => c.toUpperCase());
   return suffix === 'net' ? `${label} · Online` : suffix === 'pos' ? `${label} · In store` : label;
+}
+
+type IconName = keyof typeof Ionicons.glyphMap;
+
+const CATEGORY_ICON: Record<string, IconName> = {
+  shopping: 'bag-handle',
+  grocery: 'cart',
+  gas: 'car',
+  food: 'restaurant',
+  health: 'fitness',
+  personal: 'sparkles',
+  entertainment: 'film',
+  travel: 'airplane',
+  kids: 'paw',
+  home: 'home',
+  misc: 'apps',
+  transfer: 'paper-plane',
+};
+
+export function categoryIcon(raw: string): IconName {
+  return CATEGORY_ICON[raw.split('_')[0]] ?? 'card';
 }
 
 export function time(iso: string): string {
@@ -36,6 +59,11 @@ export function relative(iso: string): string {
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours} h ago`;
   return `${Math.round(hours / 24)} d ago`;
+}
+
+export function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
 export const PERIOD_LABEL = { DAY: 'day', WEEK: 'week', MONTH: 'month' } as const;

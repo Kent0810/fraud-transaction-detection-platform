@@ -1,7 +1,7 @@
 {
   "connector.class": "com.datastax.oss.kafka.sink.CassandraSinkConnector",
   "tasks.max": "1",
-  "topics": "decisions,alerts,cases,control,transfers",
+  "topics": "decisions,alerts,cases,control,settlements",
 
   "contactPoints": "cassandra",
   "port": "9042",
@@ -9,9 +9,9 @@
 
   "consumer.override.isolation.level": "read_committed",
 
-  "topic.decisions.fraud.txn_by_card.mapping": "card_id=key, ts=value.ts, txn_id=value.txn_id, channel=value.channel, merchant=value.merchant, counterparty_account=value.counterparty_account, category=value.category, amount=value.amount, currency=value.currency, merch_lat=value.merch_lat, merch_long=value.merch_long, decision=value.decision, score=value.score, fired_rules=value.fired_rules, decided_at=value.decided_at",
+  "topic.decisions.fraud.txn_by_card.mapping": "card_id=key, ts=value.ts, txn_id=value.txn_id, channel=value.channel, merchant=value.merchant, recipient_account=value.recipient_account, category=value.category, amount=value.amount, currency=value.currency, merch_lat=value.merch_lat, merch_long=value.merch_long, decision=value.decision, score=value.score, fired_rules=value.fired_rules, decided_at=value.decided_at",
 
-  "topic.transfers.fraud.txn_by_card.mapping": "card_id=key, ts=value.ts, txn_id=value.txn_id, channel=value.channel, merchant=value.merchant, counterparty_account=value.counterparty_account, category=value.category, amount=value.amt, currency=value.currency, decision=value.decision, fired_rules=value.fired_rules, decided_at=value.decided_at",
+  "topic.settlements.fraud.txn_by_card.mapping": "card_id=key, ts=value.ts, txn_id=value.txn_id, status=value.status, declined_for=value.declined_for, settled_at=value.settled_at",
 
   "topic.alerts.fraud.alerts_by_card.mapping": "card_id=key, ts=value.ts, alert_id=value.alert_id, txn_id=value.txn_id, rule_id=value.rule_id, score=value.score, amount=value.amount",
 

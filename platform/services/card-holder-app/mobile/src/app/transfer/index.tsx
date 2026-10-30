@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
@@ -15,15 +16,16 @@ import {
 } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
-import { BankPicker } from '@/components/BankPicker';
+import { BANK_NAME } from '@/components/brand';
 import { accountNumber as printAccount } from '@/components/format';
+import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Button } from '@/components/ui';
 import { groupThousands, parseVnd, toAccountName, vnd, vndInWords } from '@/components/vnd';
 import { ACCOUNT } from '@/data/mock';
 import { useUser } from '@/data/auth';
 import { useSettings } from '@/data/settings';
 import { useStore } from '@/data/store';
-import type { Recipient, TransferKind } from '@/data/types';
+import type { Recipient } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
 
 const QUICK = [100_000, 200_000, 500_000, 1_000_000, 2_000_000];
@@ -40,38 +42,33 @@ type Lookup =
 
 export default function TransferFormScreen() {
   const c = useColors();
-  const { balance, accountNumber, banks, saved, lookupAccount, setDraft, removeSaved } = useStore();
+  const { balance, accountNumber, saved, lookupAccount, setDraft, removeSaved } = useStore();
   const { hideBalance, update } = useSettings();
   const user = useUser();
 
-  const [bankCode, setBankCode] = useState<string | null>(null);
   const [account, setAccount] = useState('');
   const [result, setResult] = useState<{ key: string; name: string | null } | null>(null);
   const [amountText, setAmountText] = useState('');
   const [content, setContent] = useState(`${toAccountName(user.name)} transfer`);
   const [save, setSave] = useState(false);
-  const [picking, setPicking] = useState(false);
 
-  // Our own bank in the list means an internal transfer; any other goes through NAPAS.
-  const kind: TransferKind = bankCode === ACCOUNT.bankCode ? 'INTERNAL' : 'NAPAS';
-  const bank = banks.find((b) => b.code === bankCode);
   const amount = parseVnd(amountText);
-  const alreadySaved = saved.some((r) => r.bankCode === bankCode && r.account === account);
-  const toSelf = kind === 'INTERNAL' && account === accountNumber;
+  const alreadySaved = saved.some((r) => r.account === account);
+  const toSelf = account === accountNumber;
 
-  const lookupKey = bankCode && account.length >= 6 && !toSelf ? `${bankCode}|${account}` : null;
+  const lookupKey = account.length >= 6 && !toSelf ? account : null;
   useEffect(() => {
-    if (!lookupKey || !bankCode) return;
+    if (!lookupKey) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const name = await lookupAccount(bankCode, account).catch(() => null);
+      const name = await lookupAccount(lookupKey).catch(() => null);
       if (!cancelled) setResult({ key: lookupKey, name });
     }, 400);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [lookupKey, bankCode, account, lookupAccount]);
+  }, [lookupKey, lookupAccount]);
 
   const lookup: Lookup = toSelf
     ? { state: 'self' }
@@ -87,16 +84,12 @@ export default function TransferFormScreen() {
     amount > balance ? 'Insufficient balance' : amount > 0 && amount < MIN_AMOUNT ? `Minimum ${vnd(MIN_AMOUNT)}` : null;
   const valid = lookup.state === 'found' && amount >= MIN_AMOUNT && !amountError && content.trim().length > 0;
 
-  const pickSaved = (r: Recipient) => {
-    setBankCode(r.bankCode);
-    setAccount(r.account);
-  };
+  const pickSaved = (r: Recipient) => setAccount(r.account);
 
   const next = () => {
-    if (lookup.state !== 'found' || !bankCode) return;
+    if (lookup.state !== 'found') return;
     setDraft({
-      kind,
-      to: { bankCode, account, name: lookup.name },
+      to: { account, name: lookup.name },
       amount,
       content: content.trim(),
       save: save && !alreadySaved,
@@ -111,36 +104,51 @@ export default function TransferFormScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.card, styles.source, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <Text style={[styles.label, { color: c.muted }]}>From</Text>
-          <Text style={[styles.value, { color: c.text }]}>
-            {ACCOUNT.label} · {printAccount(accountNumber)}
-          </Text>
-          <View style={styles.sourceRow}>
-            <Text style={[styles.sourceBalance, { color: c.text }]}>
-              {hideBalance ? '•••••• đ' : vnd(balance)} <Text style={{ color: c.muted, fontSize: 13 }}>available</Text>
+        <FadeInUp>
+          <LinearGradient
+            colors={[c.cardFrom, c.cardTo]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.source}
+          >
+            <Text style={styles.sourceLabel}>From account</Text>
+            <Text style={styles.sourceNumber}>
+              {ACCOUNT.label} · {printAccount(accountNumber)}
             </Text>
-            <Pressable
-              onPress={() => update('hideBalance', !hideBalance)}
-              hitSlop={12}
-              accessibilityLabel={hideBalance ? 'Show balance' : 'Hide balance'}
-            >
-              <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
-            </Pressable>
-          </View>
-        </View>
+            <View style={styles.sourceRow}>
+              <View>
+                <Text style={styles.sourceLabel}>Available balance</Text>
+                <Text style={styles.sourceBalance}>{hideBalance ? '•••••• đ' : vnd(balance)}</Text>
+              </View>
+              <Pressable
+                onPress={() => update('hideBalance', !hideBalance)}
+                hitSlop={12}
+                accessibilityLabel={hideBalance ? 'Show balance' : 'Hide balance'}
+              >
+                <Ionicons
+                  name={hideBalance ? 'eye-off-outline' : 'eye-outline'}
+                  size={22}
+                  color="rgba(255,255,255,0.9)"
+                />
+              </Pressable>
+            </View>
+          </LinearGradient>
+        </FadeInUp>
 
         {saved.length > 0 && (
-          <View>
-            <Text style={[styles.section, { color: c.muted }]}>Saved recipients</Text>
+          <FadeInUp delay={stagger(2)}>
+            <Text style={[styles.section, { color: c.text }]}>Saved recipients</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.md }}>
               {saved.map((r) => {
-                const on = r.account === account && r.bankCode === bankCode;
+                const on = r.account === account;
                 return (
-                  <Pressable
-                    key={`${r.bankCode}-${r.account}`}
+                  <ScalePressable
+                    key={r.account}
                     onPress={() => pickSaved(r)}
-                    style={[styles.savedItem, { backgroundColor: c.surface, borderColor: on ? c.text : c.border }]}
+                    style={[
+                      styles.savedItem,
+                      { backgroundColor: c.surface, borderColor: on ? c.primary : 'transparent' },
+                    ]}
                   >
                     <Pressable
                       onPress={() => removeSaved(r)}
@@ -155,30 +163,19 @@ export default function TransferFormScreen() {
                     <Text style={[styles.savedName, { color: c.text }]} numberOfLines={1}>
                       {r.name.split(' ').slice(-2).join(' ')}
                     </Text>
-                    <Text style={[styles.savedBank, { color: c.muted }]}>{r.bankCode}</Text>
-                  </Pressable>
+                    <Text style={[styles.savedAccount, { color: c.muted }]} numberOfLines={1}>
+                      {printAccount(r.account)}
+                    </Text>
+                  </ScalePressable>
                 );
               })}
             </ScrollView>
-          </View>
+          </FadeInUp>
         )}
 
-        <View>
-          <Text style={[styles.section, { color: c.muted }]}>Recipient</Text>
-          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <Field label="Bank">
-              <Pressable onPress={() => setPicking(true)} style={styles.select} accessibilityRole="button">
-                {bank ? (
-                  <Text style={[styles.value, { color: c.text }]}>
-                    <Text style={{ fontWeight: '600' }}>{bank.code}</Text> · {bank.name}
-                  </Text>
-                ) : (
-                  <Text style={[styles.value, { color: c.muted }]}>Choose a bank</Text>
-                )}
-                <Ionicons name="chevron-down" size={18} color={c.muted} />
-              </Pressable>
-            </Field>
-
+        <FadeInUp delay={stagger(3)}>
+          <Text style={[styles.section, { color: c.text }]}>Recipient at {BANK_NAME}</Text>
+          <View style={[styles.card, { backgroundColor: c.surface }]}>
             <Field label="Account number">
               <TextInput
                 value={account}
@@ -186,7 +183,6 @@ export default function TransferFormScreen() {
                 placeholder="Enter account number"
                 placeholderTextColor={c.muted}
                 keyboardType="number-pad"
-                editable={!!bankCode}
                 style={[styles.input, { color: c.text }]}
               />
             </Field>
@@ -194,30 +190,28 @@ export default function TransferFormScreen() {
             <Field label="Account name" last>
               {lookup.state === 'checking' ? (
                 <View style={styles.lookup}>
-                  <ActivityIndicator size="small" color={c.muted} />
+                  <ActivityIndicator size="small" color={c.primary} />
                   <Text style={[styles.value, { color: c.muted }]}>Checking…</Text>
                 </View>
               ) : lookup.state === 'found' ? (
                 <View style={styles.lookup}>
-                  <Text style={[styles.value, { color: c.text, fontWeight: '600' }]}>{lookup.name}</Text>
-                  <Ionicons name="checkmark" size={18} color={c.allow} />
+                  <Ionicons name="checkmark-circle" size={20} color={c.allow} />
+                  <Text style={[styles.value, { color: c.text, fontWeight: '800' }]}>{lookup.name}</Text>
                 </View>
               ) : lookup.state === 'notfound' ? (
                 <Text style={[styles.value, { color: c.decline }]}>Account not found</Text>
               ) : lookup.state === 'self' ? (
                 <Text style={[styles.value, { color: c.decline }]}>This is your own account</Text>
               ) : (
-                <Text style={[styles.value, { color: c.muted }]}>
-                  {!bankCode ? 'Choose a bank first' : 'Filled in automatically'}
-                </Text>
+                <Text style={[styles.value, { color: c.muted }]}>Filled in automatically</Text>
               )}
             </Field>
           </View>
-        </View>
+        </FadeInUp>
 
-        <View>
-          <Text style={[styles.section, { color: c.muted }]}>Transfer details</Text>
-          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <FadeInUp delay={stagger(4)}>
+          <Text style={[styles.section, { color: c.text }]}>Transfer details</Text>
+          <View style={[styles.card, { backgroundColor: c.surface }]}>
             <Field label="Amount">
               <View style={styles.amountRow}>
                 <TextInput
@@ -236,16 +230,16 @@ export default function TransferFormScreen() {
               {amountError ? (
                 <Text style={[styles.hint, { color: c.decline }]}>{amountError}</Text>
               ) : amount > 0 ? (
-                <Text style={[styles.words, { color: c.muted }]}>{vndInWords(amount)}</Text>
+                <Text style={[styles.words, { color: c.primary }]}>{vndInWords(amount)}</Text>
               ) : null}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quick}>
                 {QUICK.map((q) => (
                   <Pressable
                     key={q}
                     onPress={() => setAmountText(groupThousands(q))}
-                    style={[styles.chip, { borderColor: amount === q ? c.text : c.border }]}
+                    style={[styles.chip, { backgroundColor: amount === q ? c.primarySoft : c.surfaceAlt }]}
                   >
-                    <Text style={{ color: c.text, fontWeight: amount === q ? '600' : '400', fontSize: 13 }}>
+                    <Text style={{ color: amount === q ? c.primary : c.text, fontWeight: '700', fontSize: 13 }}>
                       {groupThousands(q)}
                     </Text>
                   </Pressable>
@@ -265,13 +259,16 @@ export default function TransferFormScreen() {
               <Text style={[styles.counter, { color: c.muted }]}>{content.length}/100</Text>
             </Field>
           </View>
-        </View>
+        </FadeInUp>
 
         {!alreadySaved && lookup.state === 'found' && (
-          <View style={[styles.card, styles.saveRow, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <Text style={[styles.value, { color: c.text, flex: 1 }]}>Save recipient</Text>
-            <Switch value={save} onValueChange={setSave} trackColor={{ true: c.primary, false: c.border }} />
-          </View>
+          <FadeInUp>
+            <View style={[styles.card, styles.saveRow, { backgroundColor: c.surface }]}>
+              <Ionicons name="bookmark-outline" size={20} color={c.primary} />
+              <Text style={[styles.value, { color: c.text, flex: 1 }]}>Save recipient</Text>
+              <Switch value={save} onValueChange={setSave} trackColor={{ true: c.primary, false: c.border }} />
+            </View>
+          </FadeInUp>
         )}
 
         <View style={{ marginTop: space.xl }}>
@@ -279,17 +276,6 @@ export default function TransferFormScreen() {
         </View>
         <Text style={[styles.demo, { color: c.muted }]}>Demo only. No real money is moved.</Text>
       </ScrollView>
-
-      <BankPicker
-        visible={picking}
-        banks={banks}
-        selected={bankCode ?? undefined}
-        onSelect={(b) => {
-          setBankCode(b.code);
-          setPicking(false);
-        }}
-        onClose={() => setPicking(false)}
-      />
     </KeyboardAvoidingView>
   );
 }
@@ -306,30 +292,31 @@ function Field({ label, children, last }: { label: string; children: ReactNode; 
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl },
-  source: { paddingVertical: space.md, gap: 4 },
-  sourceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
-  sourceBalance: { fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  section: { fontSize: 13, fontWeight: '600', marginTop: space.xl, marginBottom: space.sm },
-  savedItem: { width: 108, alignItems: 'center', gap: 4, padding: space.md, borderRadius: radius.lg, borderWidth: 1 },
-  savedName: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  savedBank: { fontSize: 11 },
+  source: { borderRadius: radius.lg, padding: space.lg, gap: 4 },
+  sourceLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13 },
+  sourceNumber: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: space.sm },
+  sourceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  sourceBalance: { color: '#fff', fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  section: { fontSize: 16, fontWeight: '800', marginTop: space.xl, marginBottom: space.sm },
+  savedItem: { width: 108, alignItems: 'center', gap: 4, padding: space.md, borderRadius: radius.lg, borderWidth: 1.5 },
+  savedName: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  savedAccount: { fontSize: 11, fontWeight: '600' },
   savedRemove: { position: 'absolute', top: 6, right: 6 },
-  card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: space.lg },
+  card: { borderRadius: radius.lg, paddingHorizontal: space.lg },
   field: { paddingVertical: space.md, gap: 6 },
   label: { fontSize: 13 },
   value: { fontSize: 16 },
-  select: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   input: { fontSize: 16, paddingVertical: 2 },
   contentInput: { minHeight: 44, textAlignVertical: 'top' },
   counter: { fontSize: 11, alignSelf: 'flex-end' },
   lookup: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  amountInput: { flex: 1, fontSize: 26, fontWeight: '600', paddingVertical: 2, fontVariant: ['tabular-nums'] },
-  currency: { fontSize: 14, fontWeight: '600' },
+  amountInput: { flex: 1, fontSize: 26, fontWeight: '800', paddingVertical: 2, fontVariant: ['tabular-nums'] },
+  currency: { fontSize: 14, fontWeight: '700' },
   hint: { fontSize: 13 },
-  words: { fontSize: 13 },
+  words: { fontSize: 13, fontStyle: 'italic' },
   quick: { gap: space.sm, paddingTop: space.xs },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill },
   saveRow: {
     flexDirection: 'row',
     alignItems: 'center',

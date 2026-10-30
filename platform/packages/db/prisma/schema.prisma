@@ -11,17 +11,17 @@ datasource db {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model accounts {
-  card_id                                 String          @id
-  account_number                          String          @unique @default(dbgenerated("('1903'::text || lpad((nextval('account_number_seq'::regclass))::text, 8, '0'::text))"))
-  currency                                String          @default("VND") @db.Char(3)
-  balance                                 BigInt          @default(0)
-  status                                  String          @default("ACTIVE")
-  created_at                              DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at                              DateTime        @default(now()) @db.Timestamptz(6)
-  cardholders                             cardholders     @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
-  ledger_entries                          ledger_entries?
-  transfers_transfers_from_cardToaccounts transfers[]     @relation("transfers_from_cardToaccounts")
-  transfers_transfers_to_cardToaccounts   transfers[]     @relation("transfers_to_cardToaccounts")
+  card_id                                     String          @id
+  account_number                              String          @unique @default(dbgenerated("('1903'::text || lpad((nextval('account_number_seq'::regclass))::text, 8, '0'::text))"))
+  currency                                    String          @default("VND") @db.Char(3)
+  balance                                     BigInt          @default(0)
+  status                                      String          @default("ACTIVE")
+  created_at                                  DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at                                  DateTime        @default(now()) @db.Timestamptz(6)
+  cardholders                                 cardholders     @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
+  ledger_entries                              ledger_entries?
+  transactions_transactions_card_idToaccounts transactions[]  @relation("transactions_card_idToaccounts")
+  transactions_transactions_to_cardToaccounts transactions[]  @relation("transactions_to_cardToaccounts")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -80,14 +80,14 @@ model flyway_schema_history {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ledger_entries {
-  entry_id   BigInt     @id @default(autoincrement())
-  card_id    String     @unique(map: "ledger_entries_opening_key", where: raw("(kind = 'OPENING'::text)"))
+  entry_id   BigInt        @id @default(autoincrement())
+  card_id    String        @unique(map: "ledger_entries_opening_key", where: raw("(kind = 'OPENING'::text)"))
   kind       String
   amount     BigInt
   reference  String?
-  created_at DateTime   @default(now()) @db.Timestamptz(6)
-  accounts   accounts   @relation(fields: [card_id], references: [card_id], onUpdate: NoAction)
-  transfers  transfers? @relation(fields: [reference], references: [reference], onDelete: Restrict, onUpdate: NoAction)
+  created_at DateTime      @default(now()) @db.Timestamptz(6)
+  accounts   accounts      @relation(fields: [card_id], references: [card_id], onUpdate: NoAction)
+  transfers  transactions? @relation(fields: [reference], references: [reference], onDelete: Restrict, onUpdate: NoAction)
 
   @@unique([reference, card_id], map: "ledger_entries_transfer_key", where: raw("(reference IS NOT NULL)"))
   @@index([card_id, created_at(sort: Desc)], map: "ledger_entries_card_idx")
@@ -127,30 +127,6 @@ model sessions {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model transfers {
-  transfer_id                            String           @id @db.Uuid
-  reference                              String           @unique @default(dbgenerated("('FT'::text || lpad((nextval('transfer_reference_seq'::regclass))::text, 10, '0'::text))"))
-  from_card                              String
-  to_bank_code                           String
-  to_account                             String
-  to_name                                String
-  to_card                                String?
-  amount                                 BigInt
-  content                                String
-  status                                 String           @default("PENDING")
-  declined_for                           String[]         @default([])
-  created_at                             DateTime         @default(now()) @db.Timestamptz(6)
-  decided_at                             DateTime?        @db.Timestamptz(6)
-  ledger_entries                         ledger_entries[]
-  accounts_transfers_from_cardToaccounts accounts         @relation("transfers_from_cardToaccounts", fields: [from_card], references: [card_id], onUpdate: NoAction)
-  accounts_transfers_to_cardToaccounts   accounts?        @relation("transfers_to_cardToaccounts", fields: [to_card], references: [card_id], onDelete: Restrict, onUpdate: NoAction)
-
-  @@index([from_card, created_at(sort: Desc)], map: "transfers_from_idx")
-  @@index([to_card, created_at(sort: Desc)], map: "transfers_to_idx", where: raw("(to_card IS NOT NULL)"))
-  @@index([created_at], map: "transfers_pending_idx", where: raw("(status = 'PENDING'::text)"))
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model audit_log {
   audit_id    BigInt      @id @default(autoincrement())
   staff_id    Int
@@ -186,4 +162,32 @@ model staff_sessions {
   staff      staff    @relation(fields: [staff_id], references: [staff_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([staff_id], map: "staff_sessions_staff_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model transactions {
+  txn_id                                  String           @id
+  reference                               String           @unique @default(dbgenerated("('FT'::text || lpad((nextval('transaction_reference_seq'::regclass))::text, 10, '0'::text))"))
+  card_id                                 String
+  channel                                 String
+  merchant                                String?
+  category                                String?
+  merch_lat                               Float?
+  merch_long                              Float?
+  to_account                              String?
+  to_name                                 String?
+  to_card                                 String?
+  content                                 String?
+  amount                                  BigInt
+  status                                  String           @default("PENDING")
+  declined_for                            String[]         @default([])
+  created_at                              DateTime         @default(now()) @db.Timestamptz(6)
+  decided_at                              DateTime?        @db.Timestamptz(6)
+  ledger_entries                          ledger_entries[]
+  accounts_transactions_card_idToaccounts accounts         @relation("transactions_card_idToaccounts", fields: [card_id], references: [card_id], onUpdate: NoAction)
+  accounts_transactions_to_cardToaccounts accounts?        @relation("transactions_to_cardToaccounts", fields: [to_card], references: [card_id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([card_id, created_at(sort: Desc)], map: "transactions_card_idx")
+  @@index([created_at], map: "transactions_pending_idx", where: raw("(status = 'PENDING'::text)"))
+  @@index([to_card, created_at(sort: Desc)], map: "transactions_to_idx", where: raw("(to_card IS NOT NULL)"))
 }

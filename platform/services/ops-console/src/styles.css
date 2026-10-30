@@ -1025,6 +1025,23 @@ table.grid {
   color: var(--hl);
   background: var(--hl-soft);
 }
+.decision {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.posting {
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.p-posted {
+  color: var(--muted);
+}
+.p-declined {
+  color: var(--ctrl);
+  font-weight: 600;
+}
 .chips {
   display: flex;
   flex-wrap: wrap;

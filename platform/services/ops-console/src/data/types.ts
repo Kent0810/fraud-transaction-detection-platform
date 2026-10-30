@@ -20,6 +20,9 @@ export type RuleType = 'BLOCK' | 'ALLOW';
 
 export type LoginStatus = 'ACTIVE' | 'LOCKED' | 'DISABLED';
 
+// What the ledger did with an allowed transaction; null until it has, and for anything not allowed.
+export type PostingStatus = 'POSTED' | 'DECLINED';
+
 export type QueueItem = {
   cardId: string;
   priority: number;
@@ -43,13 +46,15 @@ export type Activity = {
   ts: string;
   channel: 'CARD' | 'TRANSFER';
   merchant: string;
-  counterpartyAccount: string | null;
+  recipientAccount: string | null;
   category: string;
   amount: number;
   currency: string;
   decision: Verdict;
   score: number;
   firedRules: string[];
+  status: PostingStatus | null;
+  declinedFor: string[];
   alerts: CaseAlert[];
 };
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { iso } from '../../../shared/cassandra/models';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { OUR_BANK } from '../../transfers/types/transfers.types';
 import type { RecipientDto } from '../types/recipients.types';
 
 type RecipientRow = {
@@ -31,7 +32,7 @@ export class RecipientsRepository {
 
   async forCard(cardId: string): Promise<RecipientDto[]> {
     const rows = await this.db.client.saved_recipients.findMany({
-      where: { card_id: cardId },
+      where: { card_id: cardId, bank_code: OUR_BANK },
       orderBy: { created_at: 'desc' },
       select: columns,
     });

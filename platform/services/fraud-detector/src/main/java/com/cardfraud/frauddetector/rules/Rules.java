@@ -18,6 +18,9 @@ public final class Rules {
             "R5", 0.3,   // high-risk category
             "R6", 1.0);  // blocked merchant
 
+    // A transfer of at least this much (VND) is declined outright
+    public static final long LARGE_AMOUNT = 50_000_000L;
+
     public static final double DECLINE_AT = 0.8;
     public static final double STEP_UP_AT = 0.4;
 
@@ -36,8 +39,12 @@ public final class Rules {
         // 1. Rules that fired. None yet: add them here, e.g. `if (...) fired.add("R5");`
         List<String> fired = new ArrayList<>();
 
-        // 2. Sum of their weights, capped at 1.0 (0 when nothing fired)
-        double score = 1.0; // Math.min(1.0, fired.stream().mapToDouble(WEIGHTS::get).sum());
+        if (Transaction.TRANSFER.equals(txn.channel()) && txn.amt() >= LARGE_AMOUNT) {
+            fired.add("LARGE_AMOUNT");
+        }
+
+        // 2. Sum of their weights, capped at 1.0 (0 when nothing fired). Placeholder 0.0 until real rules exist.
+        double score = 0.0; // Math.min(1.0, fired.stream().mapToDouble(WEIGHTS::get).sum());
 
         // 3. The decision
         return new Decision(
@@ -46,13 +53,13 @@ public final class Rules {
             txn.ts(),
             txn.channel(),
             txn.merchant(),
-            txn.counterpartyAccount(),
+            txn.recipientAccount(),
             txn.category(),
             txn.amt(),
             txn.currency(),
             txn.merchLat(),
             txn.merchLong(),
-            verdict(score),
+            fired.contains("LARGE_AMOUNT") ? Verdict.DECLINE : verdict(score),
             score,
             fired,
             Instant.now().toString());
@@ -65,7 +72,7 @@ public final class Rules {
             txn.ts(),
             txn.channel(),
             txn.merchant(),
-            txn.counterpartyAccount(),
+            txn.recipientAccount(),
             txn.category(),
             txn.amt(),
             txn.currency(),

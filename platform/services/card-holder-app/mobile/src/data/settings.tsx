@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { Appearance } from 'react-native';
 
 export type ThemeChoice = 'light' | 'dark';
 
@@ -16,7 +15,9 @@ type SettingsStore = Settings & {
   update: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
 };
 
-const DEFAULTS: Omit<Settings, 'theme'> = {
+// Light until the user switches; the phone's own dark mode doesn't change it.
+const DEFAULTS: Settings = {
+  theme: 'light',
   hideBalance: false,
   biometrics: true,
   notifyDeclines: true,
@@ -27,10 +28,7 @@ const DEFAULTS: Omit<Settings, 'theme'> = {
 const SettingsContext = createContext<SettingsStore | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<Settings>(() => ({
-    ...DEFAULTS,
-    theme: Appearance.getColorScheme() === 'dark' ? 'dark' : 'light',
-  }));
+  const [settings, setSettings] = useState<Settings>(DEFAULTS);
 
   const update = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((s) => ({ ...s, [key]: value }));

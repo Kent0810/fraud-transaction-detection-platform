@@ -7,8 +7,7 @@ x-kafka-env: &kafka-env
   TOPIC_DECISIONS: decisions
   TOPIC_ALERTS: alerts
   TOPIC_CASES: cases
-  TOPIC_TRANSFER_REQUESTS: transfer-requests    # the outbox's aggregate_type in @platform/db
-  TOPIC_TRANSFER_DECISIONS: transfer-decisions
+  TOPIC_SETTLEMENTS: settlements  # the outbox's aggregate_type in @platform/db
 
 x-postgres-env: &postgres-env
   POSTGRES_HOST: postgres
@@ -334,6 +333,9 @@ services:
       POSTGRES_USER: *postgres-app-user           # not the owner: can't alter tables or rewrite history
       POSTGRES_PASSWORD: *postgres-app-password
       PORT: 8080
+      MERCHANTS_FILE: /data/merchants.csv         # merchants offered for card payments in the app
+    volumes:
+      - ../datasets/Sparkov_Data_Generation/data/merchants.csv:/data/merchants.csv:ro
     depends_on:
       postgres-seed:
         condition: service_completed_successfully

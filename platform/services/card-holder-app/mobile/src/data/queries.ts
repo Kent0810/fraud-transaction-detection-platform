@@ -1,5 +1,5 @@
 import { HttpError, ME, request } from './http';
-import type { Alert, Period, Recipient, RuleType, Transfer, Txn } from './types';
+import type { Alert, PayMerchant, Payment, Period, Recipient, RuleType, Transfer, Txn } from './types';
 
 export type Controls = {
   budget: { limit: number; period: Period; updatedAt: string | null } | null;
@@ -25,16 +25,20 @@ export const fetchBalance = () => request<Balance>('GET', `${ME}/balance`);
 
 export const fetchRecipients = () => request<Recipient[]>('GET', `${ME}/recipients`);
 
-// One of your transfers as it is now, with your balance now.
 export const fetchTransfer = (transferId: string) =>
   request<Transfer & { balance: number }>('GET', `${ME}/transfers/${encodeURIComponent(transferId)}`);
+
+// One per category, nearest the cardholder's home first.
+export const fetchMerchants = () => request<PayMerchant[]>('GET', `${ME}/payments/merchants`);
+
+export const fetchPayment = (paymentId: string) =>
+  request<Payment & { balance: number }>('GET', `${ME}/payments/${encodeURIComponent(paymentId)}`);
 
 export type CardStatus = { frozen: boolean };
 
 // From Postgres, so a freeze shows the moment it is saved.
 export const fetchCardStatus = () => request<CardStatus>('GET', `${ME}/card`);
 
-// Same-bank recipient check; null when no account has that number.
 export async function fetchAccountHolder(accountNumber: string): Promise<string | null> {
   try {
     return (await request<{ name: string }>('GET', `/accounts/${encodeURIComponent(accountNumber)}`)).name;

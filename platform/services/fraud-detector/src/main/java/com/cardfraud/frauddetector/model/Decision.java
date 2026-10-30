@@ -10,7 +10,7 @@ public record Decision(
         String ts,
         String channel,
         String merchant,
-        String counterpartyAccount,
+        String recipientAccount,
         String category,
         long amount,
         String currency,

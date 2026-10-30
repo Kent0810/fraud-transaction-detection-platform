@@ -7,13 +7,16 @@ export type Txn = {
   ts: string;
   channel: Channel;
   merchant: string;
-  counterpartyAccount: string | null;
+  recipientAccount: string | null;
   category: string;
   amount: number;
   currency: string;
   decision: Verdict;
   score: number;
   firedRules: string[];
+  // Null until the ledger has posted or declined it (never for a fraud DECLINE).
+  status: 'POSTED' | 'DECLINED' | null;
+  declinedFor: string[];
 };
 
 export type AlertStatus = 'OPEN' | 'CONFIRMED' | 'CLEARED';
@@ -36,18 +39,11 @@ export type Budget = {
   spent: number;
 };
 
-export type Bank = {
-  code: string;
-  name: string;
-};
-
+// Always an account at this bank: transfers to other banks are not supported.
 export type Recipient = {
-  bankCode: string;
   account: string;
   name: string;
 };
-
-export type TransferKind = 'INTERNAL' | 'NAPAS';
 
 // PENDING until the bank's fraud check decides; only POSTED moved the money.
 export type TransferStatus = 'PENDING' | 'POSTED' | 'DECLINED';
@@ -55,11 +51,30 @@ export type TransferStatus = 'PENDING' | 'POSTED' | 'DECLINED';
 export type Transfer = {
   transferId: string;
   reference: string;
-  kind: TransferKind;
   to: Recipient;
   amount: number;
   fee: number;
   content: string;
+  status: TransferStatus;
+  declinedFor: string[];
+  ts: string;
+};
+
+// A merchant near the cardholder, from the dataset; paying one is a card payment like any other.
+export type PayMerchant = {
+  merchantId: string;
+  name: string;
+  category: string;
+  distanceKm: number | null;
+};
+
+// A card payment made in the app. PENDING until the fraud check decides; only POSTED moved the money.
+export type Payment = {
+  paymentId: string;
+  reference: string;
+  merchant: string;
+  category: string;
+  amount: number;
   status: TransferStatus;
   declinedFor: string[];
   ts: string;

@@ -1,6 +1,6 @@
 import { type FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { RuleChip, VerdictBadge } from '../components/Badges';
+import { PostingBadge, RuleChip, VerdictBadge } from '../components/Badges';
 import { type Bucket, Gauge, type Series, StackedColumns } from '../components/Charts';
 import { Icon, type IconName } from '../components/Icons';
 import { ReasonAction } from '../components/Reason';
@@ -456,7 +456,7 @@ export function Card({ cardId }: { cardId: string }) {
                                 )}
                                 <small className="muted">
                                   {t.channel === 'TRANSFER' ? (
-                                    <span className="mono">{t.counterpartyAccount}</span>
+                                    <span className="mono">{t.recipientAccount}</span>
                                   ) : (
                                     category(t.category)
                                   )}
@@ -466,7 +466,10 @@ export function Card({ cardId }: { cardId: string }) {
                           </td>
                           <td className="num strong">{vnd(t.amount)}</td>
                           <td>
-                            <VerdictBadge verdict={t.decision} />
+                            <span className="decision">
+                              <VerdictBadge verdict={t.decision} />
+                              <PostingBadge status={t.status} declinedFor={t.declinedFor} />
+                            </span>
                           </td>
                           <td>
                             <div className="chips">

@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { AppState } from 'react-native';
 
 import * as commands from './commands';
 import { apiEnabled, HttpError } from './http';
@@ -9,28 +11,29 @@ import {
   fetchBalance,
   fetchCardStatus,
   fetchControls,
+  fetchMerchants,
+  fetchPayment,
   fetchRecipients,
   fetchTransactions,
   fetchTransfer,
 } from './queries';
 import { MOCK_PASSWORD, useUser } from './auth';
 
-import { ACCOUNT, ALERTS, BANKS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, TRANSACTIONS } from './mock';
+import { ACCOUNT, ALERTS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, PAY_MERCHANTS, TRANSACTIONS } from './mock';
 import type {
   Alert,
-  Bank,
   Budget,
   MerchantRule,
+  PayMerchant,
+  Payment,
   Period,
   Recipient,
   RuleType,
   Transfer,
-  TransferKind,
   Txn,
 } from './types';
 
 export type TransferDraft = {
-  kind: TransferKind;
   to: Recipient;
   amount: number;
   content: string;
@@ -44,6 +47,7 @@ type Store = {
   error: string | null;
   cardId: string | null;
   refresh: () => void;
+  reload: () => void;
   transactions: Txn[];
   alerts: Alert[];
   budget: Budget;
@@ -51,7 +55,6 @@ type Store = {
   frozen: boolean;
   balance: number;
   accountNumber: string;
-  banks: Bank[];
   saved: Recipient[];
   transfers: Transfer[];
   draft: TransferDraft | null;
@@ -62,9 +65,11 @@ type Store = {
   releaseMerchant: (merchant: string) => void;
   ruleFor: (merchant: string) => MerchantRule | undefined;
   setDraft: (draft: TransferDraft | null) => void;
-  lookupAccount: (bankCode: string, account: string) => Promise<string | null>;
+  lookupAccount: (account: string) => Promise<string | null>;
   sendTransfer: (draft: TransferDraft, transferId: string, password: string) => Promise<Transfer>;
   refreshTransfer: (transferId: string) => Promise<Transfer | null>;
+  merchantsNearby: () => Promise<PayMerchant[]>;
+  pay: (merchant: PayMerchant, amount: number, paymentId: string, password: string) => Promise<Payment>;
   removeSaved: (recipient: Recipient) => void;
 };
 
@@ -81,6 +86,25 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** A transfer the bank refused; message is safe to show as is. */
 export class TransferError extends Error {}
+
+/** A card payment the bank refused before the fraud check; message is safe to show as is. */
+export class PaymentError extends Error {}
+
+function paymentError(e: unknown): Error {
+  if (!(e instanceof HttpError)) return e instanceof Error ? e : new Error(String(e));
+  switch (e.status) {
+    case 423:
+      return new PaymentError('Your card is frozen. Unfreeze it to pay.');
+    case 403:
+      return new PaymentError('Incorrect password');
+    case 404:
+      return new PaymentError('This merchant is no longer available');
+    case 422:
+      return new PaymentError('Not enough balance for this payment');
+    default:
+      return new PaymentError('Payment failed. Check your balance before trying again.');
+  }
+}
 
 /** A freeze or unfreeze the bank refused; message is safe to show as is. */
 export class CardError extends Error {}
@@ -131,7 +155,7 @@ async function fetchCardData(): Promise<CardData> {
   };
 }
 
-const sameRecipient = (a: Recipient, b: Recipient) => a.bankCode === b.bankCode && a.account === b.account;
+const sameRecipient = (a: Recipient, b: Recipient) => a.account === b.account;
 
 const toRules = (controls: Controls): MerchantRule[] => controls.merchantRules.map((r) => ({ ...r, pending: false }));
 
@@ -156,7 +180,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Txn[]>(apiEnabled ? [] : TRANSACTIONS);
   const [alerts, setAlerts] = useState<Alert[]>(apiEnabled ? [] : ALERTS);
 
-  const load = useCallback(() => {
+  // A background poll that fails keeps what is on screen instead of showing the error banner.
+  const load = useCallback((background = false) => {
     fetchCardData().then(
       (data) => {
         setTransactions(data.transactions);
@@ -171,6 +196,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setStatus('ready');
       },
       (e: unknown) => {
+        if (background) return;
         setError(message(e));
         setStatus('error');
       },
@@ -191,17 +217,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (apiEnabled) load();
   }, [load]);
 
+  // There is no push channel: fetch again whenever the app comes back to the foreground (screens do so on focus).
+  useEffect(() => {
+    if (!apiEnabled) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') load(true);
+    });
+    return () => sub.remove();
+  }, [load]);
+
   const refresh = useCallback(() => {
     if (!apiEnabled) return;
     setStatus('loading');
     load();
   }, [load]);
 
+  const reload = useCallback(() => {
+    if (apiEnabled) load(true);
+  }, [load]);
+
   const effectiveBudget = useMemo<Budget>(() => {
     if (!apiEnabled) return budget;
     const now = new Date();
     const spent = transactions
-      .filter((t) => t.decision !== 'DECLINE')
+      .filter((t) => t.decision !== 'DECLINE' && t.status !== 'DECLINED')
       .filter((t) => {
         const d = new Date(t.ts);
         return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
@@ -275,12 +314,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const lookupAccount = useCallback(
-    async (bankCode: string, account: string) => {
-      // Our own bank: a real account on this platform. Other banks stay mocked, there is no interbank link.
-      if (apiEnabled && bankCode === ACCOUNT.bankCode) return fetchAccountHolder(account);
+    async (account: string) => {
+      if (apiEnabled) return fetchAccountHolder(account);
       await wait(LOOKUP_MS);
       if (account.length < 6) return null;
-      const known = saved.find((r) => r.bankCode === bankCode && r.account === account);
+      const known = saved.find((r) => r.account === account);
       if (known) return known.name;
       const sum = [...account].reduce((acc, d) => acc + Number(d), 0);
       return LOOKUP_NAMES[sum % LOOKUP_NAMES.length];
@@ -327,7 +365,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         transfer = {
           transferId,
           reference: `FT${String(now.getTime()).slice(-10)}`,
-          kind: d.kind,
           to: d.to,
           amount: d.amount,
           fee: 0,
@@ -356,12 +393,50 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [reloadSaved],
   );
 
+  const merchantsNearby = useCallback(() => (apiEnabled ? fetchMerchants() : Promise.resolve(PAY_MERCHANTS)), []);
+
+  // Like sendTransfer: recorded PENDING, then wait a little for the fraud check before showing the result.
+  const pay = useCallback(
+    async (merchant: PayMerchant, amount: number, paymentId: string, password: string): Promise<Payment> => {
+      if (!apiEnabled) {
+        await wait(TRANSFER_MS);
+        if (password !== MOCK_PASSWORD) throw new PaymentError('Incorrect password');
+        setBalance((b) => b - amount);
+        const now = new Date();
+        return {
+          paymentId,
+          reference: `CP${String(now.getTime()).slice(-10)}`,
+          merchant: merchant.name,
+          category: merchant.category,
+          amount,
+          status: 'POSTED',
+          declinedFor: [],
+          ts: now.toISOString(),
+        };
+      }
+      let { balance: now, ...payment } = await commands
+        .sendPayment({ paymentId, merchantId: merchant.merchantId, amount, password })
+        .catch((e: unknown) => {
+          throw paymentError(e);
+        });
+      for (let waited = 0; payment.status === 'PENDING' && waited < DECISION_WAIT_MS; waited += DECISION_POLL_MS) {
+        await wait(DECISION_POLL_MS);
+        const latest = await fetchPayment(paymentId).catch(() => null);
+        if (latest) ({ balance: now, ...payment } = latest);
+      }
+      setBalance(now);
+      return payment;
+    },
+    [],
+  );
+
   const value = useMemo<Store>(
     () => ({
       status,
       error,
       cardId,
       refresh,
+      reload,
       transactions,
       alerts,
       budget: effectiveBudget,
@@ -369,7 +444,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       frozen,
       balance,
       accountNumber,
-      banks: BANKS,
       saved,
       transfers,
       draft,
@@ -383,6 +457,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       lookupAccount,
       sendTransfer,
       refreshTransfer,
+      merchantsNearby,
+      pay,
       removeSaved,
     }),
     [
@@ -390,6 +466,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       error,
       cardId,
       refresh,
+      reload,
       transactions,
       alerts,
       effectiveBudget,
@@ -408,6 +485,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       lookupAccount,
       sendTransfer,
       refreshTransfer,
+      merchantsNearby,
+      pay,
       removeSaved,
     ],
   );
@@ -421,4 +500,10 @@ export function useStore(): Store {
     throw new Error('useStore must be used inside StoreProvider');
   }
   return store;
+}
+
+/** Fetches the newest card data each time the calling screen comes into view. */
+export function useFreshOnFocus(): void {
+  const { reload } = useStore();
+  useFocusEffect(reload);
 }

@@ -11,7 +11,6 @@ export type KafkaConfig = {
   kafkaBrokers: string[];
   controlTopic: string;
   decisionsTopic: string;
-  transferDecisionsTopic: string;
 };
 
 export type PostgresConfig = {
@@ -22,7 +21,7 @@ export type PostgresConfig = {
   postgresPassword: string;
 };
 
-export type Config = CassandraConfig & KafkaConfig & PostgresConfig & { port: number };
+export type Config = CassandraConfig & KafkaConfig & PostgresConfig & { port: number; merchantsFile: string };
 
 function required(name: string): string {
   const value = process.env[name];
@@ -61,7 +60,6 @@ export function loadKafkaConfig(): KafkaConfig {
     kafkaBrokers: list('KAFKA_BOOTSTRAP_SERVERS'),
     controlTopic: required('TOPIC_CONTROL'),
     decisionsTopic: required('TOPIC_DECISIONS'),
-    transferDecisionsTopic: required('TOPIC_TRANSFER_DECISIONS'),
   };
 }
 
@@ -78,6 +76,7 @@ export function loadPostgresConfig(): PostgresConfig {
 export function loadConfig(): Config {
   return {
     port: int('PORT', process.env.PORT ?? '8080'),
+    merchantsFile: required('MERCHANTS_FILE'),
     ...loadCassandraConfig(),
     ...loadKafkaConfig(),
     ...loadPostgresConfig(),
