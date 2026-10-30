@@ -1,5 +1,14 @@
 import { request } from './http';
-import type { Activity, AuditEntry, CardView, QueueItem, RuleType, StaffMember, StaffSession } from './types';
+import type {
+  Activity,
+  AuditEntry,
+  CardView,
+  LoginStatus,
+  QueueItem,
+  RuleType,
+  StaffMember,
+  StaffSession,
+} from './types';
 
 const card = (cardId: string) => `/ops/cards/${encodeURIComponent(cardId)}`;
 
@@ -41,3 +50,6 @@ export const releaseMerchant = (cardId: string, merchant: string, reason: string
 
 export const setFrozen = (cardId: string, frozen: boolean, reason: string | null) =>
   request<{ frozen: boolean }>('POST', `${card(cardId)}/${frozen ? 'freeze' : 'unfreeze'}`, { reason });
+
+export const setLoginEnabled = (cardId: string, enabled: boolean, reason: string | null) =>
+  request<{ status: LoginStatus }>('POST', `${card(cardId)}/login/${enabled ? 'restore' : 'disable'}`, { reason });

@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { iso } from '../../../shared/cassandra/models';
 import { auditEntry, type StaffAudit } from '../../../shared/prisma/audit';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import type { AccountDto, AuditEntryDto, CardholderDto } from '../types/ops.types';
+import type { AccountDto, AuditEntryDto, CardholderDto, LoginDto, LoginStatus } from '../types/ops.types';
 
 @Injectable()
 export class CardholderFilesRepository {
@@ -21,7 +21,10 @@ export class CardholderFilesRepository {
   }
 
   /** The owner's details and account. Every look is written to the audit log first. */
-  async open(cardId: string, by: StaffAudit): Promise<{ holder: CardholderDto; account: AccountDto | null } | null> {
+  async open(
+    cardId: string,
+    by: StaffAudit,
+  ): Promise<{ holder: CardholderDto; account: AccountDto | null; login: LoginDto | null } | null> {
     const exists = await this.db.client.cardholders.count({ where: { card_id: cardId } });
     if (!exists) return null;
 
@@ -44,6 +47,13 @@ export class CardholderFilesRepository {
             status: true,
           },
         },
+        auth: {
+          select: {
+            status: true,
+            failed_logins: true,
+            last_login_at: true,
+          },
+        },
       },
     });
     return {
@@ -60,6 +70,13 @@ export class CardholderFilesRepository {
             balance: Number(row.accounts.balance),
             currency: row.accounts.currency,
             frozen: row.accounts.status === 'FROZEN',
+          }
+        : null,
+      login: row.auth
+        ? {
+            status: row.auth.status as LoginStatus,
+            failedLogins: row.auth.failed_logins,
+            lastLoginAt: iso(row.auth.last_login_at),
           }
         : null,
     };

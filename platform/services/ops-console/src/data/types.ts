@@ -18,6 +18,8 @@ export type ReviewStatus = 'OPEN' | 'CONFIRMED' | 'CLEARED';
 
 export type RuleType = 'BLOCK' | 'ALLOW';
 
+export type LoginStatus = 'ACTIVE' | 'LOCKED' | 'DISABLED';
+
 export type QueueItem = {
   cardId: string;
   priority: number;
@@ -71,6 +73,11 @@ export type CardView = {
     balance: number;
     currency: string;
     frozen: boolean;
+  } | null;
+  login: {
+    status: LoginStatus;
+    failedLogins: number;
+    lastLoginAt: string | null;
   } | null;
   state: {
     riskScore: number;

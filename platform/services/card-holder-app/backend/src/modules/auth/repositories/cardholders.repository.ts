@@ -9,6 +9,13 @@ export type Cardholder = {
   email: string;
 };
 
+/** OK with the cardholder, or why not. LOCKED and DISABLED are only told to someone who got the password right. */
+export type LoginResult =
+  { outcome: 'OK'; holder: Cardholder } | { outcome: 'INVALID' } | { outcome: 'LOCKED' } | { outcome: 'DISABLED' };
+
+// Wrong passwords in a row before the login locks; an agent restores it from the console.
+const MAX_FAILED_LOGINS = 5;
+
 // Same cost as the seed's gen_salt('bf', 8). An unknown card is compared against this throwaway hash,
 // so it takes as long as a wrong password and login timing can't be used to probe card numbers.
 const NO_SUCH_LOGIN = bcrypt.hashSync('no such login', 8);
@@ -17,8 +24,11 @@ const NO_SUCH_LOGIN = bcrypt.hashSync('no such login', 8);
 export class CardholdersRepository {
   constructor(private readonly db: PrismaService) {}
 
-  /** The cardholder for a valid, active login, or null. Records the login time on success. */
-  async login(cardId: string, password: string): Promise<Cardholder | null> {
+  /**
+   * Checks the password. A good one on an active login resets the wrong-password count and records the login time;
+   * a wrong one counts, and the last allowed one locks the login.
+   */
+  async login(cardId: string, password: string): Promise<LoginResult> {
     const login = await this.db.client.auth.findUnique({
       where: { card_id: cardId },
       select: {
@@ -34,13 +44,46 @@ export class CardholdersRepository {
       },
     });
     const passwordOk = await bcrypt.compare(password, login?.password_hash ?? NO_SUCH_LOGIN);
-    if (!login || !passwordOk || login.status !== 'ACTIVE') return null;
+    if (!login) return { outcome: 'INVALID' };
+
+    if (!passwordOk) {
+      if (login.status === 'ACTIVE') await this.countFailure(cardId);
+      return { outcome: 'INVALID' };
+    }
+    if (login.status === 'LOCKED') return { outcome: 'LOCKED' };
+    if (login.status !== 'ACTIVE') return { outcome: 'DISABLED' };
 
     await this.db.client.auth.updateMany({
       where: { card_id: cardId },
-      data: { last_login_at: new Date() },
+      data: {
+        last_login_at: new Date(),
+        failed_logins: 0,
+      },
     });
     const c = login.cardholders;
-    return { cardId, name: `${c.first_name} ${c.last_name}`, email: c.email };
+    return {
+      outcome: 'OK',
+      holder: { cardId, name: `${c.first_name} ${c.last_name}`, email: c.email },
+    };
+  }
+
+  private async countFailure(cardId: string): Promise<void> {
+    await this.db.client.$transaction([
+      this.db.client.auth.updateMany({
+        where: {
+          card_id: cardId,
+          status: 'ACTIVE',
+        },
+        data: { failed_logins: { increment: 1 } },
+      }),
+      this.db.client.auth.updateMany({
+        where: {
+          card_id: cardId,
+          status: 'ACTIVE',
+          failed_logins: { gte: MAX_FAILED_LOGINS },
+        },
+        data: { status: 'LOCKED' },
+      }),
+    ]);
   }
 }

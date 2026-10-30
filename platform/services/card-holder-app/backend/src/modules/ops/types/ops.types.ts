@@ -36,10 +36,20 @@ export type AccountDto = {
   frozen: boolean;
 };
 
+export type LoginStatus = 'ACTIVE' | 'LOCKED' | 'DISABLED';
+
+/** The cardholder's app sign-in: LOCKED after too many wrong passwords, DISABLED by an agent. */
+export type LoginDto = {
+  status: LoginStatus;
+  failedLogins: number;
+  lastLoginAt: string | null;
+};
+
 export type CardViewDto = {
   cardId: string;
   holder: CardholderDto;
   account: AccountDto | null;
+  login: LoginDto | null;
   state: CardStateDto | null;
   controls: ControlsDto;
 };

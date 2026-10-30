@@ -39,6 +39,12 @@ async function signIn(cardId: string, password: string): Promise<Session> {
     if (e instanceof HttpError && (e.status === 400 || e.status === 401)) {
       throw new LoginError('Incorrect card number or password');
     }
+    if (e instanceof HttpError && e.status === 423) {
+      throw new LoginError('Sign-in is locked after too many wrong passwords. Call the bank to unlock it.');
+    }
+    if (e instanceof HttpError && e.status === 403) {
+      throw new LoginError('Sign-in is turned off for this card. Call the bank.');
+    }
     throw e;
   }
 }

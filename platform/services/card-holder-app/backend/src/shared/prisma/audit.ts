@@ -8,7 +8,9 @@ export type AuditAction =
   | 'FREEZE_CARD'
   | 'UNFREEZE_CARD'
   | 'CONFIRM_ALERT'
-  | 'CLEAR_ALERT';
+  | 'CLEAR_ALERT'
+  | 'DISABLE_LOGIN'
+  | 'RESTORE_LOGIN';
 
 /** The staff member behind a change made from the operations console. */
 export type StaffAudit = {

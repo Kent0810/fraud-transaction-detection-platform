@@ -22,4 +22,6 @@ export const ACTION_LABEL: Record<string, string> = {
   UNFREEZE_CARD: 'Unfroze the card',
   CONFIRM_ALERT: 'Confirmed an alert as fraud',
   CLEAR_ALERT: 'Cleared an alert',
+  DISABLE_LOGIN: 'Turned off app sign-in',
+  RESTORE_LOGIN: 'Restored app sign-in',
 };

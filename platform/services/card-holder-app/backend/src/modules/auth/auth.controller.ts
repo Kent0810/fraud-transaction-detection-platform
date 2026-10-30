@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, Post, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 
 import { Public, SessionToken } from '../../common/decorators/session.decorator';
@@ -15,10 +24,19 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   async login(@Body(new ZodPipe(LoginRequest)) { cardId, password }: LoginRequest): Promise<SessionDto> {
-    const session = await this.commands.execute(new LoginCommand(cardId, password));
-    // Same error for an unknown card, a wrong password and a locked login, so login can't be used to probe card numbers.
-    if (!session) throw new UnauthorizedException('incorrect card number or password');
-    return session;
+    const result = await this.commands.execute(new LoginCommand(cardId, password));
+    // Same error for an unknown card and a wrong password, so login can't be used to probe card numbers. A locked or
+    // disabled login is only revealed to someone who knows the password.
+    switch (result.outcome) {
+      case 'OK':
+        return result.session;
+      case 'LOCKED':
+        throw new HttpException('too many wrong passwords; sign-in is locked', HttpStatus.LOCKED);
+      case 'DISABLED':
+        throw new ForbiddenException('sign-in is turned off for this card');
+      default:
+        throw new UnauthorizedException('incorrect card number or password');
+    }
   }
 
   @Post('logout')

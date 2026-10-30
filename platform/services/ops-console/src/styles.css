@@ -1773,6 +1773,23 @@ button.rule:hover {
   font-size: 0.86rem;
   font-weight: 500;
 }
+.login-banner {
+  background: var(--hl-soft);
+  border-color: var(--hl-mark);
+  color: var(--hl);
+}
+.login-status {
+  font-weight: 600;
+}
+.login-status.l-active {
+  color: var(--ok);
+}
+.login-status.l-locked {
+  color: var(--hl);
+}
+.login-status.l-disabled {
+  color: var(--ctrl);
+}
 .card-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
@@ -2482,4 +2499,7 @@ dialog::backdrop {
   .toast:nth-child(n + 2) {
     display: none;
   }
+}
+.panel > .btn {
+  align-self: flex-start;
 }

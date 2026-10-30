@@ -29,9 +29,10 @@ GRANT USAGE ON SCHEMA public TO "${app_user}";
 -- Profiles are written by the seed only.
 GRANT SELECT ON cardholders TO "${app_user}";
 
--- Login reads the hash and records the login time; it can't change a password or unlock a card.
+-- Login reads the hash, records the login time and counts wrong passwords, locking the login at the limit. Agents
+-- turn a login off and on from the console. Nothing here can change a password.
 GRANT SELECT ON auth TO "${app_user}";
-GRANT UPDATE (last_login_at) ON auth TO "${app_user}";
+GRANT UPDATE (last_login_at, failed_logins, status) ON auth TO "${app_user}";
 
 GRANT SELECT, INSERT, DELETE ON sessions TO "${app_user}";
 

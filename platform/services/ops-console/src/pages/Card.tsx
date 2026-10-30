@@ -21,7 +21,7 @@ import {
 import { useLive } from '../data/live';
 import { rememberCard } from '../data/recent';
 import { ACTION_LABEL, ruleTitle } from '../data/rules';
-import type { Activity, AuditEntry, CardView, CaseAlert, RuleType } from '../data/types';
+import type { Activity, AuditEntry, CardView, CaseAlert, LoginStatus, RuleType } from '../data/types';
 import { Kpi, SkeletonTable } from './Queue';
 
 const RANGES = [7, 30, 90];
@@ -44,6 +44,14 @@ const AUDIT_ICON: Record<string, IconName> = {
   UNFREEZE_CARD: 'unlock',
   CONFIRM_ALERT: 'shield',
   CLEAR_ALERT: 'check',
+  DISABLE_LOGIN: 'logout',
+  RESTORE_LOGIN: 'unlock',
+};
+
+const LOGIN_LABEL: Record<LoginStatus, string> = {
+  ACTIVE: 'Active',
+  LOCKED: 'Locked',
+  DISABLED: 'Turned off',
 };
 
 type Channel = 'ALL' | 'CARD' | 'TRANSFER';
@@ -197,6 +205,12 @@ export function Card({ cardId }: { cardId: string }) {
     await loadActivity();
   }
 
+  async function setLogin(enabled: boolean, reason: string | null) {
+    const { status } = await api.setLoginEnabled(cardId, enabled, reason);
+    setView((v) => (v && v.login ? { ...v, login: { ...v.login, status, failedLogins: 0 } } : v));
+    setAudit(await api.fetchAudit(cardId));
+  }
+
   function toggle(txnId: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -271,6 +285,15 @@ export function Card({ cardId }: { cardId: string }) {
             ))}
         </div>
       </header>
+
+      {view.login && view.login.status !== 'ACTIVE' && (
+        <div className="frozen-banner login-banner">
+          <Icon name="logout" size={16} />
+          {view.login.status === 'LOCKED'
+            ? 'App sign-in is locked after 5 wrong passwords. An agent can unlock it once the caller is verified.'
+            : 'App sign-in is turned off for this cardholder.'}
+        </div>
+      )}
 
       {frozen && (
         <div className="frozen-banner">
@@ -611,6 +634,24 @@ export function Card({ cardId }: { cardId: string }) {
                 <dd>{vnd(view.account.balance)}</dd>
                 <dt>Case priority</dt>
                 <dd>{view.state ? Math.round(view.state.priority).toLocaleString('en-US') : '—'}</dd>
+                <dt>App sign-in</dt>
+                <dd>
+                  {view.login ? (
+                    <span className={`login-status l-${view.login.status.toLowerCase()}`}>
+                      {LOGIN_LABEL[view.login.status]}
+                    </span>
+                  ) : (
+                    'None'
+                  )}
+                </dd>
+                {view.login && view.login.status === 'ACTIVE' && view.login.failedLogins > 0 && (
+                  <>
+                    <dt>Wrong passwords</dt>
+                    <dd>{view.login.failedLogins} of 5</dd>
+                  </>
+                )}
+                <dt>Last sign-in</dt>
+                <dd>{view.login?.lastLoginAt ? ago(view.login.lastLoginAt) : 'Never'}</dd>
                 <dt>Budget</dt>
                 <dd>
                   {view.controls.budget
@@ -621,6 +662,39 @@ export function Card({ cardId }: { cardId: string }) {
             ) : (
               <p className="muted">No account.</p>
             )}
+            {isAgent &&
+              view.login &&
+              (view.login.status === 'ACTIVE' ? (
+                <ReasonAction
+                  label="Turn off app sign-in"
+                  confirm="Turn off sign-in"
+                  title="Turn off app sign-in?"
+                  description={
+                    <p>
+                      The cardholder is signed out of the app and can't sign in again until an agent restores it. Card
+                      payments are not affected; freeze the card for that.
+                    </p>
+                  }
+                  icon="logout"
+                  tone="danger"
+                  onRun={(r) => setLogin(false, r)}
+                />
+              ) : (
+                <ReasonAction
+                  label={view.login.status === 'LOCKED' ? 'Unlock app sign-in' : 'Restore app sign-in'}
+                  confirm={view.login.status === 'LOCKED' ? 'Unlock sign-in' : 'Restore sign-in'}
+                  title={view.login.status === 'LOCKED' ? 'Unlock app sign-in?' : 'Restore app sign-in?'}
+                  description={
+                    <p>
+                      Check you are speaking to the cardholder first. They can sign in with their current password, and
+                      the wrong-password count starts again from zero.
+                    </p>
+                  }
+                  icon="unlock"
+                  tone="primary"
+                  onRun={(r) => setLogin(true, r)}
+                />
+              ))}
           </div>
 
           <div className="panel">

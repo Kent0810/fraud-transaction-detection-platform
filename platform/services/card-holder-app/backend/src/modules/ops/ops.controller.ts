@@ -24,6 +24,7 @@ import { Merchant, type CardStatusDto, type MerchantRuleDto } from '../controls/
 import { OpenCardCommand } from './commands/open-card.command';
 import { ReviewAlertCommand } from './commands/review-alert.command';
 import { SetCardFrozenCommand } from './commands/set-card-frozen.command';
+import { SetLoginEnabledCommand } from './commands/set-login-enabled.command';
 import { LiveAlertsConsumer } from './consumers/live-alerts.consumer';
 import { FindCardQuery } from './queries/find-card.query';
 import { GetActivityQuery } from './queries/get-activity.query';
@@ -37,6 +38,7 @@ import {
   type CardViewDto,
   Days,
   Lookup,
+  type LoginStatus,
   type QueueItemDto,
   ReasonRequest,
   StaffMerchantRuleRequest,
@@ -160,5 +162,33 @@ export class OpsController {
     @Body(new ZodPipe(ReasonRequest)) { reason }: ReasonRequest,
   ): Promise<CardStatusDto> {
     return this.commands.execute(new SetCardFrozenCommand(cardId, false, audit(staff, reason)));
+  }
+
+  @Staff('AGENT')
+  @Post('cards/:cardId/login/disable')
+  @HttpCode(200)
+  disableLogin(
+    @CurrentStaff() staff: StaffMember,
+    @Param('cardId', new ZodPipe(CardId)) cardId: string,
+    @Body(new ZodPipe(ReasonRequest)) { reason }: ReasonRequest,
+  ): Promise<{ status: LoginStatus }> {
+    return this.setLogin(cardId, false, audit(staff, reason));
+  }
+
+  @Staff('AGENT')
+  @Post('cards/:cardId/login/restore')
+  @HttpCode(200)
+  restoreLogin(
+    @CurrentStaff() staff: StaffMember,
+    @Param('cardId', new ZodPipe(CardId)) cardId: string,
+    @Body(new ZodPipe(ReasonRequest)) { reason }: ReasonRequest,
+  ): Promise<{ status: LoginStatus }> {
+    return this.setLogin(cardId, true, audit(staff, reason));
+  }
+
+  private async setLogin(cardId: string, enabled: boolean, by: StaffAudit): Promise<{ status: LoginStatus }> {
+    const status = await this.commands.execute(new SetLoginEnabledCommand(cardId, enabled, by));
+    if (!status) throw new NotFoundException('this card has no app sign-in');
+    return { status };
   }
 }
