@@ -1,3 +1,4 @@
+import { bankByBin, OUR_BIN } from './banks';
 import { isCardFrozen, verifyPassword } from './cards';
 import { Prisma, type PrismaClient, type transactions } from './generated/prisma/client';
 
@@ -5,6 +6,7 @@ export const OUR_BANK = 'HCMMB';
 
 const REQUESTS_TOPIC = 'transactions';
 const OUTCOMES_TOPIC = 'settlements';
+const CREDITS_TOPIC = 'credits';
 
 export type TransactionStatus = 'PENDING' | 'POSTED' | 'DECLINED';
 
@@ -13,8 +15,12 @@ export type TransferRequestInput = {
   fromCard: string;
   password: string;
   transferId: string;
-  /** An account number of this bank; the recipient's name comes from its cardholder. */
+  /** The recipient's bank id (BIN); this bank's when absent. */
+  toBank?: string;
+  /** At this bank: an account number, and the name comes from its cardholder. At another bank: as the sender gives it. */
   toAccount: string;
+  /** Required for another bank: nobody here can look its accounts up (that takes a NAPAS member's connection). */
+  toName?: string;
   amount: number;
   content: string;
 };
@@ -53,6 +59,8 @@ export type TransferRefusalCode =
   | 'INCORRECT_PASSWORD'
   | 'ACCOUNT_NOT_FOUND'
   | 'OWN_ACCOUNT'
+  | 'BANK_NOT_SUPPORTED'
+  | 'NAME_REQUIRED'
   | 'INSUFFICIENT_FUNDS'
   | 'TRANSFER_ID_REUSED'
   | 'PAYMENT_ID_REUSED';
@@ -158,12 +166,9 @@ function refuseIfFrozen(recording: Promise<TransactionState>): Promise<Transacti
 type Outcome = 'POSTED' | 'DECLINED';
 type Settle = (status: Outcome, reasons: string[]) => Promise<TransactionState | null>;
 
-function record(
-  db: PrismaClient,
-  t: TransferRequestInput,
-  to: { cardId: string; name: string },
-  amount: bigint,
-): Promise<TransactionState> {
+type Recipient = { cardId: string | null; bank: string | null; name: string };
+
+function record(db: PrismaClient, t: TransferRequestInput, to: Recipient, amount: bigint): Promise<TransactionState> {
   return db.$transaction(async (tx) => {
     const [created] = await tx.transactions.createManyAndReturn({
       data: [
@@ -174,6 +179,7 @@ function record(
           to_account: t.toAccount,
           to_name: to.name,
           to_card: to.cardId,
+          to_bank: to.bank,
           amount,
           content: t.content,
         },
@@ -231,7 +237,10 @@ function transfer(db: PrismaClient, d: DecisionInput): Settle {
       if (!t) return current(tx, d);
 
       if (status === 'POSTED') await postEntries(tx, t);
-      await tx.outbox.createMany({ data: settled(t) });
+      const events = [settled(t)];
+      // Money that stayed in this bank also shows in the recipient's history, as received from the sender.
+      if (status === 'POSTED' && t.to_card) events.push(await credited(tx, t, t.to_card));
+      await tx.outbox.createMany({ data: events });
       return { ...t, balance: await balanceOf(tx, t.card_id) };
     });
 }
@@ -342,7 +351,9 @@ function requested(t: transactions): Prisma.outboxCreateManyInput {
       cc_num: t.card_id,
       channel: t.channel,
       merchant: transfer ? t.to_name : t.merchant,
-      recipient_account: transfer ? `${OUR_BANK}:${t.to_account}` : null,
+      recipient_account: transfer
+        ? `${t.to_bank ? (bankByBin(t.to_bank)?.code ?? t.to_bank) : OUR_BANK}:${t.to_account}`
+        : null,
       category: transfer ? 'transfer' : t.category,
       amt: Number(t.amount),
       currency: 'VND',
@@ -372,6 +383,41 @@ function settled(t: transactions): Prisma.outboxCreateManyInput {
   };
 }
 
+// The recipient's side of a posted transfer: a whole history row, since nothing else writes to the recipient's card.
+// ts is the transfer's own, so a replayed event lands on the same row.
+async function credited(
+  tx: Pick<PrismaClient, 'accounts'>,
+  t: transactions,
+  toCard: string,
+): Promise<Prisma.outboxCreateManyInput> {
+  const sender = await tx.accounts.findUniqueOrThrow({
+    where: { card_id: t.card_id },
+    select: { account_number: true, cardholders: { select: { first_name: true, last_name: true } } },
+  });
+  return {
+    aggregate_type: CREDITS_TOPIC,
+    aggregate_id: toCard,
+    type: 'TransferReceived',
+    payload: {
+      txn_id: t.txn_id,
+      ts: t.created_at.toISOString(),
+      cc_num: toCard,
+      channel: 'TRANSFER',
+      direction: 'IN',
+      merchant: `${sender.cardholders.first_name} ${sender.cardholders.last_name}`.toUpperCase(),
+      recipient_account: `${OUR_BANK}:${sender.account_number}`,
+      category: 'transfer',
+      amount: Number(t.amount),
+      currency: 'VND',
+      decision: 'ALLOW',
+      status: 'POSTED',
+      settled_at: t.decided_at?.toISOString() ?? null,
+      reference: t.reference,
+      content: t.content,
+    },
+  };
+}
+
 async function balanceOf(tx: Pick<PrismaClient, 'accounts'>, cardId: string): Promise<bigint> {
   const { balance } = await tx.accounts.findUniqueOrThrow({
     where: { card_id: cardId },
@@ -380,7 +426,14 @@ async function balanceOf(tx: Pick<PrismaClient, 'accounts'>, cardId: string): Pr
   return balance;
 }
 
-async function recipient(db: PrismaClient, t: TransferRequestInput): Promise<{ cardId: string; name: string }> {
+async function recipient(db: PrismaClient, t: TransferRequestInput): Promise<Recipient> {
+  if (t.toBank && t.toBank !== OUR_BIN) {
+    if (!bankByBin(t.toBank))
+      throw new TransferRefusedError('BANK_NOT_SUPPORTED', 'transfers to this bank are not supported');
+    const name = t.toName?.trim().toUpperCase();
+    if (!name) throw new TransferRefusedError('NAME_REQUIRED', "the recipient's name is required for another bank");
+    return { cardId: null, bank: t.toBank, name };
+  }
   const account = await db.accounts.findUnique({
     where: { account_number: t.toAccount },
     select: {
@@ -400,6 +453,7 @@ async function recipient(db: PrismaClient, t: TransferRequestInput): Promise<{ c
   const { first_name, last_name } = account.cardholders;
   return {
     cardId: account.card_id,
+    bank: null,
     name: `${first_name} ${last_name}`.toUpperCase(),
   };
 }
@@ -412,6 +466,7 @@ async function replay(tx: Tx, t: TransferRequestInput, amount: bigint): Promise<
     first.channel !== 'TRANSFER' ||
     first.card_id !== t.fromCard ||
     first.to_account !== t.toAccount ||
+    first.to_bank !== (t.toBank && t.toBank !== OUR_BIN ? t.toBank : null) ||
     first.amount !== amount
   ) {
     throw new TransferRefusedError('TRANSFER_ID_REUSED', 'transferId was already used for a different transfer');

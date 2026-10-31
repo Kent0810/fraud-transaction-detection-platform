@@ -11,6 +11,7 @@ export type KafkaConfig = {
   kafkaBrokers: string[];
   controlTopic: string;
   decisionsTopic: string;
+  alertsTopic: string;
 };
 
 export type PostgresConfig = {
@@ -60,6 +61,7 @@ export function loadKafkaConfig(): KafkaConfig {
     kafkaBrokers: list('KAFKA_BOOTSTRAP_SERVERS'),
     controlTopic: required('TOPIC_CONTROL'),
     decisionsTopic: required('TOPIC_DECISIONS'),
+    alertsTopic: required('TOPIC_ALERTS'),
   };
 }
 

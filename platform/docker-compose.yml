@@ -8,6 +8,7 @@ x-kafka-env: &kafka-env
   TOPIC_ALERTS: alerts
   TOPIC_CASES: cases
   TOPIC_SETTLEMENTS: settlements  # the outbox's aggregate_type in @platform/db
+  TOPIC_CREDITS: credits          # money received from another card of this bank, for its history
 
 x-postgres-env: &postgres-env
   POSTGRES_HOST: postgres

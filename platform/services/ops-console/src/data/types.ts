@@ -45,6 +45,8 @@ export type Activity = {
   txnId: string;
   ts: string;
   channel: 'CARD' | 'TRANSFER';
+  // IN: received from another card of this bank; merchant and recipientAccount are the sender's.
+  direction: 'IN' | 'OUT';
   merchant: string;
   recipientAccount: string | null;
   category: string;
@@ -119,7 +121,8 @@ export type LiveAlert = {
   category: string;
   amount: number;
   currency: string;
-  decision: 'STEP_UP' | 'DECLINE';
+  // ALLOW: the payment went through, but an alert-only rule raised an alert on it.
+  decision: 'ALLOW' | 'STEP_UP' | 'DECLINE';
   score: number;
   firedRules: string[];
 };

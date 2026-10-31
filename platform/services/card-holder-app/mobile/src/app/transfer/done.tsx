@@ -3,7 +3,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BANK_NAME } from '@/components/brand';
 import { FadeInUp, PopIn } from '@/components/motion';
 import { Button, Empty, IconBubble } from '@/components/ui';
 import { vnd, vndInWords } from '@/components/vnd';
@@ -49,7 +48,7 @@ export default function TransferDoneScreen() {
     ['Reference', transfer.reference],
     ['Recipient', transfer.to.name],
     ['Account', transfer.to.account],
-    ['Bank', BANK_NAME],
+    ['Bank', `${transfer.to.bank.code} · ${transfer.to.bank.name}`],
     ['Message', transfer.content],
     ['Fee', transfer.fee ? vnd(transfer.fee) : 'Free'],
   ];
@@ -104,7 +103,7 @@ export default function TransferDoneScreen() {
             disabled={checking}
           />
         )}
-        <Button label="Back to Home" onPress={() => router.dismissAll()} />
+        <Button label="Back to Home" onPress={() => router.dismissTo('/')} />
         <Button label="New transfer" variant="secondary" onPress={() => router.replace('/transfer')} />
       </FadeInUp>
     </ScrollView>

@@ -1,8 +1,9 @@
 import { BANK_SHORT } from '@/components/brand';
 
 import { ME, request } from './http';
+import { OUR_BANK } from './mock';
 import type { CardStatus } from './queries';
-import type { Payment, Period, Recipient, RuleType, Transfer } from './types';
+import type { Payment, Period, Recipient, RuleType, Transfer, TransferTo } from './types';
 
 export const freezeCard = () => request<CardStatus>('POST', `${ME}/card/freeze`);
 
@@ -26,7 +27,7 @@ export const removeRecipient = (r: Recipient) => request<void>('DELETE', recipie
 
 export type SendTransfer = {
   transferId: string;
-  to: Recipient;
+  to: TransferTo;
   amount: number;
   content: string;
   password: string;
@@ -38,6 +39,8 @@ export const sendTransfer = (t: SendTransfer) =>
   request<Transfer & { balance: number }>('POST', `${ME}/transfers`, {
     transferId: t.transferId,
     toAccount: t.to.account,
+    // Another bank: say which, and give the name we were told, since nobody here can look it up.
+    ...(t.to.bank.bin === OUR_BANK.bin ? {} : { toBank: t.to.bank.bin, toName: t.to.name }),
     amount: t.amount,
     content: t.content,
     password: t.password,
@@ -48,6 +51,7 @@ export type SendPayment = {
   merchantId: string;
   amount: number;
   password: string;
+  qr?: string;
 };
 
 // Recorded as PENDING like a transfer; poll fetchPayment for the outcome. balance: the card's balance now.

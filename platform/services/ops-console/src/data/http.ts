@@ -27,20 +27,23 @@ function headers(json: boolean): Record<string, string> {
   return h;
 }
 
-async function fail(res: Response): Promise<never> {
-  if (res.status === 401 && token) onUnauthorized();
+// sent: the token the request carried. Only a 401 for the current token means the session is gone; a request sent
+// without one (or with an older one) proves nothing about the session now in use.
+async function fail(res: Response, sent: string | null): Promise<never> {
+  if (res.status === 401 && sent && sent === token) onUnauthorized();
   const body = await res.json().catch(() => null);
   const message = Array.isArray(body?.message) ? body.message.join(', ') : (body?.message ?? res.statusText);
   throw new HttpError(res.status, message);
 }
 
 export async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  const sent = token;
   const res = await fetch(`${API_URL}${path}`, {
     method,
     headers: headers(body !== undefined),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) await fail(res);
+  if (!res.ok) await fail(res, sent);
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
@@ -55,8 +58,9 @@ export async function stream(
   onOpen: () => void,
   signal: AbortSignal,
 ): Promise<void> {
+  const sent = token;
   const res = await fetch(`${API_URL}${path}`, { headers: headers(false), signal });
-  if (!res.ok || !res.body) await fail(res);
+  if (!res.ok || !res.body) await fail(res, sent);
   onOpen();
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = '';

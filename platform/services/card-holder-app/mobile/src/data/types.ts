@@ -6,6 +6,8 @@ export type Txn = {
   txnId: string;
   ts: string;
   channel: Channel;
+  // IN: received from another card of this bank; merchant and recipientAccount are the sender's.
+  direction: 'IN' | 'OUT';
   merchant: string;
   recipientAccount: string | null;
   category: string;
@@ -39,11 +41,17 @@ export type Budget = {
   spent: number;
 };
 
-// Always an account at this bank: transfers to other banks are not supported.
+// A saved recipient: always an account at this bank.
 export type Recipient = {
   account: string;
   name: string;
 };
+
+/** A bank a transfer can go to, by its NAPAS bank id (BIN). */
+export type Bank = { bin: string; code: string; name: string };
+
+/** Who a transfer goes to: at this bank, or at another bank through NAPAS. */
+export type TransferTo = Recipient & { bank: Bank };
 
 // PENDING until the bank's fraud check decides; only POSTED moved the money.
 export type TransferStatus = 'PENDING' | 'POSTED' | 'DECLINED';
@@ -51,7 +59,7 @@ export type TransferStatus = 'PENDING' | 'POSTED' | 'DECLINED';
 export type Transfer = {
   transferId: string;
   reference: string;
-  to: Recipient;
+  to: TransferTo;
   amount: number;
   fee: number;
   content: string;
@@ -79,6 +87,39 @@ export type Payment = {
   declinedFor: string[];
   ts: string;
 };
+
+// What a scanned VietQR code points at, as the bank read it.
+export type QrTarget =
+  | { kind: 'TRANSFER'; account: string; name: string; amount: number | null; note: string | null }
+  // qr: sent back with the payment; a code with an amount must be paid exactly that.
+  | { kind: 'MERCHANT'; merchant: PayMerchant; amount: number | null; qr: string }
+  | {
+      kind: 'OTHER_BANK';
+      bin: string;
+      // Null for a bank a transfer can't reach.
+      bank: Bank | null;
+      account: string;
+      toCard: boolean;
+      name: string | null;
+      amount: number | null;
+      note: string | null;
+    };
+
+/** The signed-in cardholder's own details. */
+export type Profile = {
+  cardId: string;
+  accountNumber: string;
+  name: string;
+  email: string;
+  gender: string | null;
+  dob: string | null;
+  address: string | null;
+  job: string | null;
+  memberSince: string;
+};
+
+/** The cardholder's own code, for receiving transfers. */
+export type MyQr = { payload: string; account: string; name: string };
 
 export type RuleType = 'BLOCK' | 'ALLOW';
 

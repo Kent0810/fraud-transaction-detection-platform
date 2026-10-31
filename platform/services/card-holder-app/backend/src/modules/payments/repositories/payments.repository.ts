@@ -5,6 +5,7 @@ import { asHttpError } from '../../../common/refusals';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import type { PaymentDto, PaymentRequest } from '../types/payments.types';
 import { MerchantsRepository } from './merchants.repository';
+import { QrRepository } from './qr.repository';
 
 const toDto = (r: TransactionState): PaymentDto => ({
   paymentId: r.txn_id,
@@ -24,9 +25,11 @@ export class PaymentsRepository {
   constructor(
     private readonly db: PrismaService,
     private readonly merchants: MerchantsRepository,
+    private readonly qr: QrRepository,
   ) {}
 
   async request(fromCard: string, p: PaymentRequest): Promise<PaymentDto> {
+    if (p.qr) this.qr.checkPayment(p.qr, p.merchantId, p.amount);
     const m = await this.merchants.find(fromCard, p.merchantId);
     try {
       return toDto(

@@ -75,6 +75,13 @@ export type AuditEntryDto = {
   payload: unknown;
 };
 
+// A card this staff member opened, from their own VIEW_CARDHOLDER audit rows: the bank's record, not the browser's.
+export type RecentCardDto = {
+  cardId: string;
+  name: string;
+  openedAt: string;
+};
+
 export const StaffLoginRequest = z.object({
   email: z.email().max(200),
   password: Password,

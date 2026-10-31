@@ -418,6 +418,10 @@ kbd + kbd {
   background: var(--hl-soft);
   color: var(--hl);
 }
+.avatar.t-allow {
+  background: var(--hot-soft);
+  color: var(--c-allow);
+}
 .avatar.big {
   width: 64px;
   height: 64px;
@@ -1674,6 +1678,9 @@ button.rule:hover {
 .feed-item.t-decline .feed-row {
   border-left-color: var(--c-decline);
 }
+.feed-item.t-allow .feed-row {
+  border-left-color: var(--c-allow);
+}
 .feed-row:hover {
   box-shadow: var(--shadow);
   border-color: var(--rule-strong);
@@ -2330,6 +2337,9 @@ dialog::backdrop {
 .toast.t-decline::before {
   background: var(--c-decline);
 }
+.toast.t-allow::before {
+  background: var(--c-allow);
+}
 .toast-main {
   display: flex;
   flex-direction: column;
@@ -2519,4 +2529,47 @@ dialog::backdrop {
 }
 .panel > .btn {
   align-self: flex-start;
+}
+
+/* merchant QR terminal */
+.terminal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .terminal {
+    grid-template-columns: 1fr;
+  }
+}
+.terminal-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.terminal-list a[aria-current] {
+  background: var(--hot-soft);
+}
+.terminal-code {
+  align-items: center;
+  text-align: center;
+}
+.terminal-qr {
+  width: min(280px, 100%);
+  height: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+}
+.terminal-amount {
+  font: 600 1.4rem var(--mono);
+  color: var(--ink);
+}
+.terminal-payload {
+  word-break: break-all;
+  font-size: 0.7rem;
+}
+
+/* money received from another card */
+td.credit {
+  color: var(--ok);
 }

@@ -17,6 +17,7 @@ export type TxnRow = {
   ts: Date;
   txnId: string;
   channel: string | null;
+  direction: string | null;
   merchant: string;
   recipientAccount: string | null;
   category: string;

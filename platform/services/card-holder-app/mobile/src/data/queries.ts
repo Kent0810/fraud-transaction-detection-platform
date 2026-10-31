@@ -1,5 +1,18 @@
 import { HttpError, ME, request } from './http';
-import type { Alert, PayMerchant, Payment, Period, Recipient, RuleType, Transfer, Txn } from './types';
+import type {
+  Alert,
+  Bank,
+  MyQr,
+  PayMerchant,
+  Profile,
+  Payment,
+  Period,
+  QrTarget,
+  Recipient,
+  RuleType,
+  Transfer,
+  Txn,
+} from './types';
 
 export type Controls = {
   budget: { limit: number; period: Period; updatedAt: string | null } | null;
@@ -33,6 +46,16 @@ export const fetchMerchants = () => request<PayMerchant[]>('GET', `${ME}/payment
 
 export const fetchPayment = (paymentId: string) =>
   request<Payment & { balance: number }>('GET', `${ME}/payments/${encodeURIComponent(paymentId)}`);
+
+// This bank first, then the others a transfer can reach.
+export const fetchBanks = () => request<Bank[]>('GET', `${ME}/transfers/banks`);
+
+export const fetchProfile = () => request<Profile>('GET', `${ME}/profile`);
+
+export const fetchMyQr = () => request<MyQr>('GET', `${ME}/qr`);
+
+// A POST that changes nothing: the bank checks the code (checksum, signature, account) and says what it is for.
+export const resolveQr = (payload: string) => request<QrTarget>('POST', `${ME}/qr/resolve`, { payload });
 
 export type CardStatus = { frozen: boolean };
 

@@ -9,6 +9,7 @@ export const RULE_TITLE: Record<string, string> = {
   FROZEN: 'Card frozen',
   LARGE_AMOUNT: 'Large transfer',
   INSUFFICIENT_FUNDS: 'Insufficient funds',
+  MOCK_REPEAT: 'Same transfer repeated (test rule)',
 };
 
 export const ruleTitle = (id: string) => RULE_TITLE[id] ?? id;

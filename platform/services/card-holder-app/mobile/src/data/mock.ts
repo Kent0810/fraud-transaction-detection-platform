@@ -1,10 +1,13 @@
-import type { Alert, Budget, MerchantRule, PayMerchant, Txn } from './types';
+import type { Alert, Bank, Budget, MerchantRule, PayMerchant, Txn } from './types';
 
 const now = Date.now();
 const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
 
 // number is the mock build's; with the API the real one comes from GET /cards/:id/balance.
 export const ACCOUNT = { number: '190300000001', label: 'Payment account' };
+
+/** This bank, as the bank list names it; offline, the only bank shown. */
+export const OUR_BANK: Bank = { bin: '970999', code: 'HCMMB', name: 'HCM Mock Banking' };
 
 export const LOOKUP_NAMES = ['HOANG GIA BAO', 'VO THANH TAM', 'DANG NGOC LAN', 'BUI QUOC HUY', 'DO THI MAI'];
 
@@ -13,6 +16,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1009',
     ts: minutesAgo(3),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Kuhn LLC',
     recipientAccount: null,
     category: 'shopping_net',
@@ -26,6 +30,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1008',
     ts: minutesAgo(4),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Kuhn LLC',
     recipientAccount: null,
     category: 'shopping_net',
@@ -39,6 +44,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1007',
     ts: minutesAgo(6),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Kuhn LLC',
     recipientAccount: null,
     category: 'shopping_net',
@@ -52,6 +58,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1006',
     ts: minutesAgo(95),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Kirlin and Sons',
     recipientAccount: null,
     category: 'personal_care',
@@ -65,6 +72,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1005',
     ts: minutesAgo(180),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Sporer-Keebler',
     recipientAccount: null,
     category: 'personal_care',
@@ -78,6 +86,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1004',
     ts: minutesAgo(26 * 60),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Swaniawski, Nitzsche and Welch',
     recipientAccount: null,
     category: 'health_fitness',
@@ -91,6 +100,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1003',
     ts: minutesAgo(27 * 60),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Haley Group',
     recipientAccount: null,
     category: 'misc_pos',
@@ -104,6 +114,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1002',
     ts: minutesAgo(50 * 60),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Johnston-Casper',
     recipientAccount: null,
     category: 'travel',
@@ -117,6 +128,7 @@ const MOCK_TXNS: Omit<Txn, 'status' | 'declinedFor'>[] = [
     txnId: 't-1001',
     ts: minutesAgo(52 * 60),
     channel: 'CARD',
+    direction: 'OUT',
     merchant: 'Daugherty LLC',
     recipientAccount: null,
     category: 'kids_pets',

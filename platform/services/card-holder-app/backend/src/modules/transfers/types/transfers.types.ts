@@ -1,4 +1,4 @@
-import type { TransactionStatus } from '@platform/db';
+import type { Bank, TransactionStatus } from '@platform/db';
 import { z } from 'zod';
 
 import { AccountNumber, Password, text } from '../../../common/validation';
@@ -7,7 +7,14 @@ export { OUR_BANK } from '@platform/db';
 
 export const TransferRequest = z.object({
   transferId: z.uuid().transform((id) => id.toLowerCase()),
+  // Another bank's id (BIN); absent for this bank. Its accounts can be any 6 to 19 digits.
+  toBank: z
+    .string()
+    .regex(/^\d{6}$/, 'must be a 6-digit bank id')
+    .optional(),
   toAccount: AccountNumber,
+  // Only for another bank, where nobody here can look the name up.
+  toName: text(50).optional(),
   // Whole đồng; int() also caps it at Number.MAX_SAFE_INTEGER.
   amount: z.number().int().positive(),
   content: text(140),
@@ -38,6 +45,7 @@ export type TransferDto = {
   to: {
     account: string;
     name: string;
+    bank: Bank;
   };
   amount: number;
   fee: number;

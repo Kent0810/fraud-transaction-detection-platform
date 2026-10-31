@@ -20,6 +20,8 @@ export default function TxnScreen() {
   }
 
   const transfer = txn.channel === 'TRANSFER';
+  // Received from another card of this bank: merchant and recipientAccount are the sender's.
+  const received = txn.direction === 'IN';
   // Approved by the fraud check but refused by the ledger, e.g. not enough balance.
   const refused = txn.status === 'DECLINED';
   const declined = txn.decision === 'DECLINE' || refused;
@@ -32,7 +34,12 @@ export default function TxnScreen() {
   const details: [string, string][] = [
     ['Date', `${day(txn.ts)}, ${time(txn.ts)}`],
     ...(transfer
-      ? [['To account', (txn.recipientAccount ?? '').replace(':', ' · ')] as [string, string]]
+      ? [
+          [received ? 'From account' : 'To account', (txn.recipientAccount ?? '').replace(':', ' · ')] as [
+            string,
+            string,
+          ],
+        ]
       : [['Category', category(txn.category)] as [string, string]]),
     ['Reference', txn.txnId],
   ];
@@ -41,9 +48,9 @@ export default function TxnScreen() {
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
         <IconBubble
-          name={categoryIcon(txn.category)}
-          tint={flagged ? tone.fg : c.primary}
-          bg={flagged ? tone.bg : c.primarySoft}
+          name={received ? 'arrow-down' : categoryIcon(txn.category)}
+          tint={flagged ? tone.fg : received ? c.allow : c.primary}
+          bg={flagged ? tone.bg : received ? c.allowBg : c.primarySoft}
           size={72}
         />
         <Text style={[styles.merchant, { color: c.text }]}>{txn.merchant}</Text>
@@ -51,12 +58,13 @@ export default function TxnScreen() {
           style={[
             styles.amount,
             {
-              color: declined ? c.muted : c.text,
+              color: declined ? c.muted : received ? c.allow : c.text,
               textDecorationLine: declined ? 'line-through' : 'none',
             },
           ]}
         >
-          -{money(txn.amount)}
+          {received ? '+' : '-'}
+          {money(txn.amount)}
         </Text>
         <View>
           <StatusPill decision={verdict} />

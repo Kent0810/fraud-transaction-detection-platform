@@ -30,6 +30,7 @@ import { FindCardQuery } from './queries/find-card.query';
 import { GetActivityQuery } from './queries/get-activity.query';
 import { GetAuditTrailQuery } from './queries/get-audit-trail.query';
 import { GetQueueQuery } from './queries/get-queue.query';
+import { GetRecentCardsQuery } from './queries/get-recent-cards.query';
 import {
   type ActivityDto,
   AlertId,
@@ -40,6 +41,7 @@ import {
   Lookup,
   type LoginStatus,
   type QueueItemDto,
+  type RecentCardDto,
   ReasonRequest,
   StaffMerchantRuleRequest,
 } from './types/ops.types';
@@ -78,6 +80,13 @@ export class OpsController {
     const cardId = await this.queries.execute(new FindCardQuery(q));
     if (!cardId) throw new NotFoundException('no card or account with that number');
     return { cardId };
+  }
+
+  // From the staff member's own audit rows, so it matches what the bank recorded and follows them to any computer.
+  @Staff()
+  @Get('recent-cards')
+  recentCards(@CurrentStaff() staff: StaffMember): Promise<RecentCardDto[]> {
+    return this.queries.execute(new GetRecentCardsQuery(staff.staffId));
   }
 
   @Staff()

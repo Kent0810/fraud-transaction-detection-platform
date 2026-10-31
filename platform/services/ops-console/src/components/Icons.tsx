@@ -25,9 +25,18 @@ export type IconName =
   | 'volume'
   | 'desktop'
   | 'filter'
-  | 'radar';
+  | 'radar'
+  | 'qr';
 
 const PATHS: Record<IconName, ReactNode> = {
+  qr: (
+    <>
+      <rect x="4" y="4" width="6" height="6" rx="1" />
+      <rect x="14" y="4" width="6" height="6" rx="1" />
+      <rect x="4" y="14" width="6" height="6" rx="1" />
+      <path d="M14 14h2v2h-2zM18 14h2M14 18v2M18 18h2v2" />
+    </>
+  ),
   queue: (
     <>
       <path d="M4 6h16M4 12h10M4 18h6" />

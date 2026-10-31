@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { findCard } from '../data/api';
+import { fetchRecentCards, findCard, type RecentCard } from '../data/api';
 import { ago, cardNumber } from '../data/format';
 import { useLive } from '../data/live';
-import { recentCards } from '../data/recent';
 import { go, type Route } from '../data/router';
 import type { StaffRole } from '../data/types';
 import { Icon, type IconName } from './Icons';
@@ -25,6 +24,7 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
   const [cursor, setCursor] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentCards, setRecentCards] = useState<RecentCard[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -32,6 +32,8 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
       setCursor(0);
       setError(null);
       dialog.current?.showModal();
+      // Fresh each time: the audit log is the list, and it grows with every card opened.
+      fetchRecentCards().then(setRecentCards, () => setRecentCards([]));
     } else {
       dialog.current?.close();
     }
@@ -81,8 +83,16 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
         : []),
       { id: 'p-find', icon: 'search', label: 'Find a card', hint: 'G F', group: 'Go to', run: to({ page: 'find' }) },
       { id: 'p-alerts', icon: 'bell', label: 'Live alerts', hint: 'G A', group: 'Go to', run: to({ page: 'alerts' }) },
+      {
+        id: 'p-terminal',
+        icon: 'qr',
+        label: 'Merchant QR',
+        hint: 'G M',
+        group: 'Go to',
+        run: to({ page: 'terminal' }),
+      },
     ];
-    const recent: Item[] = recentCards().map((c) => ({
+    const recent: Item[] = recentCards.map((c) => ({
       id: `r-${c.cardId}`,
       icon: 'clock',
       label: c.name,
@@ -106,7 +116,7 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
     const match = (i: Item) =>
       !needle || i.label.toLowerCase().includes(needle) || (i.hint ?? '').replace(/\s/g, '').includes(digits);
     return [...list, ...[...pages, ...recent, ...live].filter(match)];
-  }, [q, alerts, role, onClose]);
+  }, [q, alerts, recentCards, role, onClose]);
 
   const safeCursor = Math.min(cursor, Math.max(items.length - 1, 0));
   let lastGroup = '';
@@ -190,6 +200,7 @@ const SHORTCUTS: [string[], string][] = [
   [['G', 'Q'], 'Triage queue (analysts)'],
   [['G', 'F'], 'Find a card'],
   [['G', 'A'], 'Live alerts'],
+  [['G', 'M'], 'Merchant QR terminal'],
   [['J', 'K'], 'Move down / up a list'],
   [['Enter'], 'Open the selected row'],
   [['?'], 'This help'],

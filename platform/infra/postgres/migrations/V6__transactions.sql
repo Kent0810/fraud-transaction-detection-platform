@@ -13,10 +13,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   category      text,
   merch_lat     double precision,
   merch_long    double precision,
-  -- Transfers only: always to an account of this bank.
+  -- Transfers only: to an account of this bank (to_card), or of another bank through NAPAS (to_bank, its bank id).
+  -- Money sent to another bank leaves this bank: only the sender has a ledger entry.
   to_account    text,
   to_name       text,
   to_card       text REFERENCES accounts (card_id) ON DELETE RESTRICT,
+  to_bank       text CHECK (to_bank ~ '^\d{6}$'),
   content       text,
   amount        bigint NOT NULL CHECK (amount > 0),
   status        text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'POSTED', 'DECLINED')),
@@ -26,15 +28,17 @@ CREATE TABLE IF NOT EXISTS transactions (
   CONSTRAINT transactions_declined_check CHECK ((status = 'DECLINED') = (cardinality(declined_for) > 0)),
   CONSTRAINT transactions_decided_check CHECK ((status = 'PENDING') = (decided_at IS NULL)),
   CONSTRAINT transactions_channel_check CHECK (CASE channel
-    WHEN 'TRANSFER' THEN to_account IS NOT NULL AND to_name IS NOT NULL AND to_card IS NOT NULL AND content IS NOT NULL
-    ELSE merchant IS NOT NULL AND to_card IS NULL END)
+    WHEN 'TRANSFER' THEN to_account IS NOT NULL AND to_name IS NOT NULL AND content IS NOT NULL
+                         AND (to_card IS NULL) <> (to_bank IS NULL)
+    ELSE merchant IS NOT NULL AND to_card IS NULL AND to_bank IS NULL END)
 );
 
 CREATE INDEX IF NOT EXISTS transactions_card_idx ON transactions (card_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS transactions_to_idx ON transactions (to_card, created_at DESC) WHERE to_card IS NOT NULL;
 CREATE INDEX IF NOT EXISTS transactions_pending_idx ON transactions (created_at) WHERE status = 'PENDING';
 
--- Every entry except OPENING belongs to a transaction: -amount for the card, +amount for the recipient of a transfer.
+-- Every entry except OPENING belongs to a transaction: -amount for the card, +amount for the recipient of a transfer
+-- inside this bank.
 ALTER TABLE ledger_entries
   DROP CONSTRAINT ledger_entries_kind_check,
   ADD CONSTRAINT ledger_entries_kind_check CHECK (kind IN ('OPENING', 'TRANSFER', 'CARD_PAYMENT')),

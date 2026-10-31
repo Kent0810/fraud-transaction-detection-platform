@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { BANK_NAME } from '@/components/brand';
 import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp } from '@/components/motion';
 import { Button, Empty } from '@/components/ui';
@@ -32,7 +31,7 @@ export default function ConfirmTransferScreen() {
     ['From account', printAccount(accountNumber)],
     ['To account', draft.to.account],
     ['Account name', draft.to.name],
-    ['Bank', BANK_NAME],
+    ['Bank', `${draft.to.bank.code} · ${draft.to.bank.name}`],
     ['Message', draft.content],
     ['Fee', 'Free'],
   ];

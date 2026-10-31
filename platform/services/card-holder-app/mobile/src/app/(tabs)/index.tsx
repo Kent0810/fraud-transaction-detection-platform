@@ -34,7 +34,7 @@ export default function HomeScreen() {
   const recentMerchants = useMemo(() => {
     const latest = new Map<string, Txn>();
     for (const t of [...transactions].sort((a, b) => b.ts.localeCompare(a.ts))) {
-      if (t.decision !== 'DECLINE' && !latest.has(t.merchant)) latest.set(t.merchant, t);
+      if (t.direction !== 'IN' && t.decision !== 'DECLINE' && !latest.has(t.merchant)) latest.set(t.merchant, t);
       if (latest.size === RECENT_MERCHANTS) break;
     }
     return [...latest.values()];
@@ -82,6 +82,13 @@ export default function HomeScreen() {
             <Text style={[styles.hello, { color: c.muted }]}>{greeting()},</Text>
             <Text style={[styles.who, { color: c.text }]}>{user.name.split(' ')[0]}</Text>
           </View>
+          <ScalePressable
+            accessibilityLabel="Scan QR"
+            onPress={() => router.push('/scan')}
+            style={[styles.bell, { backgroundColor: c.surface }]}
+          >
+            <Ionicons name="scan-outline" size={22} color={c.text} />
+          </ScalePressable>
           <ScalePressable
             accessibilityLabel={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             onPress={() => update('theme', theme === 'dark' ? 'light' : 'dark')}

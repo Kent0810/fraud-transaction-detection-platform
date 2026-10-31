@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -83,7 +84,13 @@ export function BankCard({ last4, holder, spent, limit, period, frozen }: Props)
         >
           <LinearGradient colors={colors} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.card}>
             <Glows />
-            <View style={[styles.stripe]} />
+            {/* The link sits in the stripe: the back is pinned to the front's size, so it can't grow taller. */}
+            <View style={styles.stripe}>
+              <Pressable onPress={() => router.push('/profile')} accessibilityRole="button" style={styles.detailsLink}>
+                <Ionicons name="eye-outline" size={14} color="#fff" />
+                <Text style={styles.detailsText}>Show card details</Text>
+              </Pressable>
+            </View>
             <Text style={styles.label}>Card number</Text>
             <Text style={styles.fullNumber}>•••• •••• •••• {last4}</Text>
             <View style={styles.backRow}>
@@ -119,6 +126,16 @@ function Glows() {
 const styles = StyleSheet.create({
   face: { backfaceVisibility: 'hidden' },
   backFace: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  detailsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  detailsText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   card: { borderRadius: radius.xl, padding: space.xl, overflow: 'hidden', minHeight: 200 },
   glowA: {
     position: 'absolute',
@@ -173,7 +190,15 @@ const styles = StyleSheet.create({
   bottom: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
   number: { color: 'rgba(255,255,255,0.9)', fontSize: 15, fontWeight: '600', letterSpacing: 2 },
   small: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
-  stripe: { height: 36, marginHorizontal: -space.xl, backgroundColor: 'rgba(0,0,0,0.35)', marginBottom: space.lg },
+  stripe: {
+    height: 36,
+    marginHorizontal: -space.xl,
+    paddingHorizontal: space.xl,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    marginBottom: space.lg,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
   fullNumber: {
     color: '#fff',
     fontSize: 20,

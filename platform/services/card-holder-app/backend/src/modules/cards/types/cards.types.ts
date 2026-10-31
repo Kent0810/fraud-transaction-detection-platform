@@ -6,6 +6,8 @@ export type TxnDto = {
   txnId: string;
   ts: string;
   channel: Channel;
+  // IN: money received from another card of this bank (merchant and recipientAccount are then the sender's).
+  direction: 'IN' | 'OUT';
   merchant: string;
   recipientAccount: string | null;
   category: string;

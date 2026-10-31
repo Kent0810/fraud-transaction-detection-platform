@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -38,17 +38,38 @@ const RESULT: Record<Payment['status'], (c: Colors) => { icon: IconName; title: 
   DECLINED: (c) => ({ icon: 'close', title: 'Payment declined', tint: c.decline, bg: c.declineBg }),
 };
 
+type QrParams = {
+  merchantId?: string;
+  name?: string;
+  category?: string;
+  distanceKm?: string;
+  amount?: string;
+  qr?: string;
+};
+
 // Tap to pay at a merchant nearby: pick the merchant and amount, confirm with the password, see the bank's answer.
+// Opened from a scanned merchant QR, the merchant is fixed, and so is the amount when the code carries one.
 // The payment goes through the same fraud check and ledger as a card payment from the network.
 export default function PayScreen() {
   const c = useColors();
   const user = useUser();
   const { balance, frozen, merchantsNearby, pay } = useStore();
+  const scanned = useLocalSearchParams<QrParams>();
+  const fromQr: PayMerchant | null =
+    scanned.merchantId && scanned.name && scanned.category && scanned.qr
+      ? {
+          merchantId: scanned.merchantId,
+          name: scanned.name,
+          category: scanned.category,
+          distanceKm: scanned.distanceKm ? Number(scanned.distanceKm) : null,
+        }
+      : null;
+  const fixedAmount = fromQr && scanned.amount ? Number(scanned.amount) : null;
 
-  const [merchants, setMerchants] = useState<PayMerchant[] | null>(null);
+  const [merchants, setMerchants] = useState<PayMerchant[] | null>(fromQr ? [fromQr] : null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [merchant, setMerchant] = useState<PayMerchant | null>(null);
-  const [amountText, setAmountText] = useState('');
+  const [merchant, setMerchant] = useState<PayMerchant | null>(fromQr);
+  const [amountText, setAmountText] = useState(fixedAmount ? groupThousands(fixedAmount) : '');
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [paying, setPaying] = useState(false);
@@ -57,9 +78,11 @@ export default function PayScreen() {
   // One id per payment attempt: pressing Pay again after a timeout retries the same payment, never a second one.
   const [paymentId, setPaymentId] = useState(newTransferId);
 
+  const qrMerchantId = fromQr?.merchantId;
   useEffect(() => {
+    if (qrMerchantId) return;
     merchantsNearby().then(setMerchants, (e: unknown) => setLoadError(message(e)));
-  }, [merchantsNearby]);
+  }, [merchantsNearby, qrMerchantId]);
 
   const amount = parseVnd(amountText);
   const amountError =
@@ -71,7 +94,7 @@ export default function PayScreen() {
     setPaying(true);
     setError(null);
     try {
-      setResult(await pay(merchant, amount, paymentId, password));
+      setResult(await pay(merchant, amount, paymentId, password, fromQr ? scanned.qr : undefined));
     } catch (e) {
       setError(e instanceof PaymentError ? e.message : `Could not pay: ${message(e)}`);
       setPassword('');
@@ -84,7 +107,7 @@ export default function PayScreen() {
     setResult(null);
     setConfirming(false);
     setPassword('');
-    setAmountText('');
+    setAmountText(fixedAmount ? groupThousands(fixedAmount) : '');
     setPaymentId(newTransferId());
   };
 
@@ -113,7 +136,7 @@ export default function PayScreen() {
           )}
         </View>
         <FadeInUp delay={350} style={{ gap: space.sm }}>
-          <Button label="Back to Home" onPress={() => router.dismissAll()} />
+          <Button label="Back to Home" onPress={() => router.dismissTo('/')} />
           <Button label="Pay again" variant="secondary" onPress={again} />
         </FadeInUp>
       </ScrollView>
@@ -137,7 +160,7 @@ export default function PayScreen() {
           </View>
         )}
 
-        <Text style={[styles.section, { color: c.text }]}>Nearby merchants</Text>
+        <Text style={[styles.section, { color: c.text }]}>{fromQr ? 'Paying by QR code' : 'Nearby merchants'}</Text>
         {!merchants ? (
           <ActivityIndicator color={c.primary} style={{ marginVertical: space.xl }} />
         ) : (
@@ -187,7 +210,7 @@ export default function PayScreen() {
                 const n = parseVnd(t);
                 setAmountText(n ? groupThousands(Math.min(n, 999_999_999_999)) : '');
               }}
-              editable={!confirming}
+              editable={!confirming && !fixedAmount}
               placeholder="0"
               placeholderTextColor={c.muted}
               keyboardType="number-pad"
@@ -197,24 +220,28 @@ export default function PayScreen() {
           </View>
           {amountError ? (
             <Text style={[styles.hint, { color: c.decline }]}>{amountError}</Text>
+          ) : fixedAmount ? (
+            <Text style={[styles.hint, { color: c.muted }]}>Set by the merchant in the QR code</Text>
           ) : amount > 0 ? (
             <Text style={[styles.words, { color: c.primary }]}>{vndInWords(amount)}</Text>
           ) : (
             <Text style={[styles.hint, { color: c.muted }]}>Available {vnd(balance)}</Text>
           )}
-          <View style={styles.quick}>
-            {QUICK.map((q) => (
-              <Pressable
-                key={q}
-                onPress={() => !confirming && setAmountText(groupThousands(q))}
-                style={[styles.chip, { backgroundColor: amount === q ? c.primarySoft : c.surfaceAlt }]}
-              >
-                <Text style={{ color: amount === q ? c.primary : c.text, fontWeight: '700', fontSize: 13 }}>
-                  {groupThousands(q)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          {!fixedAmount && (
+            <View style={styles.quick}>
+              {QUICK.map((q) => (
+                <Pressable
+                  key={q}
+                  onPress={() => !confirming && setAmountText(groupThousands(q))}
+                  style={[styles.chip, { backgroundColor: amount === q ? c.primarySoft : c.surfaceAlt }]}
+                >
+                  <Text style={{ color: amount === q ? c.primary : c.text, fontWeight: '700', fontSize: 13 }}>
+                    {groupThousands(q)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         {!confirming ? (

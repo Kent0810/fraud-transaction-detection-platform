@@ -16,6 +16,7 @@ import { OpsController } from './ops.controller';
 import { FindCardHandler } from './queries/find-card.query';
 import { GetActivityHandler } from './queries/get-activity.query';
 import { GetAuditTrailHandler } from './queries/get-audit-trail.query';
+import { GetRecentCardsHandler } from './queries/get-recent-cards.query';
 import { GetQueueHandler } from './queries/get-queue.query';
 import { CardholderFilesRepository } from './repositories/cardholder-files.repository';
 import { CasesRepository } from './repositories/cases.repository';
@@ -41,6 +42,7 @@ import { StaffRepository } from './repositories/staff.repository';
     GetQueueHandler,
     GetActivityHandler,
     GetAuditTrailHandler,
+    GetRecentCardsHandler,
     FindCardHandler,
     { provide: APP_GUARD, useClass: StaffGuard },
   ],

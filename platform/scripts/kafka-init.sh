@@ -21,5 +21,6 @@ create alerts        "$PARTITIONS" --config retention.ms=604800000
 create control       "$PARTITIONS" --config retention.ms=-1
 create cases         "$PARTITIONS" --config cleanup.policy=compact
 create settlements   "$PARTITIONS" --config retention.ms=604800000
+create credits       "$PARTITIONS" --config retention.ms=604800000
 
 "$BIN/kafka-topics.sh" --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --list

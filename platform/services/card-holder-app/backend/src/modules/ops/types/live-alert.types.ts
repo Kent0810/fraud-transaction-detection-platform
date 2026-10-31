@@ -13,6 +13,16 @@ export const DecisionMessage = z.object({
   fired_rules: z.array(z.string()),
 });
 
+/** An alert from the alerts topic: its own message, without the transaction's details. */
+export const AlertMessage = z.object({
+  card_id: z.string(),
+  txn_id: z.string(),
+  rule_id: z.string(),
+  score: z.number(),
+  amount: z.number(),
+  ts: z.string(),
+});
+
 export type LiveAlertDto = {
   txnId: string;
   cardId: string;
@@ -21,7 +31,8 @@ export type LiveAlertDto = {
   category: string;
   amount: number;
   currency: string;
-  decision: 'STEP_UP' | 'DECLINE';
+  // ALLOW: the payment went through, but a rule raised an alert on it anyway (an alert-only rule).
+  decision: 'ALLOW' | 'STEP_UP' | 'DECLINE';
   score: number;
   firedRules: string[];
 };

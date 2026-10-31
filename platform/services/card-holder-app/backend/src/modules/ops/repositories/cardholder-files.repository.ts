@@ -3,7 +3,14 @@ import { Injectable } from '@nestjs/common';
 import { iso } from '../../../shared/cassandra/models';
 import { auditEntry, type StaffAudit } from '../../../shared/prisma/audit';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import type { AccountDto, AuditEntryDto, CardholderDto, LoginDto, LoginStatus } from '../types/ops.types';
+import type {
+  AccountDto,
+  AuditEntryDto,
+  CardholderDto,
+  LoginDto,
+  LoginStatus,
+  RecentCardDto,
+} from '../types/ops.types';
 
 @Injectable()
 export class CardholderFilesRepository {
@@ -80,6 +87,30 @@ export class CardholderFilesRepository {
           }
         : null,
     };
+  }
+
+  /** The cards this staff member opened most recently, each once, newest first. */
+  async recentlyOpened(staffId: number, limit: number): Promise<RecentCardDto[]> {
+    const rows = await this.db.client.audit_log.findMany({
+      where: { staff_id: staffId, action: 'VIEW_CARDHOLDER' },
+      orderBy: { at: 'desc' },
+      // Enough views to find `limit` different cards, even when the same few are opened over and over.
+      take: limit * 25,
+      select: {
+        card_id: true,
+        at: true,
+        cardholders: { select: { first_name: true, last_name: true } },
+      },
+    });
+    const seen = new Set<string>();
+    return rows
+      .filter((r) => !seen.has(r.card_id) && seen.add(r.card_id))
+      .slice(0, limit)
+      .map((r) => ({
+        cardId: r.card_id,
+        name: `${r.cardholders.first_name} ${r.cardholders.last_name}`,
+        openedAt: r.at.toISOString(),
+      }));
   }
 
   async auditTrail(cardId: string, limit: number): Promise<AuditEntryDto[]> {

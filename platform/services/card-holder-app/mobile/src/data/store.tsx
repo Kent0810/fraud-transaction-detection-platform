@@ -30,11 +30,12 @@ import type {
   Recipient,
   RuleType,
   Transfer,
+  TransferTo,
   Txn,
 } from './types';
 
 export type TransferDraft = {
-  to: Recipient;
+  to: TransferTo;
   amount: number;
   content: string;
   save: boolean;
@@ -69,7 +70,7 @@ type Store = {
   sendTransfer: (draft: TransferDraft, transferId: string, password: string) => Promise<Transfer>;
   refreshTransfer: (transferId: string) => Promise<Transfer | null>;
   merchantsNearby: () => Promise<PayMerchant[]>;
-  pay: (merchant: PayMerchant, amount: number, paymentId: string, password: string) => Promise<Payment>;
+  pay: (merchant: PayMerchant, amount: number, paymentId: string, password: string, qr?: string) => Promise<Payment>;
   removeSaved: (recipient: Recipient) => void;
 };
 
@@ -100,7 +101,9 @@ function paymentError(e: unknown): Error {
     case 404:
       return new PaymentError('This merchant is no longer available');
     case 422:
-      return new PaymentError('Not enough balance for this payment');
+      return new PaymentError(
+        e.detail === 'insufficient funds' ? 'Not enough balance for this payment' : (e.detail ?? 'Payment refused'),
+      );
     default:
       return new PaymentError('Payment failed. Check your balance before trying again.');
   }
@@ -240,7 +243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!apiEnabled) return budget;
     const now = new Date();
     const spent = transactions
-      .filter((t) => t.decision !== 'DECLINE' && t.status !== 'DECLINED')
+      .filter((t) => t.direction !== 'IN' && t.decision !== 'DECLINE' && t.status !== 'DECLINED')
       .filter((t) => {
         const d = new Date(t.ts);
         return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
@@ -377,8 +380,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       keepTransfer(transfer);
       if (d.save && transfer.status !== 'DECLINED') {
-        setSaved((rs) => (rs.some((r) => sameRecipient(r, d.to)) ? rs : [d.to, ...rs]));
-        if (apiEnabled) commands.saveRecipient(d.to).catch(reloadSaved);
+        const r = { account: d.to.account, name: d.to.name };
+        setSaved((rs) => (rs.some((x) => sameRecipient(x, r)) ? rs : [r, ...rs]));
+        if (apiEnabled) commands.saveRecipient(r).catch(reloadSaved);
       }
       return transfer;
     },
@@ -397,7 +401,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Like sendTransfer: recorded PENDING, then wait a little for the fraud check before showing the result.
   const pay = useCallback(
-    async (merchant: PayMerchant, amount: number, paymentId: string, password: string): Promise<Payment> => {
+    async (
+      merchant: PayMerchant,
+      amount: number,
+      paymentId: string,
+      password: string,
+      qr?: string,
+    ): Promise<Payment> => {
       if (!apiEnabled) {
         await wait(TRANSFER_MS);
         if (password !== MOCK_PASSWORD) throw new PaymentError('Incorrect password');
@@ -415,7 +425,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       }
       let { balance: now, ...payment } = await commands
-        .sendPayment({ paymentId, merchantId: merchant.merchantId, amount, password })
+        .sendPayment({ paymentId, merchantId: merchant.merchantId, amount, password, qr })
         .catch((e: unknown) => {
           throw paymentError(e);
         });

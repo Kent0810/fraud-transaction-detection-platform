@@ -5,11 +5,14 @@ USE fraud;
 
 -- decisions topic (the fraud verdict) and settlements topic (the final POSTED/DECLINED outcome), one row per transaction.
 -- settlements writes only status, declined_for, settled_at; its ts equals the decision's, so both land on the same row.
+-- credits topic: a transfer between two of our cards also gets a row in the recipient's partition, direction IN, with
+-- the sender as merchant/recipient_account. direction is null on every other row: money out of this card.
 CREATE TABLE IF NOT EXISTS txn_by_card (
   card_id               text,
   ts                    timestamp,
   txn_id                text,
   channel               text,
+  direction             text,
   merchant              text,
   recipient_account     text,
   category              text,

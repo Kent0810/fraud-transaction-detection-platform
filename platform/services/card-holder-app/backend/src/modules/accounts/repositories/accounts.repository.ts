@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { iso } from '../../../shared/cassandra/models';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import type { AccountHolderDto, BalanceDto } from '../types/accounts.types';
+import type { AccountHolderDto, BalanceDto, ProfileDto } from '../types/accounts.types';
 
 @Injectable()
 export class AccountsRepository {
@@ -26,6 +26,39 @@ export class AccountsRepository {
       balance: Number(row.balance),
       currency: row.currency,
       updatedAt: iso(row.updated_at) ?? '',
+    };
+  }
+
+  async profile(cardId: string): Promise<ProfileDto | null> {
+    const row = await this.db.client.cardholders.findUnique({
+      where: { card_id: cardId },
+      select: {
+        first_name: true,
+        last_name: true,
+        email: true,
+        gender: true,
+        dob: true,
+        street: true,
+        city: true,
+        state: true,
+        zip: true,
+        job: true,
+        created_at: true,
+        accounts: { select: { account_number: true } },
+      },
+    });
+    if (!row?.accounts) return null;
+    const address = [row.street, row.city, [row.state, row.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    return {
+      cardId,
+      accountNumber: row.accounts.account_number,
+      name: `${row.first_name} ${row.last_name}`,
+      email: row.email,
+      gender: row.gender,
+      dob: row.dob?.toISOString().slice(0, 10) ?? null,
+      address: address || null,
+      job: row.job,
+      memberSince: row.created_at.toISOString(),
     };
   }
 

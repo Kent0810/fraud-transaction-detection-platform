@@ -24,6 +24,14 @@ function load(): StaffSession | null {
   }
 }
 
+// After a reload, the pages' first requests go out in their effects, which run before this provider's: hand the saved
+// token to the client right away, so they carry it.
+function restore(): StaffSession | null {
+  const s = load();
+  setAuth(s?.token ?? null);
+  return s;
+}
+
 function save(s: StaffSession | null) {
   try {
     if (s) sessionStorage.setItem(KEY, JSON.stringify(s));
@@ -34,7 +42,7 @@ function save(s: StaffSession | null) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<StaffSession | null>(load);
+  const [session, setSession] = useState<StaffSession | null>(restore);
 
   const forget = useCallback(() => {
     save(null);

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -16,16 +16,18 @@ import {
 } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
-import { BANK_NAME } from '@/components/brand';
+import { BankPicker } from '@/components/BankPicker';
 import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Button } from '@/components/ui';
 import { groupThousands, parseVnd, toAccountName, vnd, vndInWords } from '@/components/vnd';
-import { ACCOUNT } from '@/data/mock';
+import { apiEnabled } from '@/data/http';
+import { ACCOUNT, OUR_BANK } from '@/data/mock';
+import { fetchBanks } from '@/data/queries';
 import { useUser } from '@/data/auth';
 import { useSettings } from '@/data/settings';
 import { useStore } from '@/data/store';
-import type { Recipient } from '@/data/types';
+import type { Bank, Recipient } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
 
 const QUICK = [100_000, 200_000, 500_000, 1_000_000, 2_000_000];
@@ -46,17 +48,36 @@ export default function TransferFormScreen() {
   const { hideBalance, update } = useSettings();
   const user = useUser();
 
-  const [account, setAccount] = useState('');
+  // Prefilled when opened from a scanned VietQR code: ours, or another bank's (bank and maybe name set).
+  const scanned = useLocalSearchParams<{
+    bank?: string;
+    account?: string;
+    name?: string;
+    amount?: string;
+    note?: string;
+  }>();
+  const [banks, setBanks] = useState<Bank[]>([OUR_BANK]);
+  const [bankBin, setBankBin] = useState(scanned.bank ?? OUR_BANK.bin);
+  const [picking, setPicking] = useState(false);
+  const [account, setAccount] = useState(scanned.account ?? '');
+  const [toName, setToName] = useState(scanned.name ?? '');
   const [result, setResult] = useState<{ key: string; name: string | null } | null>(null);
-  const [amountText, setAmountText] = useState('');
-  const [content, setContent] = useState(`${toAccountName(user.name)} transfer`);
+  const [amountText, setAmountText] = useState(scanned.amount ? groupThousands(Number(scanned.amount)) : '');
+  const [content, setContent] = useState(scanned.note || `${toAccountName(user.name)} transfer`);
   const [save, setSave] = useState(false);
 
-  const amount = parseVnd(amountText);
-  const alreadySaved = saved.some((r) => r.account === account);
-  const toSelf = account === accountNumber;
+  useEffect(() => {
+    if (apiEnabled) fetchBanks().then(setBanks, () => null);
+  }, []);
 
-  const lookupKey = account.length >= 6 && !toSelf ? account : null;
+  const bank = banks.find((b) => b.bin === bankBin) ?? OUR_BANK;
+  // Another bank's accounts can't be looked up (that takes a NAPAS member's connection): the sender types the name.
+  const external = bank.bin !== OUR_BANK.bin;
+  const amount = parseVnd(amountText);
+  const alreadySaved = external || saved.some((r) => r.account === account);
+  const toSelf = !external && account === accountNumber;
+
+  const lookupKey = !external && account.length >= 6 && !toSelf ? account : null;
   useEffect(() => {
     if (!lookupKey) return;
     let cancelled = false;
@@ -70,26 +91,34 @@ export default function TransferFormScreen() {
     };
   }, [lookupKey, lookupAccount]);
 
-  const lookup: Lookup = toSelf
-    ? { state: 'self' }
-    : !lookupKey
-      ? { state: 'idle' }
-      : result?.key !== lookupKey
-        ? { state: 'checking' }
-        : result.name
-          ? { state: 'found', name: result.name }
-          : { state: 'notfound' };
+  const typedName = toAccountName(toName).trim();
+  const lookup: Lookup = external
+    ? account.length >= 6 && typedName
+      ? { state: 'found', name: typedName }
+      : { state: 'idle' }
+    : toSelf
+      ? { state: 'self' }
+      : !lookupKey
+        ? { state: 'idle' }
+        : result?.key !== lookupKey
+          ? { state: 'checking' }
+          : result.name
+            ? { state: 'found', name: result.name }
+            : { state: 'notfound' };
 
   const amountError =
     amount > balance ? 'Insufficient balance' : amount > 0 && amount < MIN_AMOUNT ? `Minimum ${vnd(MIN_AMOUNT)}` : null;
   const valid = lookup.state === 'found' && amount >= MIN_AMOUNT && !amountError && content.trim().length > 0;
 
-  const pickSaved = (r: Recipient) => setAccount(r.account);
+  const pickSaved = (r: Recipient) => {
+    setBankBin(OUR_BANK.bin);
+    setAccount(r.account);
+  };
 
   const next = () => {
     if (lookup.state !== 'found') return;
     setDraft({
-      to: { account, name: lookup.name },
+      to: { account, name: lookup.name, bank },
       amount,
       content: content.trim(),
       save: save && !alreadySaved,
@@ -174,8 +203,17 @@ export default function TransferFormScreen() {
         )}
 
         <FadeInUp delay={stagger(3)}>
-          <Text style={[styles.section, { color: c.text }]}>Recipient at {BANK_NAME}</Text>
+          <Text style={[styles.section, { color: c.text }]}>Recipient</Text>
           <View style={[styles.card, { backgroundColor: c.surface }]}>
+            <Field label="Bank">
+              <Pressable onPress={() => setPicking(true)} style={styles.select} accessibilityRole="button">
+                <Text style={[styles.value, { color: c.text }]}>
+                  <Text style={{ fontWeight: '800' }}>{bank.code}</Text> · {bank.name}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={c.muted} />
+              </Pressable>
+            </Field>
+
             <Field label="Account number">
               <TextInput
                 value={account}
@@ -188,7 +226,16 @@ export default function TransferFormScreen() {
             </Field>
 
             <Field label="Account name" last>
-              {lookup.state === 'checking' ? (
+              {external ? (
+                <TextInput
+                  value={toName}
+                  onChangeText={(t) => setToName(t.slice(0, 50))}
+                  placeholder="As the recipient's bank shows it"
+                  placeholderTextColor={c.muted}
+                  autoCapitalize="characters"
+                  style={[styles.input, { color: c.text }]}
+                />
+              ) : lookup.state === 'checking' ? (
                 <View style={styles.lookup}>
                   <ActivityIndicator size="small" color={c.primary} />
                   <Text style={[styles.value, { color: c.muted }]}>Checking…</Text>
@@ -276,6 +323,17 @@ export default function TransferFormScreen() {
         </View>
         <Text style={[styles.demo, { color: c.muted }]}>Demo only. No real money is moved.</Text>
       </ScrollView>
+
+      <BankPicker
+        visible={picking}
+        banks={banks}
+        selected={bank.bin}
+        onSelect={(b) => {
+          setBankBin(b.bin);
+          setPicking(false);
+        }}
+        onClose={() => setPicking(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -306,6 +364,7 @@ const styles = StyleSheet.create({
   field: { paddingVertical: space.md, gap: 6 },
   label: { fontSize: 13 },
   value: { fontSize: 16 },
+  select: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   input: { fontSize: 16, paddingVertical: 2 },
   contentInput: { minHeight: 44, textAlignVertical: 'top' },
   counter: { fontSize: 11, alignSelf: 'flex-end' },

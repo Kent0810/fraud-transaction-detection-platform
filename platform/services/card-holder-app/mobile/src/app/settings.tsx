@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { FadeInUp, stagger } from '@/components/motion';
@@ -36,16 +36,19 @@ export default function SettingsScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <FadeInUp>
-        <Surface style={styles.profile}>
-          <Avatar name={user.name} size={64} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.name, { color: c.text }]}>{user.name}</Text>
-            <Text style={[styles.muted, { color: c.muted }]}>{user.email}</Text>
-            <Text style={[styles.muted, { color: c.muted }]}>
-              Card •••• {user.cardId.slice(-4)} · member since {user.memberSince}
-            </Text>
-          </View>
-        </Surface>
+        <Pressable onPress={() => router.push('/profile')} accessibilityRole="button">
+          <Surface style={styles.profile}>
+            <Avatar name={user.name} size={64} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.name, { color: c.text }]}>{user.name}</Text>
+              <Text style={[styles.muted, { color: c.muted }]}>{user.email}</Text>
+              <Text style={[styles.muted, { color: c.muted }]}>
+                Card •••• {user.cardId.slice(-4)} · member since {user.memberSince}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={c.muted} />
+          </Surface>
+        </Pressable>
       </FadeInUp>
 
       <FadeInUp delay={stagger(1)}>

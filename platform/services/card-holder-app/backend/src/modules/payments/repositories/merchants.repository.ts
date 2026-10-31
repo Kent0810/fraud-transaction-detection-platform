@@ -7,7 +7,7 @@ import { CONFIG } from '../../../config.module';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import type { MerchantDto } from '../types/payments.types';
 
-type Merchant = { merchantId: string; name: string; category: string };
+export type Merchant = { merchantId: string; name: string; category: string };
 
 /** A merchant placed near the cardholder: where the payment happens, for the fraud detector's location rules. */
 export type PlacedMerchant = MerchantDto & { lat: number | null; long: number | null };
@@ -51,9 +51,25 @@ export class MerchantsRepository {
   }
 
   async find(cardId: string, merchantId: string): Promise<PlacedMerchant> {
+    return place(this.get(merchantId), cardId, await this.home(cardId));
+  }
+
+  get(merchantId: string): Merchant {
     const merchant = this.merchants[Number(merchantId)];
     if (!merchant) throw new NotFoundException('merchant not found');
-    return place(merchant, cardId, await this.home(cardId));
+    return merchant;
+  }
+
+  /** By name, for the console's merchant terminal. */
+  search(query: string, limit: number): Merchant[] {
+    const q = query.trim().toLowerCase();
+    return this.merchants.filter((m) => !q || m.name.toLowerCase().includes(q)).slice(0, limit);
+  }
+
+  /** Where this merchant is for this card: what nearby() shows for it. */
+  async forCard(cardId: string, merchantId: string): Promise<MerchantDto> {
+    const { lat: _lat, long: _long, ...m } = await this.find(cardId, merchantId);
+    return m;
   }
 
   private home(cardId: string): Promise<{ lat: number | null; long: number | null } | null> {

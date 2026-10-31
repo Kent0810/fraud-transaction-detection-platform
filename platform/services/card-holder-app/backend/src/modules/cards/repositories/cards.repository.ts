@@ -89,6 +89,7 @@ function toTxn(r: TxnRow): TxnDto {
     txnId: r.txnId,
     ts: iso(r.ts) ?? '',
     channel: (r.channel as Channel | null) ?? 'CARD',
+    direction: r.direction === 'IN' ? 'IN' : 'OUT',
     merchant: r.merchant,
     recipientAccount: r.recipientAccount,
     category: r.category,

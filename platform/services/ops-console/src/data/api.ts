@@ -53,3 +53,19 @@ export const setFrozen = (cardId: string, frozen: boolean, reason: string | null
 
 export const setLoginEnabled = (cardId: string, enabled: boolean, reason: string | null) =>
   request<{ status: LoginStatus }>('POST', `${card(cardId)}/login/${enabled ? 'restore' : 'disable'}`, { reason });
+
+export type MerchantRef = { merchantId: string; name: string; category: string };
+
+export type MerchantQr = { payload: string; merchant: MerchantRef; amount: number | null; expiresAt: string | null };
+
+export const searchMerchants = (q: string) =>
+  request<MerchantRef[]>('GET', `/ops/merchants?q=${encodeURIComponent(q)}`);
+
+// amount set: a dynamic code the payer must pay exactly, valid for 10 minutes. null: a static counter code.
+export const merchantQr = (merchantId: string, amount: number | null) =>
+  request<MerchantQr>('POST', `/ops/merchants/${encodeURIComponent(merchantId)}/qr`, { amount });
+
+/** A card this staff member opened, from their own audit rows (newest first, each card once). */
+export type RecentCard = { cardId: string; name: string; openedAt: string };
+
+export const fetchRecentCards = () => request<RecentCard[]>('GET', '/ops/recent-cards');

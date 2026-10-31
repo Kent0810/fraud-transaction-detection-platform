@@ -9,6 +9,11 @@ export const RULE_TEXT: Record<string, { title: string; detail: string }> = {
   FROZEN: { title: 'Card frozen', detail: 'You froze this card, so the payment was declined.' },
   LARGE_AMOUNT: { title: 'Unusually large transfer', detail: 'Transfers this large need extra verification.' },
   INSUFFICIENT_FUNDS: { title: 'Not enough balance', detail: 'Your balance did not cover it, so no money moved.' },
+  MOCK_REPEAT: {
+    title: 'Same transfer repeated',
+    detail:
+      'Three or more transfers in a row to the same account for the same amount. The transfer still went through.',
+  },
 };
 
 export function ruleTitle(ruleId: string): string {

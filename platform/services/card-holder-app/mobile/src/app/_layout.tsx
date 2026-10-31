@@ -60,6 +60,12 @@ function AppShell({ signedIn }: { signedIn: boolean }) {
                 options={{ title: '', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
               />
               <Stack.Screen
+                name="scan"
+                options={{ title: 'Scan QR', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen name="my-qr" options={{ title: 'My QR', headerBackTitle: 'Back' }} />
+              <Stack.Screen name="profile" options={{ title: 'Personal information', headerBackTitle: 'Back' }} />
+              <Stack.Screen
                 name="pay"
                 options={{ title: 'Pay', headerBackTitle: 'Back', animation: 'slide_from_bottom' }}
               />

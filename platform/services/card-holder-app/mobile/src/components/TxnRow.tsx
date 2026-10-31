@@ -13,6 +13,7 @@ export function TxnRow({ txn }: { txn: Txn }) {
   const declined = txn.decision === 'DECLINE' || txn.status === 'DECLINED';
   const flagged = txn.decision !== 'ALLOW' || declined;
   const tone = useVerdictTone()[declined ? 'DECLINE' : txn.decision];
+  const received = txn.direction === 'IN';
   return (
     <Pressable
       accessibilityRole="button"
@@ -20,26 +21,30 @@ export function TxnRow({ txn }: { txn: Txn }) {
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
     >
       <IconBubble
-        name={categoryIcon(txn.category)}
-        tint={flagged ? tone.fg : c.primary}
-        bg={flagged ? tone.bg : c.primarySoft}
+        name={received ? 'arrow-down' : categoryIcon(txn.category)}
+        tint={flagged ? tone.fg : received ? c.allow : c.primary}
+        bg={flagged ? tone.bg : received ? c.allowBg : c.primarySoft}
       />
       <View style={styles.main}>
         <Text style={[styles.merchant, { color: c.text }]} numberOfLines={1}>
           {txn.merchant}
         </Text>
         <Text style={[styles.meta, { color: c.muted }]} numberOfLines={1}>
-          {category(txn.category)} · {time(txn.ts)}
+          {received ? 'Received' : category(txn.category)} · {time(txn.ts)}
         </Text>
       </View>
       <View style={styles.side}>
         <Text
           style={[
             styles.amount,
-            { color: declined ? c.muted : c.text, textDecorationLine: declined ? 'line-through' : 'none' },
+            {
+              color: declined ? c.muted : received ? c.allow : c.text,
+              textDecorationLine: declined ? 'line-through' : 'none',
+            },
           ]}
         >
-          -{money(txn.amount)}
+          {received ? '+' : '-'}
+          {money(txn.amount)}
         </Text>
         {flagged && <StatusPill decision={declined ? 'DECLINE' : txn.decision} compact />}
       </View>

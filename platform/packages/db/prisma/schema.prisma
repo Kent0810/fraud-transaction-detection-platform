@@ -177,6 +177,7 @@ model transactions {
   to_account                              String?
   to_name                                 String?
   to_card                                 String?
+  to_bank                                 String?
   content                                 String?
   amount                                  BigInt
   status                                  String           @default("PENDING")

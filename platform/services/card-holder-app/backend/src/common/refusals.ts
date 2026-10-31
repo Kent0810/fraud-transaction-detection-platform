@@ -20,6 +20,8 @@ const REFUSALS: Record<TransferRefusalCode, new (message: string) => HttpExcepti
   INCORRECT_PASSWORD: ForbiddenException,
   ACCOUNT_NOT_FOUND: NotFoundException,
   OWN_ACCOUNT: UnprocessableEntityException,
+  BANK_NOT_SUPPORTED: UnprocessableEntityException,
+  NAME_REQUIRED: UnprocessableEntityException,
   INSUFFICIENT_FUNDS: UnprocessableEntityException,
   TRANSFER_ID_REUSED: ConflictException,
   PAYMENT_ID_REUSED: ConflictException,

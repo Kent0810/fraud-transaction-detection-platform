@@ -19,7 +19,6 @@ import {
   vnd,
 } from '../data/format';
 import { useLive } from '../data/live';
-import { rememberCard } from '../data/recent';
 import { ACTION_LABEL, ruleTitle } from '../data/rules';
 import type { Activity, AuditEntry, CardView, CaseAlert, LoginStatus, RuleType } from '../data/types';
 import { Kpi, SkeletonTable } from './Queue';
@@ -85,7 +84,6 @@ export function Card({ cardId }: { cardId: string }) {
     try {
       const v = await api.openCard(cardId);
       setView(v);
-      rememberCard(v.cardId, v.holder.name);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -133,7 +131,9 @@ export function Card({ cardId }: { cardId: string }) {
         values: { ALLOW: 0, STEP_UP: 0, DECLINE: 0 },
       };
     });
+    // Spending only: money received isn't the card's risk.
     for (const t of activity ?? []) {
+      if (t.direction === 'IN') continue;
       const i = index.get(dayKey(new Date(t.ts)));
       if (i !== undefined) list[i].values[t.decision] += t.amount;
     }
@@ -456,7 +456,10 @@ export function Card({ cardId }: { cardId: string }) {
                                 )}
                                 <small className="muted">
                                   {t.channel === 'TRANSFER' ? (
-                                    <span className="mono">{t.recipientAccount}</span>
+                                    <span className="mono">
+                                      {t.direction === 'IN' ? 'from ' : ''}
+                                      {t.recipientAccount}
+                                    </span>
                                   ) : (
                                     category(t.category)
                                   )}
@@ -464,7 +467,9 @@ export function Card({ cardId }: { cardId: string }) {
                               </span>
                             </span>
                           </td>
-                          <td className="num strong">{vnd(t.amount)}</td>
+                          <td className={`num strong${t.direction === 'IN' ? ' credit' : ''}`}>
+                            {t.direction === 'IN' ? `+${vnd(t.amount)}` : vnd(t.amount)}
+                          </td>
                           <td>
                             <span className="decision">
                               <VerdictBadge verdict={t.decision} />
