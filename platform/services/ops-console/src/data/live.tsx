@@ -85,10 +85,13 @@ export function LiveAlertsProvider({ token, children }: { token: string; childre
       listeners.current.forEach((fn) => fn(a));
       if (p.sound) beep();
       if (p.desktop && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-        new Notification(`${a.decision === 'DECLINE' ? 'Declined' : 'Step-up'} · ${a.merchant}`, {
-          body: `Card ${a.cardId} · ${a.firedRules.join(', ')}`,
-          tag: a.txnId,
-        });
+        new Notification(
+          `${a.decision === 'DECLINE' ? 'Declined' : a.decision === 'STEP_UP' ? 'Step-up' : 'Alert'} · ${a.merchant}`,
+          {
+            body: `Card ${a.cardId} · ${a.firedRules.join(', ')}`,
+            tag: a.txnId,
+          },
+        );
       }
     };
 

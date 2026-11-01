@@ -24,10 +24,8 @@ import com.cardfraud.frauddetector.model.CaseSummary;
 import com.cardfraud.frauddetector.model.ControlEvent;
 import com.cardfraud.frauddetector.model.Decision;
 import com.cardfraud.frauddetector.model.Transaction;
-import com.cardfraud.frauddetector.model.TransferDecision;
 import com.cardfraud.frauddetector.rules.MockRepeatTransferRule;
 import com.cardfraud.frauddetector.rules.Rules;
-import com.cardfraud.frauddetector.rules.TransferRules;
 import com.cardfraud.frauddetector.serde.JsonSerde;
 
 // The processing pipeline, kept apart from main() so it can be tested with TopologyTestDriver.
@@ -40,13 +38,12 @@ public final class FraudTopology {
         AtomicLong received = new AtomicLong();
 
         Serde<String> keys = Serdes.String();
-        
+
         Serde<Transaction> transactionSerde = JsonSerde.of(Transaction.class);
         Serde<Decision> decisionSerde = JsonSerde.of(Decision.class);
         Serde<Alert> alertSerde = JsonSerde.of(Alert.class);
         Serde<CaseSummary> caseSerde = JsonSerde.of(CaseSummary.class);
         Serde<ControlEvent> controlSerde = JsonSerde.of(ControlEvent.class);
-        Serde<TransferDecision> transferDecisionSerde = JsonSerde.of(TransferDecision.class);
         Serde<Boolean> flags = Serdes.Boolean();
 
         StreamsBuilder builder = new StreamsBuilder();
@@ -60,19 +57,19 @@ public final class FraudTopology {
                         .withKeySerde(keys)
                         .withValueSerde(flags));
 
-        // 1. Read transactions as Transaction objects: card payments and app transfers
-        KStream<String, Transaction> cardPayments = builder
+        // 1. Read transactions as Transaction objects: card payments and app transfers share one topic
+        KStream<String, Transaction> transactions = builder
                 .stream(cfg.transactionsTopic(), Consumed.with(keys, transactionSerde))
+                .filter((cardId, txn) -> txn != null)
                 .peek((cardId, txn) -> {
                     long count = received.incrementAndGet();
                     if (count % cfg.logEvery() == 0) {
                         log.info("received {} records (last: key={} txn={})", count, cardId, txn.txnId());
                     }
                 });
-        KStream<String, Transaction> transfers = builder
-                .stream(cfg.transferRequestsTopic(), Consumed.with(keys, transactionSerde))
-                .filter((cardId, transfer) -> transfer != null);
-        KStream<String, Transaction> transactions = cardPayments.merge(transfers);
+
+        KStream<String, Transaction> transfers = transactions
+                .filter((cardId, txn) -> Transaction.TRANSFER.equals(txn.channel()));
 
         // 2. Every transaction -> one decision: DECLINE if the card is frozen, otherwise the rules (Rules.evaluate)
         KStream<String, Decision> decisions = transactions.leftJoin(
@@ -82,15 +79,8 @@ public final class FraudTopology {
                         : Rules.evaluate(cardId, txn),
                 Joined.with(keys, transactionSerde, flags));
 
-        // 3. Every card payment's decision -> decisions topic
-        decisions.filter((cardId, d) -> Transaction.CARD.equals(d.channel()))
-                .to(cfg.decisionsTopic(), Produced.with(keys, decisionSerde));
-
-        // 6. Every transfer's decision -> transfer-decisions topic
-        decisions.filter((cardId, d) -> Transaction.TRANSFER.equals(d.channel()))
-                .mapValues(TransferRules::decide)
-                .peek((cardId, d) -> log.info("transfer {} {} {}", d.txnId(), d.decision(), d.firedRules()))
-                .to(cfg.transferDecisionsTopic(), Produced.with(keys, transferDecisionSerde));
+        // 3. Every decision, card payment or transfer -> decisions topic
+        decisions.to(cfg.decisionsTopic(), Produced.with(keys, decisionSerde));
 
         // 4. Every fired rule -> one alert (details: Alert.fromDecision)
         decisions.flatMapValues(Alert::fromDecision)

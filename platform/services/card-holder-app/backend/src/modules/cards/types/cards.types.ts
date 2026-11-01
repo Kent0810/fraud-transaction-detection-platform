@@ -6,14 +6,19 @@ export type TxnDto = {
   txnId: string;
   ts: string;
   channel: Channel;
+  // IN: money received from another card of this bank (merchant and recipientAccount are then the sender's).
+  direction: 'IN' | 'OUT';
   merchant: string;
-  counterpartyAccount: string | null;
+  recipientAccount: string | null;
   category: string;
   amount: number;
   currency: string;
   decision: Verdict;
   score: number;
   firedRules: string[];
+  // Null until the ledger has posted or declined it.
+  status: 'POSTED' | 'DECLINED' | null;
+  declinedFor: string[];
 };
 
 export type AlertStatus = 'OPEN' | 'CONFIRMED' | 'CLEARED';

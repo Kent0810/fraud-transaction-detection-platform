@@ -17,14 +17,17 @@ export type TxnRow = {
   ts: Date;
   txnId: string;
   channel: string | null;
+  direction: string | null;
   merchant: string;
-  counterpartyAccount: string | null;
+  recipientAccount: string | null;
   category: string;
   amount: types.BigDecimal | null;
   currency: string | null;
   decision: string | null;
   score: number | null;
   firedRules: string[] | null;
+  status: string | null;
+  declinedFor: string[] | null;
 };
 
 export type AlertRow = {

@@ -9,6 +9,7 @@ import { radius, space, useColors } from '@/theme';
 type Props = {
   visible: boolean;
   banks: Bank[];
+  /** The selected bank's id (BIN). */
   selected?: string;
   onSelect: (bank: Bank) => void;
   onClose: () => void;
@@ -39,10 +40,10 @@ export function BankPicker({ visible, banks, selected, onSelect, onClose }: Prop
         </View>
         <FlatList
           data={shown}
-          keyExtractor={(b) => b.code}
+          keyExtractor={(b) => b.bin}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => {
-            const on = item.code === selected;
+            const on = item.bin === selected;
             return (
               <Pressable
                 onPress={() => {

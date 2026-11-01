@@ -1,20 +1,14 @@
 import { Module } from '@nestjs/common';
 
-import { SendTransferHandler } from './commands/send-transfer.command';
-import { SettleTransferHandler } from './commands/settle-transfer.command';
-import { TransferDecisionsConsumer } from './consumers/transfer-decisions.consumer';
-import { GetTransferHandler } from './queries/get-transfer.query';
+import { SettleConsumer } from './consumers/settle.consumer';
+import { SendTransferHandler } from './handlers/command-handlers/send-transfer.handler';
+import { SettleHandler } from './handlers/command-handlers/settle.handler';
+import { GetTransferHandler } from './handlers/query-handlers/get-transfer.handler';
 import { TransfersRepository } from './repositories/transfers.repository';
 import { TransfersController } from './transfers.controller';
 
 @Module({
   controllers: [TransfersController],
-  providers: [
-    TransfersRepository,
-    SendTransferHandler,
-    SettleTransferHandler,
-    GetTransferHandler,
-    TransferDecisionsConsumer,
-  ],
+  providers: [TransfersRepository, SendTransferHandler, SettleHandler, GetTransferHandler, SettleConsumer],
 })
 export class TransfersModule {}

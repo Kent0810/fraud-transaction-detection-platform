@@ -20,5 +20,5 @@ export function Avatar({ name, size = 48 }: { name: string; size?: number }) {
 
 const styles = StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
-  text: { fontWeight: '600' },
+  text: { fontWeight: '800' },
 });

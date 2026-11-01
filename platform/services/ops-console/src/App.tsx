@@ -16,6 +16,7 @@ import { Card } from './pages/Card';
 import { Find } from './pages/Find';
 import { Login } from './pages/Login';
 import { Queue } from './pages/Queue';
+import { Terminal } from './pages/Terminal';
 
 const HOME: Record<StaffRole, Route> = {
   ANALYST: { page: 'queue' },
@@ -56,6 +57,7 @@ function Shell({ role }: { role: StaffRole }) {
     'g q': () => role === 'ANALYST' && go({ page: 'queue' }),
     'g f': () => go({ page: 'find' }),
     'g a': () => go({ page: 'alerts' }),
+    'g m': () => go({ page: 'terminal' }),
   });
 
   const now = useNow(10_000);
@@ -108,6 +110,7 @@ function Shell({ role }: { role: StaffRole }) {
             'G A',
             unseen > 0 && page.page !== 'alerts' && <span className="count">{unseen > 99 ? '99+' : unseen}</span>,
           )}
+          {nav({ page: 'terminal' }, 'Merchant QR', 'qr', 'G M')}
         </nav>
 
         <a className={`pulse-card c-${connection}`} href={href({ page: 'alerts' })}>
@@ -150,6 +153,7 @@ function Shell({ role }: { role: StaffRole }) {
         {page.page === 'queue' && <Queue />}
         {page.page === 'find' && <Find />}
         {page.page === 'alerts' && <Alerts />}
+        {page.page === 'terminal' && <Terminal />}
         {page.page === 'card' && <Card key={page.cardId} cardId={page.cardId} />}
       </main>
 

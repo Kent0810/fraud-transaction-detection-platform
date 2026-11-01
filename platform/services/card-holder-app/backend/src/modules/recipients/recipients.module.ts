@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 
-import { RemoveRecipientHandler } from './commands/remove-recipient.command';
-import { SaveRecipientHandler } from './commands/save-recipient.command';
-import { GetRecipientsHandler } from './queries/get-recipients.query';
+import { RemoveRecipientHandler } from './handlers/command-handlers/remove-recipient.handler';
+import { SaveRecipientHandler } from './handlers/command-handlers/save-recipient.handler';
+import { GetRecipientsHandler } from './handlers/query-handlers/get-recipients.handler';
 import { RecipientsController } from './recipients.controller';
 import { RecipientsRepository } from './repositories/recipients.repository';
 

@@ -1,10 +1,12 @@
+import { BANK_SHORT } from '@/components/brand';
+
 import { ME, request } from './http';
+import { OUR_BANK } from './mock';
 import type { CardStatus } from './queries';
-import type { Period, Recipient, RuleType, Transfer } from './types';
+import type { Payment, Period, Recipient, RuleType, Transfer, TransferTo } from './types';
 
 export const freezeCard = () => request<CardStatus>('POST', `${ME}/card/freeze`);
 
-// Asks for the password: unfreezing lets money move again.
 export const unfreezeCard = (password: string) => request<CardStatus>('POST', `${ME}/card/unfreeze`, { password });
 
 const merchantPath = (merchant: string) => `${ME}/merchant-rules/${encodeURIComponent(merchant)}`;
@@ -16,8 +18,8 @@ export const setMerchantRule = (merchant: string, type: RuleType) =>
 
 export const releaseMerchant = (merchant: string) => request<void>('DELETE', merchantPath(merchant));
 
-const recipientPath = (r: Recipient) =>
-  `${ME}/recipients/${encodeURIComponent(r.bankCode)}/${encodeURIComponent(r.account)}`;
+// Recipients are always at this bank; the API still names the bank in the path.
+const recipientPath = (r: Recipient) => `${ME}/recipients/${BANK_SHORT}/${encodeURIComponent(r.account)}`;
 
 export const saveRecipient = (r: Recipient) => request<void>('PUT', recipientPath(r), { name: r.name });
 
@@ -25,7 +27,7 @@ export const removeRecipient = (r: Recipient) => request<void>('DELETE', recipie
 
 export type SendTransfer = {
   transferId: string;
-  to: Recipient;
+  to: TransferTo;
   amount: number;
   content: string;
   password: string;
@@ -36,15 +38,26 @@ export type SendTransfer = {
 export const sendTransfer = (t: SendTransfer) =>
   request<Transfer & { balance: number }>('POST', `${ME}/transfers`, {
     transferId: t.transferId,
-    toBankCode: t.to.bankCode,
     toAccount: t.to.account,
-    toName: t.to.name,
+    // Another bank: say which, and give the name we were told, since nobody here can look it up.
+    ...(t.to.bank.bin === OUR_BANK.bin ? {} : { toBank: t.to.bank.bin, toName: t.to.name }),
     amount: t.amount,
     content: t.content,
     password: t.password,
   });
 
-// The idempotency key for one transfer: made once per confirm screen, so a retry after a timeout can't send twice.
+export type SendPayment = {
+  paymentId: string;
+  merchantId: string;
+  amount: number;
+  password: string;
+  qr?: string;
+};
+
+// Recorded as PENDING like a transfer; poll fetchPayment for the outcome. balance: the card's balance now.
+export const sendPayment = (p: SendPayment) => request<Payment & { balance: number }>('POST', `${ME}/payments`, p);
+
+// The idempotency key for one transfer or payment: made once per confirm screen, so a retry after a timeout can't send twice.
 // Only needs to be unique, not secret, so Math.random is enough where crypto.randomUUID isn't available.
 export function newTransferId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();

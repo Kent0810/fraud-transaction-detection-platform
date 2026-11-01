@@ -1,7 +1,7 @@
 import { types } from 'cassandra-driver';
 
-import { createClient, createMapper } from './shared/cassandra/cassandra.service';
 import { loadCassandraConfig } from './config';
+import { createClient, createMapper } from './shared/cassandra/cassandra.service';
 
 const DEFAULT_CARD = '2291163933867244';
 

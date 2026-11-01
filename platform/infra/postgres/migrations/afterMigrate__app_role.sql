@@ -41,9 +41,9 @@ GRANT SELECT, INSERT, DELETE ON sessions TO "${app_user}";
 GRANT SELECT ON accounts TO "${app_user}";
 GRANT UPDATE (status) ON accounts TO "${app_user}";
 GRANT SELECT, INSERT ON ledger_entries TO "${app_user}";
-GRANT SELECT, INSERT ON transfers TO "${app_user}";
-GRANT UPDATE (status, declined_for, decided_at) ON transfers TO "${app_user}";
-GRANT USAGE ON SEQUENCE transfer_reference_seq TO "${app_user}";
+GRANT SELECT, INSERT ON transactions TO "${app_user}";
+GRANT UPDATE (status, declined_for, decided_at) ON transactions TO "${app_user}";
+GRANT USAGE ON SEQUENCE transaction_reference_seq TO "${app_user}";
 GRANT INSERT ON outbox TO "${app_user}";
 
 GRANT SELECT, INSERT, DELETE ON saved_recipients TO "${app_user}";

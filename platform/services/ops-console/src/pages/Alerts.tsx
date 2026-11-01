@@ -12,6 +12,7 @@ import { ruleTitle } from '../data/rules';
 const WINDOW_MIN = 30;
 
 const SERIES: Series[] = [
+  { key: 'ALLOW', label: 'Alert only', color: 'var(--c-allow)' },
   { key: 'STEP_UP', label: 'Step-up', color: 'var(--c-step)' },
   { key: 'DECLINE', label: 'Decline', color: 'var(--c-decline)' },
 ];
@@ -38,7 +39,7 @@ export function Alerts() {
     const list: Bucket[] = Array.from({ length: WINDOW_MIN }, (_, i) => {
       const at = start + (i + 1) * 60_000;
       const label = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      return { label, detail: `Minute to ${label}`, values: { STEP_UP: 0, DECLINE: 0 } };
+      return { label, detail: `Minute to ${label}`, values: { ALLOW: 0, STEP_UP: 0, DECLINE: 0 } };
     });
     for (const a of alerts) {
       const i = Math.floor((a.receivedAt - start) / 60_000);
@@ -74,7 +75,8 @@ export function Alerts() {
         <div>
           <h1>Live alerts</h1>
           <p className="muted">
-            Every payment the detector steps up or declines, the moment it is decided. Kept for this session only.
+            Every payment the detector steps up or declines, the moment it is decided, and every alert raised on a
+            payment that went through. Kept for this session only.
           </p>
         </div>
         <div className="head-actions">

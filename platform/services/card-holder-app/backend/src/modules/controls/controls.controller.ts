@@ -3,11 +3,13 @@ import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { ZodPipe } from '../../common/validation';
-import { FreezeCardCommand } from './commands/freeze-card.command';
-import { ReleaseMerchantCommand } from './commands/release-merchant.command';
-import { SetBudgetCommand } from './commands/set-budget.command';
-import { SetMerchantRuleCommand } from './commands/set-merchant-rule.command';
-import { UnfreezeCardCommand } from './commands/unfreeze-card.command';
+import { FreezeCardCommand } from './handlers/commands/freeze-card.command';
+import { ReleaseMerchantCommand } from './handlers/commands/release-merchant.command';
+import { SetBudgetCommand } from './handlers/commands/set-budget.command';
+import { SetMerchantRuleCommand } from './handlers/commands/set-merchant-rule.command';
+import { UnfreezeCardCommand } from './handlers/commands/unfreeze-card.command';
+import { GetCardStatusQuery } from './handlers/queries/get-card-status.query';
+import { GetControlsQuery } from './handlers/queries/get-controls.query';
 import {
   type BudgetDto,
   BudgetRequest,
@@ -18,8 +20,6 @@ import {
   MerchantRuleRequest,
   UnfreezeRequest,
 } from './types/controls.types';
-import { GetCardStatusQuery } from './queries/get-card-status.query';
-import { GetControlsQuery } from './queries/get-controls.query';
 
 @Controller('me')
 export class ControlsController {

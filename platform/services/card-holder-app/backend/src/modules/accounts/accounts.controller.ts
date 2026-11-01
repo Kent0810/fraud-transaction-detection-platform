@@ -3,9 +3,10 @@ import { QueryBus } from '@nestjs/cqrs';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { AccountNumber, ZodPipe } from '../../common/validation';
-import type { AccountHolderDto, BalanceDto } from './types/accounts.types';
-import { GetAccountHolderQuery } from './queries/get-account-holder.query';
-import { GetBalanceQuery } from './queries/get-balance.query';
+import { GetAccountHolderQuery } from './handlers/queries/get-account-holder.query';
+import { GetBalanceQuery } from './handlers/queries/get-balance.query';
+import { GetProfileQuery } from './handlers/queries/get-profile.query';
+import type { AccountHolderDto, BalanceDto, ProfileDto } from './types/accounts.types';
 
 @Controller()
 export class AccountsController {
@@ -16,6 +17,14 @@ export class AccountsController {
     const balance = await this.queries.execute(new GetBalanceQuery(cardId));
     if (!balance) throw new NotFoundException('account not found');
     return balance;
+  }
+
+  // The card is the session's: a cardholder can only ever read their own details.
+  @Get('me/profile')
+  async profile(@CurrentCard() cardId: string): Promise<ProfileDto> {
+    const profile = await this.queries.execute(new GetProfileQuery(cardId));
+    if (!profile) throw new NotFoundException('account not found');
+    return profile;
   }
 
   // Recipient check for a same-bank transfer.

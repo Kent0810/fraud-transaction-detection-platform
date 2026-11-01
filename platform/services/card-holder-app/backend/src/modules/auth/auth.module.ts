@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 
 import { AuthController } from './auth.controller';
-import { LoginHandler } from './commands/login.command';
-import { LogoutHandler } from './commands/logout.command';
 import { SessionGuard } from './guards/session.guard';
+import { LoginHandler } from './handlers/command-handlers/login.handler';
+import { LogoutHandler } from './handlers/command-handlers/logout.handler';
 import { CardholdersRepository } from './repositories/cardholders.repository';
 import { SessionsRepository } from './repositories/sessions.repository';
 

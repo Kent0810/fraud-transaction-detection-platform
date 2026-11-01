@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
 
-import { FreezeCardHandler } from './commands/freeze-card.command';
-import { ReleaseMerchantHandler } from './commands/release-merchant.command';
-import { SetBudgetHandler } from './commands/set-budget.command';
-import { SetMerchantRuleHandler } from './commands/set-merchant-rule.command';
-import { UnfreezeCardHandler } from './commands/unfreeze-card.command';
 import { ControlsController } from './controls.controller';
+import { FreezeCardHandler } from './handlers/command-handlers/freeze-card.handler';
+import { ReleaseMerchantHandler } from './handlers/command-handlers/release-merchant.handler';
+import { SetBudgetHandler } from './handlers/command-handlers/set-budget.handler';
+import { SetMerchantRuleHandler } from './handlers/command-handlers/set-merchant-rule.handler';
+import { UnfreezeCardHandler } from './handlers/command-handlers/unfreeze-card.handler';
+import { GetCardStatusHandler } from './handlers/query-handlers/get-card-status.handler';
+import { GetControlsHandler } from './handlers/query-handlers/get-controls.handler';
 import { CardStatusRepository } from './repositories/card-status.repository';
 import { ControlsRepository } from './repositories/controls.repository';
-import { GetCardStatusHandler } from './queries/get-card-status.query';
-import { GetControlsHandler } from './queries/get-controls.query';
 
 @Module({
   controllers: [ControlsController],

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 
-export type Route = { page: 'queue' } | { page: 'find' } | { page: 'alerts' } | { page: 'card'; cardId: string };
+export type Route =
+  { page: 'queue' } | { page: 'find' } | { page: 'alerts' } | { page: 'terminal' } | { page: 'card'; cardId: string };
 
 function parse(hash: string): Route | null {
   const path = hash.replace(/^#\/?/, '');
   const card = /^cards\/(\d+)$/.exec(path);
   if (card) return { page: 'card', cardId: card[1] };
-  if (path === 'queue' || path === 'find' || path === 'alerts') return { page: path };
+  if (path === 'queue' || path === 'find' || path === 'alerts' || path === 'terminal') return { page: path };
   return null;
 }
 

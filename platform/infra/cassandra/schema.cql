@@ -3,14 +3,18 @@ CREATE KEYSPACE IF NOT EXISTS fraud
 
 USE fraud;
 
--- decisions topic (card payments) and transfers topic (app transfers)
+-- decisions topic (the fraud verdict) and settlements topic (the final POSTED/DECLINED outcome), one row per transaction.
+-- settlements writes only status, declined_for, settled_at; its ts equals the decision's, so both land on the same row.
+-- credits topic: a transfer between two of our cards also gets a row in the recipient's partition, direction IN, with
+-- the sender as merchant/recipient_account. direction is null on every other row: money out of this card.
 CREATE TABLE IF NOT EXISTS txn_by_card (
   card_id               text,
   ts                    timestamp,
   txn_id                text,
   channel               text,
+  direction             text,
   merchant              text,
-  counterparty_account  text,
+  recipient_account     text,
   category              text,
   amount                decimal,
   currency              text,
@@ -20,6 +24,9 @@ CREATE TABLE IF NOT EXISTS txn_by_card (
   score                 double,
   fired_rules           set<text>,
   decided_at            timestamp,
+  status                text,
+  declined_for          set<text>,
+  settled_at            timestamp,
   PRIMARY KEY ((card_id), ts, txn_id)
 ) WITH CLUSTERING ORDER BY (ts DESC, txn_id ASC)
   AND default_time_to_live = 7776000;   -- 90 days

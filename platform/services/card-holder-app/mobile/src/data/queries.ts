@@ -1,5 +1,18 @@
 import { HttpError, ME, request } from './http';
-import type { Alert, Period, Recipient, RuleType, Transfer, Txn } from './types';
+import type {
+  Alert,
+  Bank,
+  MyQr,
+  PayMerchant,
+  Profile,
+  Payment,
+  Period,
+  QrTarget,
+  Recipient,
+  RuleType,
+  Transfer,
+  Txn,
+} from './types';
 
 export type Controls = {
   budget: { limit: number; period: Period; updatedAt: string | null } | null;
@@ -25,16 +38,30 @@ export const fetchBalance = () => request<Balance>('GET', `${ME}/balance`);
 
 export const fetchRecipients = () => request<Recipient[]>('GET', `${ME}/recipients`);
 
-// One of your transfers as it is now, with your balance now.
 export const fetchTransfer = (transferId: string) =>
   request<Transfer & { balance: number }>('GET', `${ME}/transfers/${encodeURIComponent(transferId)}`);
+
+// One per category, nearest the cardholder's home first.
+export const fetchMerchants = () => request<PayMerchant[]>('GET', `${ME}/payments/merchants`);
+
+export const fetchPayment = (paymentId: string) =>
+  request<Payment & { balance: number }>('GET', `${ME}/payments/${encodeURIComponent(paymentId)}`);
+
+// This bank first, then the others a transfer can reach.
+export const fetchBanks = () => request<Bank[]>('GET', `${ME}/transfers/banks`);
+
+export const fetchProfile = () => request<Profile>('GET', `${ME}/profile`);
+
+export const fetchMyQr = () => request<MyQr>('GET', `${ME}/qr`);
+
+// A POST that changes nothing: the bank checks the code (checksum, signature, account) and says what it is for.
+export const resolveQr = (payload: string) => request<QrTarget>('POST', `${ME}/qr/resolve`, { payload });
 
 export type CardStatus = { frozen: boolean };
 
 // From Postgres, so a freeze shows the moment it is saved.
 export const fetchCardStatus = () => request<CardStatus>('GET', `${ME}/card`);
 
-// Same-bank recipient check; null when no account has that number.
 export async function fetchAccountHolder(accountNumber: string): Promise<string | null> {
   try {
     return (await request<{ name: string }>('GET', `/accounts/${encodeURIComponent(accountNumber)}`)).name;

@@ -1,10 +1,9 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 
 import { Icon } from '../components/Icons';
-import { findCard } from '../data/api';
+import { fetchRecentCards, findCard, type RecentCard } from '../data/api';
 import { ago, cardNumber, initials } from '../data/format';
 import { useLive } from '../data/live';
-import { recentCards } from '../data/recent';
 import { go, href } from '../data/router';
 
 export function Find() {
@@ -12,7 +11,11 @@ export function Find() {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recent] = useState(recentCards);
+  const [recent, setRecent] = useState<RecentCard[] | null>(null);
+
+  useEffect(() => {
+    fetchRecentCards().then(setRecent, () => setRecent([]));
+  }, []);
 
   const digits = q.replace(/\D/g, '');
   const kind = digits.length === 0 ? null : digits.length <= 12 ? 'account' : 'card';
@@ -74,8 +77,10 @@ export function Find() {
           <h2>
             <Icon name="clock" size={15} /> Recently opened
           </h2>
-          {recent.length === 0 ? (
-            <p className="muted small">Cards you open show up here, on this computer only.</p>
+          {recent === null ? (
+            <p className="muted small">Loading…</p>
+          ) : recent.length === 0 ? (
+            <p className="muted small">Cards you open show up here, from the audit log.</p>
           ) : (
             <ul className="person-list">
               {recent.map((c) => (

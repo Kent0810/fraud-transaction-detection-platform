@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 
 import { CardsController } from './cards.controller';
+import { GetAlertsHandler } from './handlers/query-handlers/get-alerts.handler';
+import { GetCardStateHandler } from './handlers/query-handlers/get-card-state.handler';
+import { GetTransactionHandler } from './handlers/query-handlers/get-transaction.handler';
+import { GetTransactionsHandler } from './handlers/query-handlers/get-transactions.handler';
 import { CardsRepository } from './repositories/cards.repository';
-import { GetAlertsHandler } from './queries/get-alerts.query';
-import { GetCardStateHandler } from './queries/get-card-state.query';
-import { GetTransactionHandler } from './queries/get-transaction.query';
-import { GetTransactionsHandler } from './queries/get-transactions.query';
 
 @Module({
   controllers: [CardsController],

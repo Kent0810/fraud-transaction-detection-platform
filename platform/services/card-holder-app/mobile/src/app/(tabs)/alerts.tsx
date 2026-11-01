@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { money, relative } from '@/components/format';
+import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Screen } from '@/components/Screen';
-import { Empty, Pill, ScreenTitle, Surface } from '@/components/ui';
+import { Empty, IconBubble, Pill, ScreenTitle, Surface } from '@/components/ui';
 import { RULE_TEXT, ruleTitle } from '@/data/rules';
-import { useStore } from '@/data/store';
+import { useFreshOnFocus, useStore } from '@/data/store';
 import type { AlertStatus } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
 
@@ -16,6 +17,7 @@ type Filter = 'OPEN' | 'ALL';
 export default function AlertsScreen() {
   const c = useColors();
   const { alerts } = useStore();
+  useFreshOnFocus();
   const [filter, setFilter] = useState<Filter>('OPEN');
   const shown = filter === 'OPEN' ? alerts.filter((a) => a.status === 'OPEN') : alerts;
 
@@ -27,7 +29,7 @@ export default function AlertsScreen() {
 
   return (
     <Screen>
-      <ScreenTitle title="Alerts" />
+      <ScreenTitle title="Alerts" subtitle="Security" />
 
       <View style={[styles.segment, { backgroundColor: c.surfaceAlt }]}>
         {(['OPEN', 'ALL'] as Filter[]).map((f) => {
@@ -49,53 +51,59 @@ export default function AlertsScreen() {
       </View>
 
       {shown.length === 0 ? (
-        <Empty title="Nothing to review" detail="We'll notify you if a payment looks unusual." />
+        <Empty
+          icon="shield-checkmark"
+          title="All clear"
+          detail="We'll notify you right away if something looks unusual."
+        />
       ) : (
-        <Surface style={styles.list}>
+        <View style={{ gap: space.md }}>
           {shown.map((a, i) => {
             const t = tone[a.status];
             return (
-              <Pressable
-                key={`${filter}-${a.alertId}`}
-                accessibilityRole="button"
-                onPress={() => router.push({ pathname: '/txn/[id]', params: { id: a.txnId } })}
-                style={({ pressed }) => [
-                  styles.alert,
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                <View style={{ flex: 1, gap: 4 }}>
-                  <View style={styles.head}>
-                    <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>
-                      {ruleTitle(a.ruleId)}
-                    </Text>
-                    <Text style={[styles.when, { color: c.muted }]}>{relative(a.ts)}</Text>
-                  </View>
-                  <Text style={[styles.detail, { color: c.muted }]}>
-                    <Text style={{ color: c.text }}>{money(a.amount)}</Text> at {a.merchant}.{' '}
-                    {RULE_TEXT[a.ruleId]?.detail}
-                  </Text>
-                  <Pill label={t.label} fg={t.fg} bg={t.bg} />
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={c.muted} />
-              </Pressable>
+              <FadeInUp key={`${filter}-${a.alertId}`} delay={stagger(i, 60)}>
+                <ScalePressable
+                  accessibilityRole="button"
+                  scaleTo={0.97}
+                  onPress={() => router.push({ pathname: '/txn/[id]', params: { id: a.txnId } })}
+                >
+                  <Surface style={styles.alert}>
+                    <IconBubble name={a.status === 'CLEARED' ? 'shield-checkmark' : 'warning'} tint={t.fg} bg={t.bg} />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <View style={styles.head}>
+                        <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>
+                          {ruleTitle(a.ruleId)}
+                        </Text>
+                        <Text style={[styles.when, { color: c.muted }]}>{relative(a.ts)}</Text>
+                      </View>
+                      <Text style={[styles.detail, { color: c.muted }]}>
+                        <Text style={{ color: c.text, fontWeight: '600' }}>{money(a.amount)}</Text> at {a.merchant}.{' '}
+                        {RULE_TEXT[a.ruleId]?.detail}
+                      </Text>
+                      <View style={styles.foot}>
+                        <Pill label={t.label} fg={t.fg} bg={t.bg} />
+                        <Ionicons name="chevron-forward" size={18} color={c.muted} />
+                      </View>
+                    </View>
+                  </Surface>
+                </ScalePressable>
+              </FadeInUp>
             );
           })}
-        </Surface>
+        </View>
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  segment: { flexDirection: 'row', borderRadius: radius.md, padding: 3, marginBottom: space.lg },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md - 2 },
-  segmentText: { fontSize: 14, fontWeight: '600' },
-  list: { paddingVertical: 0 },
-  alert: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
+  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 4, marginBottom: space.lg },
+  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.pill },
+  segmentText: { fontSize: 14, fontWeight: '700' },
+  alert: { flexDirection: 'row', gap: space.md },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm },
-  title: { fontSize: 16, fontWeight: '600', flex: 1 },
+  title: { fontSize: 16, fontWeight: '700', flex: 1 },
   when: { fontSize: 12 },
   detail: { fontSize: 14, lineHeight: 20 },
+  foot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
 });

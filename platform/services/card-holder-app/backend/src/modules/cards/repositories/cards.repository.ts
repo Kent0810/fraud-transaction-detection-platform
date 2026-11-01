@@ -89,13 +89,16 @@ function toTxn(r: TxnRow): TxnDto {
     txnId: r.txnId,
     ts: iso(r.ts) ?? '',
     channel: (r.channel as Channel | null) ?? 'CARD',
+    direction: r.direction === 'IN' ? 'IN' : 'OUT',
     merchant: r.merchant,
-    counterpartyAccount: r.counterpartyAccount,
+    recipientAccount: r.recipientAccount,
     category: r.category,
     amount: num(r.amount),
     currency: r.currency ?? 'VND',
     decision: (r.decision as Verdict | null) ?? 'ALLOW',
     score: num(r.score),
     firedRules: [...(r.firedRules ?? [])].sort(),
+    status: r.status === 'POSTED' || r.status === 'DECLINED' ? r.status : null,
+    declinedFor: [...(r.declinedFor ?? [])].sort(),
   };
 }
