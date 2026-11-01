@@ -4,8 +4,8 @@ import { CommandBus } from '@nestjs/cqrs';
 import { Public } from '../../common/decorators/session.decorator';
 import { CurrentStaff, Staff, type StaffMember, StaffToken } from '../../common/decorators/staff.decorator';
 import { ZodPipe } from '../../common/validation';
-import { StaffLoginCommand } from './commands/staff-login.command';
-import { StaffLogoutCommand } from './commands/staff-logout.command';
+import { StaffLoginCommand } from './handlers/commands/staff-login.command';
+import { StaffLogoutCommand } from './handlers/commands/staff-logout.command';
 import { StaffLoginRequest, type StaffSessionDto } from './types/ops.types';
 
 @Controller('ops/auth')

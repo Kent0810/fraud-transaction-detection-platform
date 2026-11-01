@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { Config } from '../../../config';

@@ -18,19 +18,19 @@ import { interval, map, merge, type Observable } from 'rxjs';
 import { CurrentStaff, Staff, type StaffMember } from '../../common/decorators/staff.decorator';
 import { CardId, ZodPipe } from '../../common/validation';
 import type { StaffAudit } from '../../shared/prisma/audit';
-import { ReleaseMerchantCommand } from '../controls/commands/release-merchant.command';
-import { SetMerchantRuleCommand } from '../controls/commands/set-merchant-rule.command';
+import { ReleaseMerchantCommand } from '../controls/handlers/commands/release-merchant.command';
+import { SetMerchantRuleCommand } from '../controls/handlers/commands/set-merchant-rule.command';
 import { Merchant, type CardStatusDto, type MerchantRuleDto } from '../controls/types/controls.types';
-import { OpenCardCommand } from './commands/open-card.command';
-import { ReviewAlertCommand } from './commands/review-alert.command';
-import { SetCardFrozenCommand } from './commands/set-card-frozen.command';
-import { SetLoginEnabledCommand } from './commands/set-login-enabled.command';
 import { LiveAlertsConsumer } from './consumers/live-alerts.consumer';
-import { FindCardQuery } from './queries/find-card.query';
-import { GetActivityQuery } from './queries/get-activity.query';
-import { GetAuditTrailQuery } from './queries/get-audit-trail.query';
-import { GetQueueQuery } from './queries/get-queue.query';
-import { GetRecentCardsQuery } from './queries/get-recent-cards.query';
+import { OpenCardCommand } from './handlers/commands/open-card.command';
+import { ReviewAlertCommand } from './handlers/commands/review-alert.command';
+import { SetCardFrozenCommand } from './handlers/commands/set-card-frozen.command';
+import { SetLoginEnabledCommand } from './handlers/commands/set-login-enabled.command';
+import { FindCardQuery } from './handlers/queries/find-card.query';
+import { GetActivityQuery } from './handlers/queries/get-activity.query';
+import { GetAuditTrailQuery } from './handlers/queries/get-audit-trail.query';
+import { GetQueueQuery } from './handlers/queries/get-queue.query';
+import { GetRecentCardsQuery } from './handlers/queries/get-recent-cards.query';
 import {
   type ActivityDto,
   AlertId,

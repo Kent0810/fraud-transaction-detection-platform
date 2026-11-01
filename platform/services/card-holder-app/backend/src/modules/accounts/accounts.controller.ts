@@ -3,10 +3,10 @@ import { QueryBus } from '@nestjs/cqrs';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { AccountNumber, ZodPipe } from '../../common/validation';
+import { GetAccountHolderQuery } from './handlers/queries/get-account-holder.query';
+import { GetBalanceQuery } from './handlers/queries/get-balance.query';
+import { GetProfileQuery } from './handlers/queries/get-profile.query';
 import type { AccountHolderDto, BalanceDto, ProfileDto } from './types/accounts.types';
-import { GetAccountHolderQuery } from './queries/get-account-holder.query';
-import { GetBalanceQuery } from './queries/get-balance.query';
-import { GetProfileQuery } from './queries/get-profile.query';
 
 @Controller()
 export class AccountsController {

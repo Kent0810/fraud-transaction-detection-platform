@@ -3,8 +3,8 @@ import { mapping } from 'cassandra-driver';
 
 import { CassandraService } from '../../../shared/cassandra/cassandra.service';
 import { type AlertRow, iso, num, type TriageRow } from '../../../shared/cassandra/models';
-import type { Verdict } from '../../cards/types/cards.types';
 import { CardsRepository } from '../../cards/repositories/cards.repository';
+import type { Verdict } from '../../cards/types/cards.types';
 import type { ActivityDto, CaseAlertDto, QueueItemDto, ReviewStatus } from '../types/ops.types';
 
 const DAY_MS = 86_400_000;

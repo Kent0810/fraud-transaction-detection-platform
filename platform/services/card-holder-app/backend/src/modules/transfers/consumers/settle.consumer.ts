@@ -4,7 +4,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import type { Config } from '../../../config';
 import { CONFIG } from '../../../config.module';
 import { KafkaService } from '../../../kafka/kafka.service';
-import { SettleCommand } from '../commands/settle.command';
+import { SettleCommand } from '../handlers/commands/settle.command';
 import { DecisionMessage } from '../types/transfers.types';
 
 // Posts every decision, card payment or transfer, to the ledger. A throw redelivers the message; settle is repeatable.

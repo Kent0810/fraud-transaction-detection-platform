@@ -4,7 +4,10 @@ import { QueryBus } from '@nestjs/cqrs';
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { Staff } from '../../common/decorators/staff.decorator';
 import { ZodPipe } from '../../common/validation';
-import { GetMyQrQuery, MerchantQrQuery, ResolveQrQuery, SearchMerchantsQuery } from './queries/qr.queries';
+import { GetMyQrQuery } from './handlers/queries/get-my-qr.query';
+import { MerchantQrQuery } from './handlers/queries/merchant-qr.query';
+import { ResolveQrQuery } from './handlers/queries/resolve-qr.query';
+import { SearchMerchantsQuery } from './handlers/queries/search-merchants.query';
 import {
   MerchantId,
   MerchantQrRequest,

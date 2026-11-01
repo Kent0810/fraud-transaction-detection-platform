@@ -5,9 +5,9 @@ import { z } from 'zod';
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { AccountNumber, BankCode, ZodPipe } from '../../common/validation';
 import { OUR_BANK } from '../transfers/types/transfers.types';
-import { RemoveRecipientCommand } from './commands/remove-recipient.command';
-import { SaveRecipientCommand } from './commands/save-recipient.command';
-import { GetRecipientsQuery } from './queries/get-recipients.query';
+import { RemoveRecipientCommand } from './handlers/commands/remove-recipient.command';
+import { SaveRecipientCommand } from './handlers/commands/save-recipient.command';
+import { GetRecipientsQuery } from './handlers/queries/get-recipients.query';
 import { type RecipientDto, RecipientName } from './types/recipients.types';
 
 // Only this bank's accounts can be saved; the app may still send the bank code in the path.

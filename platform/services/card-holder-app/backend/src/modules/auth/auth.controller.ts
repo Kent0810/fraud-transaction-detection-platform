@@ -12,9 +12,9 @@ import { CommandBus } from '@nestjs/cqrs';
 
 import { Public, SessionToken } from '../../common/decorators/session.decorator';
 import { ZodPipe } from '../../common/validation';
+import { LoginCommand } from './handlers/commands/login.command';
+import { LogoutCommand } from './handlers/commands/logout.command';
 import { LoginRequest, type SessionDto } from './types/auth.types';
-import { LoginCommand } from './commands/login.command';
-import { LogoutCommand } from './commands/logout.command';
 
 @Controller('auth')
 export class AuthController {

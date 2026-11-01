@@ -1,5 +1,4 @@
 import { hostname } from 'node:os';
-
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { type Observable, Subject } from 'rxjs';
 

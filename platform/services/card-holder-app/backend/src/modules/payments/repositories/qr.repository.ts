@@ -1,10 +1,8 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-
-import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { bankByBin, OUR_BIN } from '@platform/db';
 
+import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { accountQr, merchantQr, parseQr, QrFormatError } from '../qr/vietqr';
 import type { MerchantQrDto, MerchantRefDto, MyQrDto, QrTargetDto } from '../types/payments.types';
 import { MerchantsRepository } from './merchants.repository';

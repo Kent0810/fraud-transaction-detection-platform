@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 
-import { SendTransferHandler } from './commands/send-transfer.command';
-import { SettleHandler } from './commands/settle.command';
 import { SettleConsumer } from './consumers/settle.consumer';
-import { GetTransferHandler } from './queries/get-transfer.query';
+import { SendTransferHandler } from './handlers/command-handlers/send-transfer.handler';
+import { SettleHandler } from './handlers/command-handlers/settle.handler';
+import { GetTransferHandler } from './handlers/query-handlers/get-transfer.handler';
 import { TransfersRepository } from './repositories/transfers.repository';
 import { TransfersController } from './transfers.controller';
 

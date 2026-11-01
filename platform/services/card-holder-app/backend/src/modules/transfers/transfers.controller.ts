@@ -1,12 +1,11 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Param, Post } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import type { Bank } from '@platform/db';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { ZodPipe } from '../../common/validation';
-import { SendTransferCommand } from './commands/send-transfer.command';
-import { GetTransferQuery } from './queries/get-transfer.query';
-import type { Bank } from '@platform/db';
-
+import { SendTransferCommand } from './handlers/commands/send-transfer.command';
+import { GetTransferQuery } from './handlers/queries/get-transfer.query';
 import { TransfersRepository } from './repositories/transfers.repository';
 import { TransferId, type TransferDto, TransferRequest } from './types/transfers.types';
 

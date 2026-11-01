@@ -3,14 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { iso } from '../../../shared/cassandra/models';
 import { auditEntry, type StaffAudit } from '../../../shared/prisma/audit';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import type {
-  AccountDto,
-  AuditEntryDto,
-  CardholderDto,
-  LoginDto,
-  LoginStatus,
-  RecentCardDto,
-} from '../types/ops.types';
+import { AccountDto, AuditEntryDto, CardholderDto, LoginDto, LoginStatus, RecentCardDto } from '../types/ops.types';
 
 @Injectable()
 export class CardholderFilesRepository {

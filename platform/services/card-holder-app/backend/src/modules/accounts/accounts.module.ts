@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 
 import { AccountsController } from './accounts.controller';
+import { GetAccountHolderHandler } from './handlers/query-handlers/get-account-holder.handler';
+import { GetBalanceHandler } from './handlers/query-handlers/get-balance.handler';
+import { GetProfileHandler } from './handlers/query-handlers/get-profile.handler';
 import { AccountsRepository } from './repositories/accounts.repository';
-import { GetAccountHolderHandler } from './queries/get-account-holder.query';
-import { GetBalanceHandler } from './queries/get-balance.query';
-import { GetProfileHandler } from './queries/get-profile.query';
 
 @Module({
   controllers: [AccountsController],

@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
 
-import { SendPaymentHandler } from './commands/send-payment.command';
+import { SendPaymentHandler } from './handlers/command-handlers/send-payment.handler';
+import { GetMerchantsHandler } from './handlers/query-handlers/get-merchants.handler';
+import { GetMyQrHandler } from './handlers/query-handlers/get-my-qr.handler';
+import { GetPaymentHandler } from './handlers/query-handlers/get-payment.handler';
+import { MerchantQrHandler } from './handlers/query-handlers/merchant-qr.handler';
+import { ResolveQrHandler } from './handlers/query-handlers/resolve-qr.handler';
+import { SearchMerchantsHandler } from './handlers/query-handlers/search-merchants.handler';
 import { PaymentsController } from './payments.controller';
-import { GetMerchantsHandler } from './queries/get-merchants.query';
-import { GetPaymentHandler } from './queries/get-payment.query';
-import { GetMyQrHandler, MerchantQrHandler, ResolveQrHandler, SearchMerchantsHandler } from './queries/qr.queries';
 import { QrController } from './qr.controller';
 import { MerchantsRepository } from './repositories/merchants.repository';
 import { PaymentsRepository } from './repositories/payments.repository';

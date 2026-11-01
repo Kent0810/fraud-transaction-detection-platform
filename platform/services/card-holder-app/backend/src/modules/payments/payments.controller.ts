@@ -3,9 +3,9 @@ import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { ZodPipe } from '../../common/validation';
-import { SendPaymentCommand } from './commands/send-payment.command';
-import { GetMerchantsQuery } from './queries/get-merchants.query';
-import { GetPaymentQuery } from './queries/get-payment.query';
+import { SendPaymentCommand } from './handlers/commands/send-payment.command';
+import { GetMerchantsQuery } from './handlers/queries/get-merchants.query';
+import { GetPaymentQuery } from './handlers/queries/get-payment.query';
 import { type MerchantDto, type PaymentDto, PaymentId, PaymentRequest } from './types/payments.types';
 
 @Controller('me/payments')
