@@ -1,6 +1,7 @@
 -- A Flyway callback, not a versioned migration: it runs after every migrate, so the passwords stay in sync with the
 -- environment and tables added by later migrations get their grants here. ${app_user}, ${app_password},
--- ${debezium_user}, ${debezium_password}, ${notifier_user} and ${notifier_password} are Flyway placeholders
+-- ${debezium_user}, ${debezium_password}, ${notifier_user}, ${notifier_password}, ${loader_user} and
+-- ${loader_password} are Flyway placeholders
 -- (FLYWAY_PLACEHOLDERS_*); Flyway refuses to run if one is missing.
 
 DO $$
@@ -23,6 +24,12 @@ BEGIN
   END IF;
   EXECUTE format('ALTER ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L',
                  '${notifier_user}', '${notifier_password}');
+
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${loader_user}') THEN
+    EXECUTE format('CREATE ROLE %I LOGIN', '${loader_user}');
+  END IF;
+  EXECUTE format('ALTER ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L',
+                 '${loader_user}', '${loader_password}');
 END $$;
 
 -- Start from nothing, then grant table by table.
@@ -80,3 +87,11 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM "${notifier_user}";
 REVOKE CREATE ON SCHEMA public FROM "${notifier_user}";
 GRANT USAGE ON SCHEMA public TO "${notifier_user}";
 GRANT SELECT ON sessions, auth, cardholders, staff, staff_sessions, transactions TO "${notifier_user}";
+
+-- The BigQuery batch loader copies analyst reviews out of the audit log, nothing else.
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM "${loader_user}";
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM "${loader_user}";
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM "${loader_user}";
+REVOKE CREATE ON SCHEMA public FROM "${loader_user}";
+GRANT USAGE ON SCHEMA public TO "${loader_user}";
+GRANT SELECT ON audit_log TO "${loader_user}";

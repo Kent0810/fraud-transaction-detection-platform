@@ -51,3 +51,11 @@ datasets/Sparkov_Data_Generation/
 platform/infra/connect/plugins/
 *.jar
 !**/gradle/wrapper/gradle-wrapper.jar
+
+# ───────── Terraform (state holds service-account private keys) ─────────
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

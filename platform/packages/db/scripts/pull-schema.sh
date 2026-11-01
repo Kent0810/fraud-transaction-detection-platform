@@ -24,6 +24,7 @@ docker run --rm --network "$run" -v "$migrations:/flyway/migrations:ro" \
   -e FLYWAY_PLACEHOLDERS_APP_USER=app -e FLYWAY_PLACEHOLDERS_APP_PASSWORD=app \
   -e FLYWAY_PLACEHOLDERS_DEBEZIUM_USER=debezium -e FLYWAY_PLACEHOLDERS_DEBEZIUM_PASSWORD=debezium \
   -e FLYWAY_PLACEHOLDERS_NOTIFIER_USER=notifier -e FLYWAY_PLACEHOLDERS_NOTIFIER_PASSWORD=notifier \
+  -e FLYWAY_PLACEHOLDERS_LOADER_USER=loader -e FLYWAY_PLACEHOLDERS_LOADER_PASSWORD=loader \
   flyway/flyway:13.8.1 -q migrate
 
 port="$(docker port "$run-pg" 5432/tcp | head -1 | sed 's/.*://')"
