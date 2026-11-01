@@ -100,7 +100,7 @@ export default function SettingsScreen() {
           <Divider />
           {toggle('notifyBudget', 'Budget alerts', 'pie-chart-outline', 'When you get close to your limit')}
           <Divider />
-          {toggle('notifyTransfers', 'Transfer receipts', 'paper-plane-outline', 'When money leaves your account')}
+          {toggle('notifyTransfers', 'Transfers', 'paper-plane-outline', 'When a transfer is sent or money arrives')}
         </Surface>
       </FadeInUp>
 

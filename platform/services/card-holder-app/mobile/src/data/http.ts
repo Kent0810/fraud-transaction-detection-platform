@@ -3,6 +3,8 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 export const apiEnabled = !!API_URL;
 export const apiUrl = API_URL;
 
+export const notifierUrl = (process.env.EXPO_PUBLIC_NOTIFIER_URL ?? 'http://localhost:8081').replace(/\/$/, '');
+
 export class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -33,6 +35,8 @@ export function setAuth(next: string | null, unauthorized: () => void = () => {}
   token = next;
   onUnauthorized = unauthorized;
 }
+
+export const authToken = () => token;
 
 export async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
   // Only a 401 for the token in use now means the session is gone; one sent without it (or with an older one) doesn't.

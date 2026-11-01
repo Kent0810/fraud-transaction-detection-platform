@@ -105,6 +105,16 @@ export type QrTarget =
       note: string | null;
     };
 
+export type CardNotice = {
+  kind: 'POSTED' | 'DECLINED' | 'RECEIVED' | 'ALERT';
+  txnId: string;
+  ts: string;
+  channel: Channel;
+  counterparty: string;
+  amount: number;
+  reasons: string[];
+};
+
 /** The signed-in cardholder's own details. */
 export type Profile = {
   cardId: string;

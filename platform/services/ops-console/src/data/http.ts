@@ -1,4 +1,5 @@
 const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/$/, '');
+const NOTIFIER_URL = (import.meta.env.VITE_NOTIFIER_URL ?? 'http://localhost:8081').replace(/\/$/, '');
 
 export class HttpError extends Error {
   constructor(
@@ -59,7 +60,7 @@ export async function stream(
   signal: AbortSignal,
 ): Promise<void> {
   const sent = token;
-  const res = await fetch(`${API_URL}${path}`, { headers: headers(false), signal });
+  const res = await fetch(`${NOTIFIER_URL}${path}`, { headers: headers(false), signal });
   if (!res.ok || !res.body) await fail(res, sent);
   onOpen();
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();

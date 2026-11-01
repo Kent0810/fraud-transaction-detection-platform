@@ -3,7 +3,6 @@ import { APP_GUARD } from '@nestjs/core';
 
 import { CardsModule } from '../cards/cards.module';
 import { ControlsModule } from '../controls/controls.module';
-import { LiveAlertsConsumer } from './consumers/live-alerts.consumer';
 import { StaffGuard } from './guards/staff.guard';
 import { OpenCardHandler } from './handlers/command-handlers/open-card.handler';
 import { ReviewAlertHandler } from './handlers/command-handlers/review-alert.handler';
@@ -32,7 +31,6 @@ import { StaffRepository } from './repositories/staff.repository';
     CasesRepository,
     CardholderFilesRepository,
     LoginsRepository,
-    LiveAlertsConsumer,
     StaffLoginHandler,
     StaffLogoutHandler,
     OpenCardHandler,
