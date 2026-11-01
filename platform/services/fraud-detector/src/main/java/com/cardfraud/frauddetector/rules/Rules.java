@@ -18,6 +18,11 @@ public final class Rules {
             "R5", 0.3,   // high-risk category
             "R6", 1.0);  // blocked merchant
 
+    public static final String BLOCKED_MERCHANT = "R6";
+    public static final String LARGE_AMOUNT_RULE = "LARGE_AMOUNT";
+    // Over the cardholder's budget: alert only, never changes the verdict.
+    public static final String BUDGET = "BUDGET";
+
     // A transfer of at least this much (VND) is declined outright
     public static final long LARGE_AMOUNT = 50_000_000L;
 
@@ -27,45 +32,56 @@ public final class Rules {
     private Rules() {
     }
 
-    public static Decision evaluate(String cardId, Transaction txn) {
-        // TODO
-        //   1. Collect the ids of the rules that fire ("R1", "R5", ...) in a List<String>.
-        //      Start with none: every transaction ALLOW. Add rules one at a time later;
-        //      most need per-card history, so they will read state stores, not just txn.
-        //   2. score = sum of WEIGHTS for the fired rules, capped at 1.0.
-        //   3. Build the Decision: copy the transaction's fields, add verdict(score),
-        //      score, fired rules and decidedAt = Instant.now().toString().
-
-        // 1. Rules that fired. None yet: add them here, e.g. `if (...) fired.add("R5");`
+    /**
+     * @param merchantRule  the card's rule for this merchant: BLOCK, ALLOW or null
+     * @param budget        the card's budget, or null when it has none
+     * @param spentInPeriod spent so far in the budget's current period, before this transaction
+     */
+    public static Decision evaluate(String cardId, Transaction txn, String merchantRule, Budget budget,
+                                    long spentInPeriod) {
         List<String> fired = new ArrayList<>();
 
-        if (Transaction.TRANSFER.equals(txn.channel()) && txn.amt() >= LARGE_AMOUNT) {
-            fired.add("LARGE_AMOUNT");
+        boolean allowListed = MerchantRules.ALLOW.equals(merchantRule);
+        if (!allowListed) {
+            // R1 to R5 go here. A merchant the card allows skips them (BR3). None are written yet.
         }
 
-        // 2. Sum of their weights, capped at 1.0 (0 when nothing fired). Placeholder 0.0 until real rules exist.
-        double score = 0.0; // Math.min(1.0, fired.stream().mapToDouble(WEIGHTS::get).sum());
+        if (MerchantRules.BLOCK.equals(merchantRule)) {
+            fired.add(BLOCKED_MERCHANT);
+        }
 
-        // 3. The decision
-        return new Decision(
-            txn.txnId(),
-            cardId,
-            txn.ts(),
-            txn.channel(),
-            txn.merchant(),
-            txn.recipientAccount(),
-            txn.category(),
-            txn.amt(),
-            txn.currency(),
-            txn.merchLat(),
-            txn.merchLong(),
-            fired.contains("LARGE_AMOUNT") ? Verdict.DECLINE : verdict(score),
-            score,
-            fired,
-            Instant.now().toString());
+        if (Transaction.TRANSFER.equals(txn.channel()) && txn.amt() >= LARGE_AMOUNT) {
+            fired.add(LARGE_AMOUNT_RULE);
+        }
+
+        // Sum of the fired rules' weights, capped at 1.0 (0 when nothing fired).
+        double score = Math.min(1.0, fired.stream().mapToDouble(r -> WEIGHTS.getOrDefault(r, 0.0)).sum());
+        Verdict verdict = fired.contains(LARGE_AMOUNT_RULE) ? Verdict.DECLINE : verdict(score);
+
+        // BR5: flag the payment that takes the card over its budget. A declined one spends nothing.
+        if (verdict != Verdict.DECLINE && budget != null && spentInPeriod + txn.amt() > budget.limit()) {
+            fired.add(BUDGET);
+        }
+
+        return decision(cardId, txn, verdict, score, fired);
     }
 
     public static Decision frozen(String cardId, Transaction txn) {
+        return decision(cardId, txn, Verdict.DECLINE, 1.0, List.of("FROZEN"));
+    }
+
+    public static Verdict verdict(double score) {
+        if (score >= DECLINE_AT) {
+            return Verdict.DECLINE;
+        }
+        if (score >= STEP_UP_AT) {
+            return Verdict.STEP_UP;
+        }
+        return Verdict.ALLOW;
+    }
+
+    private static Decision decision(String cardId, Transaction txn, Verdict verdict, double score,
+                                     List<String> fired) {
         return new Decision(
             txn.txnId(),
             cardId,
@@ -78,19 +94,9 @@ public final class Rules {
             txn.currency(),
             txn.merchLat(),
             txn.merchLong(),
-            Verdict.DECLINE,
-            1.0,
-            List.of("FROZEN"),
+            verdict,
+            score,
+            fired,
             Instant.now().toString());
-    }
-
-    public static Verdict verdict(double score) {
-        // if (score >= DECLINE_AT) {
-        //     return Verdict.DECLINE;
-        // }
-        // if (score >= STEP_UP_AT) {
-        //     return Verdict.STEP_UP;
-        // }
-        return Verdict.ALLOW;
     }
 }

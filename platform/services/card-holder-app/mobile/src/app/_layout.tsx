@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
 
+import { NoticeBanner } from '@/components/NoticeBanner';
 import { AuthProvider, useAuth } from '@/data/auth';
 import { SettingsProvider } from '@/data/settings';
 import { StoreProvider } from '@/data/store';
@@ -80,6 +81,7 @@ function AppShell({ signedIn }: { signedIn: boolean }) {
               />
             </Stack.Protected>
           </Stack>
+          {signedIn && <NoticeBanner />}
         </View>
       </View>
     </>

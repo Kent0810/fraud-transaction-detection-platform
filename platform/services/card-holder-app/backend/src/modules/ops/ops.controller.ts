@@ -1,19 +1,5 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  type MessageEvent,
-  NotFoundException,
-  Param,
-  Post,
-  Put,
-  Query,
-  Sse,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { interval, map, merge, type Observable } from 'rxjs';
 
 import { CurrentStaff, Staff, type StaffMember } from '../../common/decorators/staff.decorator';
 import { CardId, ZodPipe } from '../../common/validation';
@@ -21,7 +7,6 @@ import type { StaffAudit } from '../../shared/prisma/audit';
 import { ReleaseMerchantCommand } from '../controls/handlers/commands/release-merchant.command';
 import { SetMerchantRuleCommand } from '../controls/handlers/commands/set-merchant-rule.command';
 import { Merchant, type CardStatusDto, type MerchantRuleDto } from '../controls/types/controls.types';
-import { LiveAlertsConsumer } from './consumers/live-alerts.consumer';
 import { OpenCardCommand } from './handlers/commands/open-card.command';
 import { ReviewAlertCommand } from './handlers/commands/review-alert.command';
 import { SetCardFrozenCommand } from './handlers/commands/set-card-frozen.command';
@@ -46,9 +31,6 @@ import {
   StaffMerchantRuleRequest,
 } from './types/ops.types';
 
-// Keeps idle proxies from closing the live feed.
-const HEARTBEAT_MS = 20_000;
-
 const audit = (staff: StaffMember, reason: string | null): StaffAudit => ({ staffId: staff.staffId, reason });
 
 @Controller('ops')
@@ -56,22 +38,12 @@ export class OpsController {
   constructor(
     private readonly commands: CommandBus,
     private readonly queries: QueryBus,
-    private readonly live: LiveAlertsConsumer,
   ) {}
 
   @Staff('ANALYST')
   @Get('queue')
   queue(): Promise<QueueItemDto[]> {
     return this.queries.execute(new GetQueueQuery(100));
-  }
-
-  @Staff()
-  @Sse('alerts/live')
-  liveAlerts(): Observable<MessageEvent> {
-    return merge(
-      this.live.stream.pipe(map((data) => ({ type: 'alert', data }))),
-      interval(HEARTBEAT_MS).pipe(map(() => ({ type: 'ping', data: '' }))),
-    );
   }
 
   @Staff()

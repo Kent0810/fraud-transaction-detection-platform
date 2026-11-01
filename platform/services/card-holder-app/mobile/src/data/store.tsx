@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
 
 import * as commands from './commands';
 import { apiEnabled, HttpError } from './http';
+import { followNotices } from './live';
 import {
   type Controls,
   fetchAccountHolder,
@@ -18,11 +19,13 @@ import {
   fetchTransfer,
 } from './queries';
 import { MOCK_PASSWORD, useUser } from './auth';
+import { useSettings } from './settings';
 
 import { ACCOUNT, ALERTS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, PAY_MERCHANTS, TRANSACTIONS } from './mock';
 import type {
   Alert,
   Budget,
+  CardNotice,
   MerchantRule,
   PayMerchant,
   Payment,
@@ -69,6 +72,8 @@ type Store = {
   lookupAccount: (account: string) => Promise<string | null>;
   sendTransfer: (draft: TransferDraft, transferId: string, password: string) => Promise<Transfer>;
   refreshTransfer: (transferId: string) => Promise<Transfer | null>;
+  notice: CardNotice | null;
+  dismissNotice: () => void;
   merchantsNearby: () => Promise<PayMerchant[]>;
   pay: (merchant: PayMerchant, amount: number, paymentId: string, password: string, qr?: string) => Promise<Payment>;
   removeSaved: (recipient: Recipient) => void;
@@ -82,6 +87,7 @@ const TRANSFER_MS = 1200;
 // How long sendTransfer waits for the fraud check before handing back a PENDING transfer.
 const DECISION_POLL_MS = 500;
 const DECISION_WAIT_MS = 10_000;
+const NOTICE_RELOAD_MS = 600;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -237,6 +243,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(() => {
     if (apiEnabled) load(true);
+  }, [load]);
+
+  const { notifyDeclines, notifyTransfers } = useSettings();
+  const showRef = useRef({ notifyDeclines, notifyTransfers });
+  useEffect(() => {
+    showRef.current = { notifyDeclines, notifyTransfers };
+  }, [notifyDeclines, notifyTransfers]);
+  const [notice, setNotice] = useState<CardNotice | null>(null);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  useEffect(() => {
+    if (!apiEnabled) return;
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const stop = followNotices((n) => {
+      if (!pending) {
+        pending = setTimeout(() => {
+          pending = null;
+          load(true);
+        }, NOTICE_RELOAD_MS);
+      }
+      const show = showRef.current;
+      const shown =
+        n.kind === 'DECLINED' || n.kind === 'ALERT'
+          ? show.notifyDeclines
+          : show.notifyTransfers && (n.kind === 'RECEIVED' || n.channel === 'TRANSFER');
+      if (shown) setNotice(n);
+    });
+    return () => {
+      stop();
+      if (pending) clearTimeout(pending);
+    };
   }, [load]);
 
   const effectiveBudget = useMemo<Budget>(() => {
@@ -447,6 +483,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cardId,
       refresh,
       reload,
+      notice,
+      dismissNotice,
       transactions,
       alerts,
       budget: effectiveBudget,
@@ -477,6 +515,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cardId,
       refresh,
       reload,
+      notice,
+      dismissNotice,
       transactions,
       alerts,
       effectiveBudget,

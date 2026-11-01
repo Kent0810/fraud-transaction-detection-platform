@@ -22,7 +22,7 @@ const DEFAULTS: Settings = {
   biometrics: true,
   notifyDeclines: true,
   notifyBudget: true,
-  notifyTransfers: false,
+  notifyTransfers: true,
 };
 
 const SettingsContext = createContext<SettingsStore | null>(null);

@@ -149,20 +149,6 @@ services:
         condition: service_healthy
     restart: on-failure
 
-  # notifier:                           # alerts topic -> push to cardholder
-  #   build: ./services/notifier
-  #   environment:
-  #     <<: *kafka-env
-  #     KAFKA_GROUP_ID: notifier
-  #     KAFKA_ISOLATION_LEVEL: read_committed   # only see committed exactly-once output
-  #     PUSH_TARGET_URL: http://cardholder-app:8080/internal/push
-  #   depends_on:
-  #     kafka-init:
-  #       condition: service_completed_successfully
-  #     cardholder-app:
-  #       condition: service_started
-  #   restart: on-failure
-
   # # ───────────────────────── Cold path ─────────────────────────
   # batch-loader:                       # all topics + side files -> BigQuery (idempotent, counted)
   #   build: ./services/batch-loader
@@ -235,6 +221,8 @@ services:
       FLYWAY_PLACEHOLDERS_APP_PASSWORD: &postgres-app-password ${POSTGRES_APP_PASSWORD:-cardholder_app_password}
       FLYWAY_PLACEHOLDERS_DEBEZIUM_USER: &postgres-debezium-user ${POSTGRES_DEBEZIUM_USER:-debezium}
       FLYWAY_PLACEHOLDERS_DEBEZIUM_PASSWORD: &postgres-debezium-password ${POSTGRES_DEBEZIUM_PASSWORD:-debezium_password}
+      FLYWAY_PLACEHOLDERS_NOTIFIER_USER: &postgres-notifier-user ${POSTGRES_NOTIFIER_USER:-notifier}
+      FLYWAY_PLACEHOLDERS_NOTIFIER_PASSWORD: &postgres-notifier-password ${POSTGRES_NOTIFIER_PASSWORD:-notifier_password}
     volumes:
       - ./infra/postgres/migrations:/flyway/migrations:ro
     command: migrate
@@ -322,6 +310,8 @@ services:
     depends_on:
       cardholder-backend:
         condition: service_started
+      notifier:
+        condition: service_started
 
   cardholder-backend:
     build:
@@ -354,6 +344,26 @@ services:
     depends_on:
       cardholder-backend:
         condition: service_started
+      notifier:
+        condition: service_started
+
+  notifier:
+    build:
+      context: .
+      dockerfile: services/notifier/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      <<: [*kafka-env, *postgres-env]
+      POSTGRES_USER: *postgres-notifier-user
+      POSTGRES_PASSWORD: *postgres-notifier-password
+      PORT: 8081
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres-migrate:
+        condition: service_completed_successfully
+    restart: on-failure
 
 volumes:
   kafka-data:

@@ -1,0 +1,13 @@
+*
+!packages/db/package.json
+!packages/db/package-lock.json
+!packages/db/tsconfig.json
+!packages/db/prisma.config.ts
+!packages/db/prisma/
+!packages/db/src/
+packages/db/src/generated/
+!services/notifier/package.json
+!services/notifier/package-lock.json
+!services/notifier/tsconfig.json
+!services/notifier/nest-cli.json
+!services/notifier/src/
