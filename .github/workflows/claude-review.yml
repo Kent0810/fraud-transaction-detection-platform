@@ -5,10 +5,9 @@ on:
 jobs:
   review:
     uses: Kent0810/shared-workflows/.github/workflows/claude-review.yml@main
-    with:
-      federation_rule_id: ${{ vars.FEDERATION_RULE_ID }}
-      organization_id: ${{ vars.ORGANIZATION_ID }}
     secrets:
+      federation_rule_id: ${{ secrets.FEDERATION_RULE_ID }}
+      organization_id: ${{ secrets.ORGANIZATION_ID }}
       service_account_id: ${{ secrets.SERVICE_ACCOUNT_ID }}
     permissions:
       contents: read
