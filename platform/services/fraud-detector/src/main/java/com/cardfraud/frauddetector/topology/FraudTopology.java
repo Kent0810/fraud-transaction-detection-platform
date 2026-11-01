@@ -25,7 +25,6 @@ import com.cardfraud.frauddetector.model.ControlEvent;
 import com.cardfraud.frauddetector.model.Decision;
 import com.cardfraud.frauddetector.model.Transaction;
 import com.cardfraud.frauddetector.rules.MockRepeatTransferRule;
-import com.cardfraud.frauddetector.rules.Rules;
 import com.cardfraud.frauddetector.serde.JsonSerde;
 
 // The processing pipeline, kept apart from main() so it can be tested with TopologyTestDriver.
@@ -48,14 +47,21 @@ public final class FraudTopology {
 
         StreamsBuilder builder = new StreamsBuilder();
 
-        // 0. Is each card frozen? The cardholder's freeze / unfreeze from the app, latest wins.
-        KTable<String, Boolean> frozen = builder
+        KStream<String, ControlEvent> control = builder
                 .stream(cfg.controlTopic(), Consumed.with(keys, controlSerde))
-                .filter((cardId, event) -> event != null && event.isFreezeChange())
+                .filter((cardId, event) -> event != null);
+
+        // 0a. Is each card frozen? The cardholder's freeze / unfreeze from the app, latest wins.
+        KTable<String, Boolean> frozen = control
+                .filter((cardId, event) -> event.isFreezeChange())
                 .mapValues(ControlEvent::freezes)
                 .toTable(Materialized.<String, Boolean, KeyValueStore<Bytes, byte[]>>as("frozen-accounts")
                         .withKeySerde(keys)
                         .withValueSerde(flags));
+
+        // 0b. Merchant rules and budgets per card (CardRules), for the rules in step 2.
+        CardRules.addStores(builder, keys);
+        control.process(CardRules.ControlWriter::new, CardRules.MERCHANT_RULES, CardRules.BUDGETS);
 
         // 1. Read transactions as Transaction objects: card payments and app transfers share one topic
         KStream<String, Transaction> transactions = builder
@@ -72,12 +78,14 @@ public final class FraudTopology {
                 .filter((cardId, txn) -> Transaction.TRANSFER.equals(txn.channel()));
 
         // 2. Every transaction -> one decision: DECLINE if the card is frozen, otherwise the rules (Rules.evaluate)
-        KStream<String, Decision> decisions = transactions.leftJoin(
-                frozen,
-                (cardId, txn, isFrozen) -> Boolean.TRUE.equals(isFrozen)
-                        ? Rules.frozen(cardId, txn)
-                        : Rules.evaluate(cardId, txn),
-                Joined.with(keys, transactionSerde, flags));
+        //    with the card's merchant rules, budget and spend so far (CardRules.Evaluator)
+        KStream<String, Decision> decisions = transactions
+                .leftJoin(
+                        frozen,
+                        (txn, isFrozen) -> new CardRules.Screened(txn, Boolean.TRUE.equals(isFrozen)),
+                        Joined.with(keys, transactionSerde, flags))
+                .processValues(CardRules.Evaluator::new,
+                        CardRules.MERCHANT_RULES, CardRules.BUDGETS, CardRules.SPEND);
 
         // 3. Every decision, card payment or transfer -> decisions topic
         decisions.to(cfg.decisionsTopic(), Produced.with(keys, decisionSerde));
