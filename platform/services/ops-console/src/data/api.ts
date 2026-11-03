@@ -3,6 +3,7 @@ import type {
   Activity,
   AuditEntry,
   CardView,
+  FlaggedPayment,
   Followup,
   FraudMark,
   LoginStatus,
@@ -23,6 +24,8 @@ export const logout = () => request<void>('POST', '/ops/auth/logout');
 export const me = () => request<StaffMember>('GET', '/ops/auth/me');
 
 export const fetchQueue = () => request<QueueItem[]>('GET', '/ops/queue');
+
+export const fetchFlaggedPayments = () => request<FlaggedPayment[]>('GET', '/ops/flagged-payments');
 
 export const findCard = (q: string) => request<{ cardId: string }>('GET', `/ops/cards?q=${encodeURIComponent(q)}`);
 

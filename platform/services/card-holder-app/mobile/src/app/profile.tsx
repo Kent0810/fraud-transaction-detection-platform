@@ -5,8 +5,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { Avatar } from '@/components/Avatar';
 import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp, stagger } from '@/components/motion';
-import { Empty, SectionHeader, Surface } from '@/components/ui';
-import { useUser } from '@/data/auth';
+import { Button, Empty, SectionHeader, Surface } from '@/components/ui';
+import { useAuth, useUser } from '@/data/auth';
 import { apiEnabled } from '@/data/http';
 import { ACCOUNT } from '@/data/mock';
 import { fetchProfile } from '@/data/queries';
@@ -25,6 +25,7 @@ const mask = (s: string) => `${'•'.repeat(Math.max(0, Math.min(s.length - 4, 1
 export default function ProfileScreen() {
   const c = useColors();
   const user = useUser();
+  const { logout } = useAuth();
   // Offline, the demo user is all there is; live, the bank has the full record.
   const [profile, setProfile] = useState<Profile | null>(() =>
     apiEnabled
@@ -92,6 +93,9 @@ export default function ProfileScreen() {
       <Text style={[styles.hint, { color: c.muted }]}>
         To change these details, contact the bank. Nobody from the bank will ask you for your password.
       </Text>
+      <FadeInUp delay={stagger(3)} style={styles.logout}>
+        <Button label="Log out" icon="log-out-outline" variant="danger" onPress={logout} />
+      </FadeInUp>
     </ScrollView>
   );
 }
@@ -134,4 +138,5 @@ const styles = StyleSheet.create({
   key: { fontSize: 14 },
   val: { fontSize: 14, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
   hint: { fontSize: 12, textAlign: 'center', marginTop: space.xl, lineHeight: 17 },
+  logout: { marginTop: space.xl },
 });

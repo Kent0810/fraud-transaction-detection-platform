@@ -3,10 +3,12 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Icon } from '../components/Icons';
 import { fetchRecentCards, findCard, type RecentCard } from '../data/api';
 import { ago, cardNumber, initials } from '../data/format';
+import { useAuth } from '../data/auth';
 import { useLive } from '../data/live';
 import { go, href } from '../data/router';
 
 export function Find() {
+  const { session } = useAuth();
   const { alerts } = useLive();
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -98,31 +100,33 @@ export function Find() {
             </ul>
           )}
         </div>
-        <div className="panel">
-          <h2>
-            <Icon name="bell" size={15} /> Just flagged
-          </h2>
-          {flagged.length === 0 ? (
-            <p className="muted small">Cards with a payment stepped up or declined since you signed in.</p>
-          ) : (
-            <ul className="person-list">
-              {flagged.map((a) => (
-                <li key={a.cardId}>
-                  <a href={href({ page: 'card', cardId: a.cardId })}>
-                    <span className={`avatar t-${a.decision.toLowerCase()}`}>
-                      <Icon name={a.decision === 'DECLINE' ? 'ban' : 'shield'} size={15} />
-                    </span>
-                    <span className="person-text">
-                      <b>{a.merchant}</b>
-                      <small className="mono">{cardNumber(a.cardId)}</small>
-                    </span>
-                    <span className="muted small">{ago(new Date(a.receivedAt).toISOString())}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {session?.role === 'ANALYST' && (
+          <div className="panel">
+            <h2>
+              <Icon name="bell" size={15} /> Just flagged
+            </h2>
+            {flagged.length === 0 ? (
+              <p className="muted small">Cards with a payment stepped up or declined since you signed in.</p>
+            ) : (
+              <ul className="person-list">
+                {flagged.map((a) => (
+                  <li key={a.cardId}>
+                    <a href={href({ page: 'card', cardId: a.cardId })}>
+                      <span className={`avatar t-${a.decision.toLowerCase()}`}>
+                        <Icon name={a.decision === 'DECLINE' ? 'ban' : 'shield'} size={15} />
+                      </span>
+                      <span className="person-text">
+                        <b>{a.merchant}</b>
+                        <small className="mono">{cardNumber(a.cardId)}</small>
+                      </span>
+                      <span className="muted small">{ago(new Date(a.receivedAt).toISOString())}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

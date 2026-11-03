@@ -5,9 +5,13 @@ import { CassandraService } from '../../../shared/cassandra/cassandra.service';
 import { type AlertRow, iso, num, type TriageRow } from '../../../shared/cassandra/models';
 import { CardsRepository } from '../../cards/repositories/cards.repository';
 import type { Verdict } from '../../cards/types/cards.types';
-import type { ActivityDto, CaseAlertDto, QueueItemDto, ReviewStatus } from '../types/ops.types';
+import type { ActivityDto, CaseAlertDto, FlaggedPaymentDto, QueueItemDto, ReviewStatus } from '../types/ops.types';
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+
+// Trends read each card in the queue separately (txn_by_card is split by card), so the number of cards is capped.
+const TREND_CARDS = 500;
 
 const bucket = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -49,6 +53,27 @@ export class CasesRepository {
       .slice(0, limit);
   }
 
+  /**
+   * Payments that went on a case in the last hours, across cards. Any such card is in today's or yesterday's queue
+   * partition, so the queue finds the cards. The same test as the fraud detector's Decision.needsReview.
+   */
+  async flaggedPayments(hours: number): Promise<FlaggedPaymentDto[]> {
+    const since = new Date(Date.now() - hours * HOUR_MS);
+    const cards = await this.queue(TREND_CARDS);
+    const txns = await Promise.all(cards.map((c) => this.cards.transactionsSince(c.cardId, since, 1000)));
+    return cards.flatMap((c, i) =>
+      txns[i]
+        .filter((t) => isFlagged(t.decision, t.firedRules))
+        .map((t) => ({
+          txnId: t.txnId,
+          cardId: c.cardId,
+          ts: t.ts,
+          decision: t.decision,
+          firedRules: t.firedRules,
+        })),
+    );
+  }
+
   /** The card's transactions and alerts since the given day, merged on txn_id. */
   async activity(cardId: string, days: number): Promise<ActivityDto[]> {
     const since = new Date(Date.now() - days * DAY_MS);
@@ -85,6 +110,11 @@ export class CasesRepository {
     const rows = await this.alerts.find({ cardId, ts: mapping.q.gte(since) }, { limit: 1000 });
     return rows.toArray();
   }
+}
+
+function isFlagged(decision: Verdict, firedRules: string[]): boolean {
+  if (firedRules.includes('FRAUD_RECIPIENT')) return true;
+  return decision !== 'ALLOW' && firedRules.some((r) => r !== 'R6');
 }
 
 function toAlert(r: AlertRow): CaseAlertDto {

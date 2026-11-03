@@ -90,7 +90,6 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
         run: to({ page: 'followups' }),
       },
       { id: 'p-find', icon: 'search', label: 'Find a card', hint: 'G F', group: 'Go to', run: to({ page: 'find' }) },
-      { id: 'p-alerts', icon: 'bell', label: 'Live alerts', hint: 'G A', group: 'Go to', run: to({ page: 'alerts' }) },
       {
         id: 'p-terminal',
         icon: 'qr',
@@ -109,7 +108,7 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
       run: to({ page: 'card', cardId: c.cardId }),
     }));
     const seen = new Set<string>();
-    const live: Item[] = alerts
+    const live: Item[] = (role === 'ANALYST' ? alerts : [])
       .filter((a) => !seen.has(a.cardId) && seen.add(a.cardId))
       .slice(0, 5)
       .map((a) => ({
@@ -208,7 +207,6 @@ const SHORTCUTS: [string[], string][] = [
   [['G', 'Q'], 'Triage queue (analysts)'],
   [['G', 'F'], 'Find a card'],
   [['G', 'U'], 'Fraud follow-ups'],
-  [['G', 'A'], 'Live alerts'],
   [['G', 'M'], 'Merchant QR terminal'],
   [['J', 'K'], 'Move down / up a list'],
   [['Enter'], 'Open the selected row'],

@@ -17,6 +17,7 @@ import { SetLoginEnabledCommand } from './handlers/commands/set-login-enabled.co
 import { FindCardQuery } from './handlers/queries/find-card.query';
 import { GetActivityQuery } from './handlers/queries/get-activity.query';
 import { GetAuditTrailQuery } from './handlers/queries/get-audit-trail.query';
+import { GetFlaggedPaymentsQuery } from './handlers/queries/get-flagged-payments.query';
 import { GetFollowupsQuery } from './handlers/queries/get-followups.query';
 import { GetFraudMarksQuery } from './handlers/queries/get-fraud-marks.query';
 import { GetQueueQuery } from './handlers/queries/get-queue.query';
@@ -28,6 +29,7 @@ import {
   type AuditEntryDto,
   type CardViewDto,
   Days,
+  type FlaggedPaymentDto,
   type FollowupDto,
   FollowupOutcomeRequest,
   type FraudMarkDto,
@@ -54,6 +56,12 @@ export class OpsController {
   @Get('queue')
   queue(): Promise<QueueItemDto[]> {
     return this.queries.execute(new GetQueueQuery(100));
+  }
+
+  @Staff('ANALYST')
+  @Get('flagged-payments')
+  flaggedPayments(): Promise<FlaggedPaymentDto[]> {
+    return this.queries.execute(new GetFlaggedPaymentsQuery(24));
   }
 
   @Staff()

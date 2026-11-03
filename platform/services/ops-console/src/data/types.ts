@@ -33,6 +33,14 @@ export type QueueItem = {
   updatedAt: string | null;
 };
 
+export type FlaggedPayment = {
+  txnId: string;
+  cardId: string;
+  ts: string;
+  decision: Verdict;
+  firedRules: string[];
+};
+
 export type CaseAlert = {
   alertId: string;
   ruleId: string;

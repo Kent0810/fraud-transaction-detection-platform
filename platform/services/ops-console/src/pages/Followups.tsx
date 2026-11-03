@@ -80,7 +80,7 @@ export function Followups({ role }: { role: StaffRole }) {
               role === 'AGENT' && (
                 <>
                   <ReasonAction
-                    label="That was me"
+                    label="Not fraud"
                     confirm="Discard fraud finding"
                     title="The cardholder made this payment?"
                     description={
@@ -93,8 +93,8 @@ export function Followups({ role }: { role: StaffRole }) {
                     onRun={(r) => resolve(f, 'GENUINE', r)}
                   />
                   <ReasonAction
-                    label="That wasn't me"
-                    confirm="Freeze and mark"
+                    label="Confirm fraud"
+                    confirm="Confirm fraud"
                     title="The cardholder did not make this payment?"
                     description={
                       <p>

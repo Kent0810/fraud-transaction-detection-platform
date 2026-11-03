@@ -1,25 +1,37 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { VerdictBadge } from '../components/Badges';
-import { ScoreMeter, Spark } from '../components/Charts';
+import { BarList, type Bucket, ScoreMeter, type Series, Spark, StackedColumns } from '../components/Charts';
 import { Icon } from '../components/Icons';
-import { fetchQueue } from '../data/api';
-import { ago, cardNumber, compactVnd, vnd } from '../data/format';
+import { fetchFlaggedPayments, fetchQueue } from '../data/api';
+import { ago, cardNumber, compactVnd } from '../data/format';
 import { useHotkeys } from '../data/hotkeys';
 import { useLive } from '../data/live';
-import { perMinute, useNow } from '../data/now';
+import { useNow } from '../data/now';
 import { go } from '../data/router';
-import type { QueueItem, Verdict } from '../data/types';
+import { ruleTitle } from '../data/rules';
+import type { FlaggedPayment, QueueItem, Verdict } from '../data/types';
 
 // New cases reach Cassandra within seconds (BR1), so the queue polls at the same pace.
 const REFRESH_MS = 5_000;
 
+const TREND_HOURS = 24;
+const HOUR_MS = 3_600_000;
+
+const SERIES: Series[] = [
+  { key: 'ALLOW', label: 'Alert only', color: 'var(--c-allow)' },
+  { key: 'STEP_UP', label: 'Step-up', color: 'var(--c-step)' },
+  { key: 'DECLINE', label: 'Decline', color: 'var(--c-decline)' },
+];
+
 type DecisionFilter = 'ALL' | Exclude<Verdict, 'ALLOW'>;
 
 export function Queue() {
-  const { alerts } = useLive();
+  const { alerts, markSeen } = useLive();
   const now = useNow(1_000);
   const [items, setItems] = useState<QueueItem[] | null>(null);
+  const [flaggedPayments, setFlaggedPayments] = useState<FlaggedPayment[] | null>(null);
+  const [pausedAt, setPausedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [filter, setFilter] = useState('');
@@ -29,7 +41,9 @@ export function Queue() {
 
   const load = useCallback(async () => {
     try {
-      setItems(await fetchQueue());
+      const [queue, flagged] = await Promise.all([fetchQueue(), fetchFlaggedPayments()]);
+      setItems(queue);
+      setFlaggedPayments(flagged);
       setError(null);
       setCheckedAt(Date.now());
     } catch (err) {
@@ -37,11 +51,41 @@ export function Queue() {
     }
   }, []);
 
+  // Paused: the rows and charts hold still while an analyst reads them. Resuming loads straight away.
+  const paused = pausedAt !== null;
   useEffect(() => {
+    if (paused) return;
     void load();
     const id = setInterval(load, REFRESH_MS);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, paused]);
+
+  useEffect(() => {
+    if (!paused) markSeen();
+  }, [alerts, markSeen, paused]);
+
+  const waiting = pausedAt === null ? 0 : alerts.filter((a) => a.receivedAt > pausedAt).length;
+
+  const trendAt = pausedAt ?? now;
+  const hourlyStart = Math.floor(trendAt / HOUR_MS) * HOUR_MS - (TREND_HOURS - 1) * HOUR_MS;
+  const buckets = useMemo<Bucket[]>(() => {
+    const list: Bucket[] = Array.from({ length: TREND_HOURS }, (_, i) => {
+      const at = new Date(hourlyStart + i * HOUR_MS);
+      const label = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return { label, detail: `Hour from ${label}`, values: { ALLOW: 0, STEP_UP: 0, DECLINE: 0 } };
+    });
+    for (const p of flaggedPayments ?? []) {
+      const i = Math.floor((new Date(p.ts).getTime() - hourlyStart) / HOUR_MS);
+      if (i >= 0 && i < TREND_HOURS) list[i].values[p.decision]++;
+    }
+    return list;
+  }, [flaggedPayments, hourlyStart]);
+
+  const ruleCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of flaggedPayments ?? []) for (const r of p.firedRules) counts.set(r, (counts.get(r) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [flaggedPayments]);
 
   const rows = useMemo(() => {
     const digits = filter.replace(/\s/g, '');
@@ -67,14 +111,8 @@ export function Queue() {
   const all = items ?? [];
   const maxPriority = Math.max(...all.map((c) => c.priority), 1);
   const fresh = new Set(alerts.filter((a) => now - a.receivedAt < 60_000).map((a) => a.cardId));
-  const rate = perMinute(
-    alerts.map((a) => a.receivedAt),
-    now,
-    30,
-  );
   const declines = all.filter((c) => c.lastDecision === 'DECLINE').length;
   const openAlerts = all.reduce((n, c) => n + c.openAlerts, 0);
-  const flagged = all.reduce((n, c) => n + c.amountSum, 0);
   const nextIn = checkedAt ? Math.max(0, Math.ceil((REFRESH_MS - (now - checkedAt)) / 1000)) : null;
 
   return (
@@ -84,40 +122,87 @@ export function Queue() {
           <h1>Triage queue</h1>
           <p className="muted">One case per card, ranked by risk score × flagged amount, across today and yesterday.</p>
         </div>
-        <div className={`refresh${error ? ' bad' : ''}`} title="The queue refreshes every 5 seconds">
-          <svg viewBox="0 0 20 20" aria-hidden>
-            <circle cx="10" cy="10" r="8" className="ring-track" />
-            <circle
-              cx="10"
-              cy="10"
-              r="8"
-              className="ring"
-              style={{ strokeDashoffset: nextIn === null ? 0 : (50.3 * nextIn) / (REFRESH_MS / 1000) }}
-            />
-          </svg>
-          {error
-            ? 'Refresh failed, retrying'
-            : checkedAt
-              ? `Updated ${ago(new Date(checkedAt).toISOString())}`
-              : 'Loading…'}
+        <div className="head-actions">
+          <button
+            type="button"
+            className={`btn small ${paused ? 'primary' : 'ghost'}`}
+            onClick={() => setPausedAt((p) => (p === null ? Date.now() : null))}
+          >
+            <Icon name={paused ? 'play' : 'pause'} size={14} />
+            {paused ? 'Resume' : 'Pause'}
+          </button>
+          <div className={`refresh${error ? ' bad' : ''}`} title="The queue refreshes every 5 seconds">
+            <svg viewBox="0 0 20 20" aria-hidden>
+              <circle cx="10" cy="10" r="8" className="ring-track" />
+              <circle
+                cx="10"
+                cy="10"
+                r="8"
+                className="ring"
+                style={{ strokeDashoffset: nextIn === null ? 0 : (50.3 * nextIn) / (REFRESH_MS / 1000) }}
+              />
+            </svg>
+            {paused
+              ? 'Paused'
+              : error
+                ? 'Refresh failed, retrying'
+                : checkedAt
+                  ? `Updated ${ago(new Date(checkedAt).toISOString())}`
+                  : 'Loading…'}
+          </div>
         </div>
       </header>
 
       <div className="kpis">
         <Kpi label="Open cases" value={items ? String(all.length) : '—'} sub={`${declines} last declined`} />
         <Kpi label="Open alerts" value={items ? String(openAlerts) : '—'} sub="across all cases" tone="hl" />
-        <Kpi label="Flagged amount" value={items ? compactVnd(flagged) : '—'} sub={items ? vnd(flagged) : ''} />
         <Kpi
-          label="Flagged · last 30 min"
-          value={String(rate.reduce((a, b) => a + b, 0))}
-          sub="from the live feed"
+          label={`Flagged · last ${TREND_HOURS} h`}
+          value={flaggedPayments ? String(flaggedPayments.length) : '—'}
+          sub="payments, from stored alerts"
           tone="ctrl"
         >
-          <Spark values={rate} />
+          <Spark values={buckets.map((b) => b.values.ALLOW + b.values.STEP_UP + b.values.DECLINE)} />
         </Kpi>
       </div>
 
+      <div className="trends">
+        <div className="panel">
+          <h2>Flagged per hour</h2>
+          <StackedColumns
+            buckets={buckets}
+            series={SERIES}
+            format={(n) => String(Math.round(n))}
+            axisEvery={6}
+            height={120}
+            caption={`Flagged payments per hour over the last ${TREND_HOURS} hours`}
+          />
+        </div>
+        <div className="panel">
+          <h2>Rules firing</h2>
+          <BarList
+            empty="No rules have fired yet."
+            rows={ruleCounts.map(([r, n]) => ({
+              key: r,
+              label: (
+                <>
+                  <b className="mono">{r}</b> {ruleTitle(r)}
+                </>
+              ),
+              value: n,
+            }))}
+          />
+        </div>
+      </div>
+
       {error && <p className="error banner">{error}</p>}
+
+      {waiting > 0 && (
+        <button type="button" className="new-banner" onClick={() => setPausedAt(null)}>
+          <Icon name="arrow" size={14} style={{ transform: 'rotate(-90deg)' }} />
+          {waiting} new {waiting === 1 ? 'alert' : 'alerts'} while paused, show them
+        </button>
+      )}
 
       <div className="toolbar">
         <label className="search-box">
@@ -176,7 +261,6 @@ export function Queue() {
                 <th>Card</th>
                 <th>Priority</th>
                 <th>Risk score</th>
-                <th className="num">Flagged amount</th>
                 <th className="num">Open alerts</th>
                 <th>Last decision</th>
                 <th>Updated</th>
@@ -208,7 +292,6 @@ export function Queue() {
                   <td>
                     <ScoreMeter value={c.riskScore} />
                   </td>
-                  <td className="num">{vnd(c.amountSum)}</td>
                   <td className="num">
                     <span className={`pill${c.openAlerts > 0 ? ' hot' : ''}`}>{c.openAlerts}</span>
                   </td>

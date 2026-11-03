@@ -15,6 +15,7 @@ import { StaffLogoutHandler } from './handlers/command-handlers/staff-logout.han
 import { FindCardHandler } from './handlers/query-handlers/find-card.handler';
 import { GetActivityHandler } from './handlers/query-handlers/get-activity.handler';
 import { GetAuditTrailHandler } from './handlers/query-handlers/get-audit-trail.handler';
+import { GetFlaggedPaymentsHandler } from './handlers/query-handlers/get-flagged-payments.handler';
 import { GetFollowupsHandler } from './handlers/query-handlers/get-followups.handler';
 import { GetFraudMarksHandler } from './handlers/query-handlers/get-fraud-marks.handler';
 import { GetQueueHandler } from './handlers/query-handlers/get-queue.handler';
@@ -48,6 +49,7 @@ import { StaffRepository } from './repositories/staff.repository';
     SetCardFrozenHandler,
     SetLoginEnabledHandler,
     GetQueueHandler,
+    GetFlaggedPaymentsHandler,
     GetActivityHandler,
     GetAuditTrailHandler,
     GetRecentCardsHandler,

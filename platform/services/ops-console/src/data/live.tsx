@@ -22,7 +22,6 @@ type Live = {
   prefs: AlertPrefs;
   setPrefs: (p: AlertPrefs) => void;
   markSeen: () => void;
-  clear: () => void;
   subscribe: (fn: (a: LiveAlert) => void) => () => void;
 };
 
@@ -122,10 +121,6 @@ export function LiveAlertsProvider({ token, children }: { token: string; childre
   }, [token]);
 
   const markSeen = useCallback(() => setUnseen(0), []);
-  const clear = useCallback(() => {
-    setAlerts([]);
-    setUnseen(0);
-  }, []);
   const subscribe = useCallback((fn: (a: LiveAlert) => void) => {
     listeners.current.add(fn);
     return () => {
@@ -134,8 +129,8 @@ export function LiveAlertsProvider({ token, children }: { token: string; childre
   }, []);
 
   const value = useMemo(
-    () => ({ alerts, unseen, connection, prefs, setPrefs, markSeen, clear, subscribe }),
-    [alerts, unseen, connection, prefs, setPrefs, markSeen, clear, subscribe],
+    () => ({ alerts, unseen, connection, prefs, setPrefs, markSeen, subscribe }),
+    [alerts, unseen, connection, prefs, setPrefs, markSeen, subscribe],
   );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }

@@ -21,6 +21,15 @@ export type QueueItemDto = {
   updatedAt: string | null;
 };
 
+/** A payment that went on its card's case: what the queue's trends count. */
+export type FlaggedPaymentDto = {
+  txnId: string;
+  cardId: string;
+  ts: string;
+  decision: Verdict;
+  firedRules: string[];
+};
+
 export type CardholderDto = {
   name: string;
   email: string;
