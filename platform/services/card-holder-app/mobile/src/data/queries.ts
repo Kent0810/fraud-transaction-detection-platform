@@ -9,14 +9,12 @@ import type {
   Period,
   QrTarget,
   Recipient,
-  RuleType,
   Transfer,
   Txn,
 } from './types';
 
 export type Controls = {
   budget: { limit: number; period: Period; updatedAt: string | null } | null;
-  merchantRules: { merchant: string; type: RuleType; createdAt: string }[];
 };
 
 export const fetchTransactions = () => request<Txn[]>('GET', `${ME}/transactions?limit=100`);

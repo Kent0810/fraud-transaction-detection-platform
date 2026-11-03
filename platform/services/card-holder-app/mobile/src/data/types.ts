@@ -130,12 +130,3 @@ export type Profile = {
 
 /** The cardholder's own code, for receiving transfers. */
 export type MyQr = { payload: string; account: string; name: string };
-
-export type RuleType = 'BLOCK' | 'ALLOW';
-
-export type MerchantRule = {
-  merchant: string;
-  type: RuleType;
-  createdAt: string;
-  pending: boolean;
-};

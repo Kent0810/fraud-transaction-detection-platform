@@ -22,5 +22,6 @@ create control       "$PARTITIONS" --config retention.ms=-1
 create cases         "$PARTITIONS" --config cleanup.policy=compact
 create settlements   "$PARTITIONS" --config retention.ms=604800000
 create credits       "$PARTITIONS" --config retention.ms=604800000
+create fraud-marks   "$PARTITIONS" --config cleanup.policy=compact   # keyed by recipient, read in full by every task
 
 "$BIN/kafka-topics.sh" --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --list

@@ -14,6 +14,7 @@ import {
   type LiveAlertDto,
   SettlementMessage,
 } from './event.types';
+import { staffShouldSee } from './staff-feed';
 
 const ALERT_ONLY_RULES = new Set(['MOCK_REPEAT']);
 
@@ -62,7 +63,7 @@ export class EventsService implements OnApplicationBootstrap {
   }
 
   private onDecision(d: z.infer<typeof DecisionMessage>): Promise<void> {
-    if (d.decision === 'ALLOW') return Promise.resolve();
+    if (!staffShouldSee(d)) return Promise.resolve();
     this.ops.next({
       txnId: d.txn_id,
       cardId: d.card_id,

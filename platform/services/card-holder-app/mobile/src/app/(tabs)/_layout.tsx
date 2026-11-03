@@ -42,10 +42,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen name="budget" options={{ title: 'Budget', tabBarIcon: icon('pie-chart-outline', 'pie-chart') }} />
-      <Tabs.Screen
-        name="merchants"
-        options={{ title: 'Merchants', tabBarIcon: icon('storefront-outline', 'storefront') }}
-      />
     </Tabs>
   );
 }

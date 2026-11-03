@@ -16,6 +16,17 @@ import type { AlertDto, AlertStatus, CardStateDto, Channel, TxnDto, Verdict } fr
 
 type ByCard = { cardId: string };
 
+// A fraud mark is the bank's suspicion about someone else, and can be wrong: only staff see it.
+const STAFF_ONLY_RULES = new Set(['FRAUD_RECIPIENT']);
+
+/** A transaction as its cardholder sees it. */
+export function forCardholder(t: TxnDto): TxnDto {
+  return { 
+    ...t, 
+    firedRules: t.firedRules.filter((r) => !STAFF_ONLY_RULES.has(r)) 
+  };
+}
+
 @Injectable()
 export class CardsRepository {
   private readonly txns: mapping.ModelMapper<TxnRow>;
@@ -58,15 +69,18 @@ export class CardsRepository {
       this.transactions(cardId, 500),
     ]);
     const merchants = new Map(txns.map((t) => [t.txnId, t.merchant]));
-    return alerts.toArray().map((r) => ({
-      alertId: r.alertId,
-      txnId: r.txnId,
-      ruleId: r.ruleId,
-      ts: iso(r.ts) ?? '',
-      amount: num(r.amount),
-      merchant: merchants.get(r.txnId) ?? 'Unknown merchant',
-      status: (r.status as AlertStatus | null) ?? 'OPEN',
-    }));
+    return alerts
+      .toArray()
+      .filter((r) => !STAFF_ONLY_RULES.has(r.ruleId))
+      .map((r) => ({
+        alertId: r.alertId,
+        txnId: r.txnId,
+        ruleId: r.ruleId,
+        ts: iso(r.ts) ?? '',
+        amount: num(r.amount),
+        merchant: merchants.get(r.txnId) ?? 'Unknown merchant',
+        status: (r.status as AlertStatus | null) ?? 'OPEN',
+      }));
   }
 
   async cardState(cardId: string): Promise<CardStateDto | null> {

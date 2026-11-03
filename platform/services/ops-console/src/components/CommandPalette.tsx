@@ -81,6 +81,14 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
             },
           ]
         : []),
+      {
+        id: 'p-followups',
+        icon: 'shield',
+        label: 'Fraud follow-ups',
+        hint: 'G U',
+        group: 'Go to',
+        run: to({ page: 'followups' }),
+      },
       { id: 'p-find', icon: 'search', label: 'Find a card', hint: 'G F', group: 'Go to', run: to({ page: 'find' }) },
       { id: 'p-alerts', icon: 'bell', label: 'Live alerts', hint: 'G A', group: 'Go to', run: to({ page: 'alerts' }) },
       {
@@ -199,6 +207,7 @@ const SHORTCUTS: [string[], string][] = [
   [['/'], 'Search cards and pages'],
   [['G', 'Q'], 'Triage queue (analysts)'],
   [['G', 'F'], 'Find a card'],
+  [['G', 'U'], 'Fraud follow-ups'],
   [['G', 'A'], 'Live alerts'],
   [['G', 'M'], 'Merchant QR terminal'],
   [['J', 'K'], 'Move down / up a list'],

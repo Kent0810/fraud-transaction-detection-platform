@@ -1,4 +1,4 @@
-import type { Alert, Bank, Budget, MerchantRule, PayMerchant, Txn } from './types';
+import type { Alert, Bank, Budget, PayMerchant, Txn } from './types';
 
 const now = Date.now();
 const minutesAgo = (m: number) => new Date(now - m * 60_000).toISOString();
@@ -160,11 +160,6 @@ export const ALERTS: Alert[] = TRANSACTIONS.flatMap((t) =>
 );
 
 export const BUDGET: Budget = { limit: 37_500_000, period: 'MONTH', spent: 28_603_000 };
-
-export const MERCHANT_RULES: MerchantRule[] = [
-  { merchant: 'Rippin, Kub and Mann', type: 'BLOCK', createdAt: minutesAgo(9 * 24 * 60), pending: false },
-  { merchant: 'Kirlin and Sons', type: 'ALLOW', createdAt: minutesAgo(30 * 24 * 60), pending: false },
-];
 
 export const PAY_MERCHANTS: PayMerchant[] = [
   { merchantId: '0', name: 'Kirlin and Sons', category: 'personal_care', distanceKm: 0.8 },

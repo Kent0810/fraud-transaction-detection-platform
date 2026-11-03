@@ -4,16 +4,21 @@ import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentStaff, Staff, type StaffMember } from '../../common/decorators/staff.decorator';
 import { CardId, ZodPipe } from '../../common/validation';
 import type { StaffAudit } from '../../shared/prisma/audit';
-import { ReleaseMerchantCommand } from '../controls/handlers/commands/release-merchant.command';
-import { SetMerchantRuleCommand } from '../controls/handlers/commands/set-merchant-rule.command';
-import { Merchant, type CardStatusDto, type MerchantRuleDto } from '../controls/types/controls.types';
+import { ReleaseRecipientCommand } from '../controls/handlers/commands/release-recipient.command';
+import { SetRecipientRuleCommand } from '../controls/handlers/commands/set-recipient-rule.command';
+import type { CardStatusDto, RecipientRuleDto } from '../controls/types/controls.types';
+import { accountRecipient, merchantRecipient } from '../controls/types/recipient';
 import { OpenCardCommand } from './handlers/commands/open-card.command';
+import { RemoveFraudMarkCommand } from './handlers/commands/remove-fraud-mark.command';
+import { ResolveFollowupCommand } from './handlers/commands/resolve-followup.command';
 import { ReviewAlertCommand } from './handlers/commands/review-alert.command';
 import { SetCardFrozenCommand } from './handlers/commands/set-card-frozen.command';
 import { SetLoginEnabledCommand } from './handlers/commands/set-login-enabled.command';
 import { FindCardQuery } from './handlers/queries/find-card.query';
 import { GetActivityQuery } from './handlers/queries/get-activity.query';
 import { GetAuditTrailQuery } from './handlers/queries/get-audit-trail.query';
+import { GetFollowupsQuery } from './handlers/queries/get-followups.query';
+import { GetFraudMarksQuery } from './handlers/queries/get-fraud-marks.query';
 import { GetQueueQuery } from './handlers/queries/get-queue.query';
 import { GetRecentCardsQuery } from './handlers/queries/get-recent-cards.query';
 import {
@@ -23,12 +28,17 @@ import {
   type AuditEntryDto,
   type CardViewDto,
   Days,
+  type FollowupDto,
+  FollowupOutcomeRequest,
+  type FraudMarkDto,
   Lookup,
   type LoginStatus,
   type QueueItemDto,
   type RecentCardDto,
   ReasonRequest,
-  StaffMerchantRuleRequest,
+  RecipientId,
+  StaffRecipientRuleRequest,
+  TxnId,
 } from './types/ops.types';
 
 const audit = (staff: StaffMember, reason: string | null): StaffAudit => ({ staffId: staff.staffId, reason });
@@ -87,7 +97,8 @@ export class OpsController {
     return this.queries.execute(new GetAuditTrailQuery(cardId));
   }
 
-  @Staff()
+  // Analysts judge alerts; confirming one sends the transaction to the agents to call the cardholder.
+  @Staff('ANALYST')
   @Put('cards/:cardId/alerts/:alertId')
   @HttpCode(204)
   reviewAlert(
@@ -100,27 +111,67 @@ export class OpsController {
   }
 
   @Staff('AGENT')
-  @Put('cards/:cardId/merchant-rules/:merchant')
+  @Put('cards/:cardId/recipient-rules')
   @HttpCode(202)
-  setMerchantRule(
+  setRecipientRule(
     @CurrentStaff() staff: StaffMember,
     @Param('cardId', new ZodPipe(CardId)) cardId: string,
-    @Param('merchant', new ZodPipe(Merchant)) merchant: string,
-    @Body(new ZodPipe(StaffMerchantRuleRequest)) { type, reason }: StaffMerchantRuleRequest,
-  ): Promise<MerchantRuleDto> {
-    return this.commands.execute(new SetMerchantRuleCommand(cardId, merchant, type, audit(staff, reason)));
+    @Body(new ZodPipe(StaffRecipientRuleRequest)) { recipient, type, reason }: StaffRecipientRuleRequest,
+  ): Promise<RecipientRuleDto> {
+    const target =
+      recipient.kind === 'MERCHANT'
+        ? merchantRecipient(recipient.name)
+        : accountRecipient(recipient.account, recipient.name);
+    return this.commands.execute(new SetRecipientRuleCommand(cardId, target, type, audit(staff, reason)));
   }
 
   @Staff('AGENT')
-  @Delete('cards/:cardId/merchant-rules/:merchant')
+  @Delete('cards/:cardId/recipient-rules/:recipientId')
   @HttpCode(202)
-  releaseMerchant(
+  releaseRecipient(
     @CurrentStaff() staff: StaffMember,
     @Param('cardId', new ZodPipe(CardId)) cardId: string,
-    @Param('merchant', new ZodPipe(Merchant)) merchant: string,
+    @Param('recipientId', new ZodPipe(RecipientId)) recipientId: string,
     @Body(new ZodPipe(ReasonRequest)) { reason }: ReasonRequest,
   ): Promise<void> {
-    return this.commands.execute(new ReleaseMerchantCommand(cardId, merchant, audit(staff, reason)));
+    return this.commands.execute(new ReleaseRecipientCommand(cardId, recipientId, audit(staff, reason)));
+  }
+
+  // Agents work the pending ones; analysts see how their confirmed alerts turned out.
+  @Staff()
+  @Get('follow-ups')
+  followups(): Promise<FollowupDto[]> {
+    return this.queries.execute(new GetFollowupsQuery(200));
+  }
+
+  @Staff('AGENT')
+  @Post('follow-ups/:cardId/:txnId')
+  @HttpCode(204)
+  resolveFollowup(
+    @CurrentStaff() staff: StaffMember,
+    @Param('cardId', new ZodPipe(CardId)) cardId: string,
+    @Param('txnId', new ZodPipe(TxnId)) txnId: string,
+    @Body(new ZodPipe(FollowupOutcomeRequest)) { outcome, reason }: FollowupOutcomeRequest,
+  ): Promise<void> {
+    return this.commands.execute(new ResolveFollowupCommand(cardId, txnId, outcome, audit(staff, reason)));
+  }
+
+  @Staff()
+  @Get('fraud-marks')
+  fraudMarks(): Promise<FraudMarkDto[]> {
+    return this.queries.execute(new GetFraudMarksQuery(200));
+  }
+
+  // Only analysts: an agent who thinks a mark is wrong asks one.
+  @Staff('ANALYST')
+  @Delete('fraud-marks/:recipientId')
+  @HttpCode(204)
+  removeFraudMark(
+    @CurrentStaff() staff: StaffMember,
+    @Param('recipientId', new ZodPipe(RecipientId)) recipientId: string,
+    @Body(new ZodPipe(ReasonRequest)) { reason }: ReasonRequest,
+  ): Promise<void> {
+    return this.commands.execute(new RemoveFraudMarkCommand(recipientId, audit(staff, reason)));
   }
 
   @Staff('AGENT')

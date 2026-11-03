@@ -59,7 +59,6 @@ export default function HomeScreen() {
       active: frozen,
     },
     { icon: 'pie-chart-outline', label: 'Budget', onPress: () => router.navigate('/budget') },
-    { icon: 'storefront-outline', label: 'Merchants', onPress: () => router.navigate('/merchants') },
   ];
 
   return (

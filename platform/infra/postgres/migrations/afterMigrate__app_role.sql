@@ -60,6 +60,12 @@ GRANT SELECT ON staff TO "${app_user}";
 GRANT SELECT, INSERT, DELETE ON staff_sessions TO "${app_user}";
 GRANT SELECT, INSERT ON audit_log TO "${app_user}";
 
+-- An analyst opens a follow-up, an agent records how the call went; it's never deleted.
+GRANT SELECT, INSERT ON fraud_followups TO "${app_user}";
+GRANT UPDATE (status, resolved_by, resolved_at, note) ON fraud_followups TO "${app_user}";
+-- An agent adds a fraud mark, an analyst removes it.
+GRANT SELECT, INSERT, DELETE ON recipient_fraud_marks TO "${app_user}";
+
 -- Debezium reads the outbox (the snapshot on first start, then the WAL) and no other table.
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM "${debezium_user}";
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM "${debezium_user}";

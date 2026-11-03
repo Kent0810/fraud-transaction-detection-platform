@@ -11,9 +11,9 @@ public record Alert(
         long amount,
         String ts) {
 
-    // One alert per fired rule; none when nothing fired.
+    // One alert per fired rule an analyst should see; none when nothing fired.
     public static List<Alert> fromDecision(Decision d) {
-        return d.firedRules().stream()
+        return d.alertRules().stream()
                 .map(rule -> new Alert(
                         d.txnId() + ":" + rule,
                         d.cardId(),

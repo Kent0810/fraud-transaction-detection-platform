@@ -75,6 +75,34 @@ export type AuditEntryDto = {
   payload: unknown;
 };
 
+export type FollowupStatus = 'PENDING' | 'GENUINE' | 'FRAUD';
+
+/** A transaction an analyst confirmed as fraud, and how the agent's call to the cardholder went. */
+export type FollowupDto = {
+  cardId: string;
+  txnId: string;
+  ts: string;
+  holderName: string;
+  holderEmail: string;
+  recipientId: string;
+  recipientName: string;
+  amount: number;
+  status: FollowupStatus;
+  confirmedBy: string;
+  confirmedAt: string;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  note: string | null;
+};
+
+export type FraudMarkDto = {
+  recipientId: string;
+  recipientName: string;
+  cardId: string;
+  markedBy: string;
+  markedAt: string;
+};
+
 // A card this staff member opened, from their own VIEW_CARDHOLDER audit rows: the bank's record, not the browser's.
 export type RecentCardDto = {
   cardId: string;
@@ -92,11 +120,31 @@ const Reason = text(500)
   .nullish()
   .transform((r) => r ?? null);
 
-export const StaffMerchantRuleRequest = z.object({
+const RecipientRef = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('MERCHANT'), name: text(120) }),
+  z.object({
+    kind: z.literal('ACCOUNT'),
+    account: z.string().regex(/^[A-Za-z]{2,10}:\d{6,19}$/, 'must be <bank code>:<account number>'),
+    name: text(120).nullish(),
+  }),
+]);
+
+export const StaffRecipientRuleRequest = z.object({
+  recipient: RecipientRef,
   type: z.enum(RULE_TYPES),
   reason: Reason,
 });
-export type StaffMerchantRuleRequest = z.infer<typeof StaffMerchantRuleRequest>;
+export type StaffRecipientRuleRequest = z.infer<typeof StaffRecipientRuleRequest>;
+
+export const RecipientId = text(200);
+
+export const FollowupOutcomeRequest = z.object({
+  outcome: z.enum(['GENUINE', 'FRAUD']),
+  reason: Reason,
+});
+export type FollowupOutcomeRequest = z.infer<typeof FollowupOutcomeRequest>;
+
+export const TxnId = text(200);
 
 export const ReasonRequest = z.object({ reason: Reason }).default({ reason: null });
 export type ReasonRequest = z.infer<typeof ReasonRequest>;

@@ -40,27 +40,29 @@ model auth {
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model cardholders {
-  card_id          String             @id
-  first_name       String
-  last_name        String
-  email            String
-  gender           String?            @db.Char(1)
-  street           String?
-  city             String?
-  state            String?            @db.Char(2)
-  zip              String?
-  lat              Float?
-  long             Float?
-  city_pop         Int?
-  job              String?
-  dob              DateTime?          @db.Date
-  created_at       DateTime           @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
-  accounts         accounts?
-  audit_log        audit_log[]
-  auth             auth?
-  saved_recipients saved_recipients[]
-  sessions         sessions[]
+  card_id               String                  @id
+  first_name            String
+  last_name             String
+  email                 String
+  gender                String?                 @db.Char(1)
+  street                String?
+  city                  String?
+  state                 String?                 @db.Char(2)
+  zip                   String?
+  lat                   Float?
+  long                  Float?
+  city_pop              Int?
+  job                   String?
+  dob                   DateTime?               @db.Date
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  accounts              accounts?
+  audit_log             audit_log[]
+  auth                  auth?
+  fraud_followups       fraud_followups[]
+  recipient_fraud_marks recipient_fraud_marks[]
+  saved_recipients      saved_recipients[]
+  sessions              sessions[]
 }
 
 model flyway_schema_history {
@@ -143,15 +145,18 @@ model audit_log {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model staff {
-  staff_id       Int              @id @default(autoincrement())
-  email          String
-  name           String
-  role           String
-  password_hash  String
-  active         Boolean          @default(true)
-  created_at     DateTime         @default(now()) @db.Timestamptz(6)
-  audit_log      audit_log[]
-  staff_sessions staff_sessions[]
+  staff_id                                            Int                     @id @default(autoincrement())
+  email                                               String
+  name                                                String
+  role                                                String
+  password_hash                                       String
+  active                                              Boolean                 @default(true)
+  created_at                                          DateTime                @default(now()) @db.Timestamptz(6)
+  audit_log                                           audit_log[]
+  fraud_followups_fraud_followups_confirmed_byTostaff fraud_followups[]       @relation("fraud_followups_confirmed_byTostaff")
+  fraud_followups_fraud_followups_resolved_byTostaff  fraud_followups[]       @relation("fraud_followups_resolved_byTostaff")
+  recipient_fraud_marks                               recipient_fraud_marks[]
+  staff_sessions                                      staff_sessions[]
 }
 
 model staff_sessions {
@@ -191,4 +196,37 @@ model transactions {
   @@index([card_id, created_at(sort: Desc)], map: "transactions_card_idx")
   @@index([created_at], map: "transactions_pending_idx", where: raw("(status = 'PENDING'::text)"))
   @@index([to_card, created_at(sort: Desc)], map: "transactions_to_idx", where: raw("(to_card IS NOT NULL)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model fraud_followups {
+  card_id                                   String
+  txn_id                                    String
+  txn_ts                                    DateTime    @db.Timestamptz(6)
+  recipient_id                              String
+  recipient_name                            String
+  amount                                    BigInt
+  status                                    String      @default("PENDING")
+  confirmed_by                              Int
+  confirmed_at                              DateTime    @default(now()) @db.Timestamptz(6)
+  resolved_by                               Int?
+  resolved_at                               DateTime?   @db.Timestamptz(6)
+  note                                      String?
+  cardholders                               cardholders @relation(fields: [card_id], references: [card_id], onUpdate: NoAction)
+  staff_fraud_followups_confirmed_byTostaff staff       @relation("fraud_followups_confirmed_byTostaff", fields: [confirmed_by], references: [staff_id], onUpdate: NoAction)
+  staff_fraud_followups_resolved_byTostaff  staff?      @relation("fraud_followups_resolved_byTostaff", fields: [resolved_by], references: [staff_id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@id([card_id, txn_id])
+  @@index([confirmed_at(sort: Desc)], map: "fraud_followups_recent_idx")
+}
+
+model recipient_fraud_marks {
+  recipient_id   String      @id
+  recipient_name String
+  card_id        String
+  txn_id         String
+  marked_by      Int
+  marked_at      DateTime    @default(now()) @db.Timestamptz(6)
+  cardholders    cardholders @relation(fields: [card_id], references: [card_id], onUpdate: NoAction)
+  staff          staff       @relation(fields: [marked_by], references: [staff_id], onUpdate: NoAction)
 }

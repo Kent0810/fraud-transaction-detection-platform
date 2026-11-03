@@ -98,7 +98,9 @@ export async function requestPayment(db: PrismaClient, p: PaymentRequestInput): 
  */
 export async function settle(db: PrismaClient, d: DecisionInput): Promise<TransactionState | null> {
   const approve = d.verdict === 'ALLOW';
-  const reasons = d.firedRules.length ? d.firedRules : [d.verdict];
+  // A fraud mark never stops a payment by itself, and the cardholder sees these reasons: it stays between staff.
+  const fired = d.firedRules.filter((r) => r !== 'FRAUD_RECIPIENT');
+  const reasons = fired.length ? fired : [d.verdict];
   const run = d.channel === 'CARD' ? cardPayment(db, d) : transfer(db, d);
 
   if (!approve) {

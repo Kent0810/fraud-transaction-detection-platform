@@ -63,8 +63,18 @@ export class CasesRepository {
     return txns.map((t) => ({ ...t, alerts: byTxn.get(t.txnId) ?? [] }));
   }
 
-  async alertExists(cardId: string, ts: Date, alertId: string): Promise<boolean> {
-    return !!(await this.alerts.get({ cardId, ts, alertId }));
+  async alert(cardId: string, ts: Date, alertId: string): Promise<AlertRow | null> {
+    return this.alerts.get({ cardId, ts, alertId });
+  }
+
+  /** All of one transaction's alerts: they share its ts, though another transaction could too. */
+  async clearTransactionAlerts(cardId: string, ts: Date, txnId: string): Promise<void> {
+    const rows = (await this.alerts.find({ cardId, ts })).toArray();
+    await Promise.all(
+      rows
+        .filter((r) => r.txnId === txnId && r.status !== 'CLEARED')
+        .map((r) => this.setAlertStatus(cardId, ts, r.alertId, 'CLEARED')),
+    );
   }
 
   async setAlertStatus(cardId: string, ts: Date, alertId: string, status: ReviewStatus): Promise<void> {

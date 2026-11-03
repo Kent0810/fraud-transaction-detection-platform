@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { Password, text } from '../../../common/validation';
+import { Password } from '../../../common/validation';
 
 export const PERIODS = ['DAY', 'WEEK', 'MONTH'] as const;
 export type Period = (typeof PERIODS)[number];
@@ -14,24 +14,26 @@ export type BudgetDto = {
   updatedAt: string | null;
 };
 
-export type MerchantRuleDto = {
-  merchant: string;
+export type RecipientRuleDto = {
+  recipientId: string;
+  name: string;
   type: RuleType;
   createdAt: string;
 };
 
-export type ControlsDto = { budget: BudgetDto | null; merchantRules: MerchantRuleDto[] };
+export type ControlsDto = { budget: BudgetDto | null; recipientRules: RecipientRuleDto[] };
 
 export type CardStatusDto = { frozen: boolean };
 
-export type ControlAction = 'SET_BUDGET' | 'SET_MERCHANT_RULE' | 'RELEASE_MERCHANT' | 'FREEZE_CARD' | 'UNFREEZE_CARD';
+export type ControlAction = 'SET_BUDGET' | 'SET_RECIPIENT_RULE' | 'RELEASE_RECIPIENT' | 'FREEZE_CARD' | 'UNFREEZE_CARD';
 
 export type ControlEvent = {
   action: ControlAction;
   control_id: string;
   ts: string;
-  kind: 'BUDGET' | 'MERCHANT' | 'FREEZE' | null;
-  merchant: string | null;
+  kind: 'BUDGET' | 'RECIPIENT' | 'FREEZE' | null;
+  recipient_id: string | null;
+  recipient_name: string | null;
   rule: RuleType | null;
   budget_limit: number | null;
   budget_period: Period | null;
@@ -42,7 +44,8 @@ type ControlFields = Omit<ControlEvent, 'action' | 'control_id' | 'ts'>;
 
 const NO_FIELDS: ControlFields = {
   kind: null,
-  merchant: null,
+  recipient_id: null,
+  recipient_name: null,
   rule: null,
   budget_limit: null,
   budget_period: null,
@@ -51,10 +54,10 @@ const NO_FIELDS: ControlFields = {
 
 export const BUDGET_ID = 'budget';
 export const FREEZE_ID = 'freeze';
-export const MERCHANT_PREFIX = 'merchant:';
+export const RECIPIENT_PREFIX = 'recipient:';
 
-export function merchantControlId(merchant: string): string {
-  return `${MERCHANT_PREFIX}${merchant}`;
+export function recipientControlId(recipientId: string): string {
+  return `${RECIPIENT_PREFIX}${recipientId}`;
 }
 
 export function controlEvent(
@@ -68,11 +71,6 @@ export function controlEvent(
 
 export const BudgetRequest = z.object({ limit: z.number().positive(), period: z.enum(PERIODS) });
 export type BudgetRequest = z.infer<typeof BudgetRequest>;
-
-export const MerchantRuleRequest = z.object({ type: z.enum(RULE_TYPES) });
-export type MerchantRuleRequest = z.infer<typeof MerchantRuleRequest>;
-
-export const Merchant = text(120);
 
 export const UnfreezeRequest = z.object({ password: Password });
 export type UnfreezeRequest = z.infer<typeof UnfreezeRequest>;

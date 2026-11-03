@@ -16,9 +16,12 @@ public final class Rules {
             "R3", 0.6,   // impossible travel
             "R4", 0.4,   // new-region burst
             "R5", 0.3,   // high-risk category
-            "R6", 1.0);  // blocked merchant
+            Decision.BLOCKED_RECIPIENT, 1.0,
+            // Below STEP_UP_AT: a fraud mark alone flags the payment and never stops it. Above 0: it ranks in the queue.
+            Decision.FRAUD_RECIPIENT, 0.3);
 
-    public static final String BLOCKED_MERCHANT = "R6";
+    public static final String BLOCKED_RECIPIENT = Decision.BLOCKED_RECIPIENT;
+    public static final String FRAUD_RECIPIENT = Decision.FRAUD_RECIPIENT;
     public static final String LARGE_AMOUNT_RULE = "LARGE_AMOUNT";
     // Over the cardholder's budget: alert only, never changes the verdict.
     public static final String BUDGET = "BUDGET";
@@ -33,21 +36,25 @@ public final class Rules {
     }
 
     /**
-     * @param merchantRule  the card's rule for this merchant: BLOCK, ALLOW or null
+     * @param recipientRule  the card's rule for this recipient: BLOCK, ALLOW or null
+     * @param fraudMarked   whether this recipient carries a bank-wide fraud mark
      * @param budget        the card's budget, or null when it has none
      * @param spentInPeriod spent so far in the budget's current period, before this transaction
      */
-    public static Decision evaluate(String cardId, Transaction txn, String merchantRule, Budget budget,
-                                    long spentInPeriod) {
+    public static Decision evaluate(String cardId, Transaction txn, String recipientRule, boolean fraudMarked,
+                                    Budget budget, long spentInPeriod) {
         List<String> fired = new ArrayList<>();
 
-        boolean allowListed = MerchantRules.ALLOW.equals(merchantRule);
+        boolean allowListed = RecipientRules.ALLOW.equals(recipientRule);
         if (!allowListed) {
-            // R1 to R5 go here. A merchant the card allows skips them (BR3). None are written yet.
+            // R1 to R5 go here. A recipient the card whitelists skips them (BR3). None are written yet.
         }
 
-        if (MerchantRules.BLOCK.equals(merchantRule)) {
-            fired.add(BLOCKED_MERCHANT);
+        if (RecipientRules.BLOCK.equals(recipientRule)) {
+            fired.add(BLOCKED_RECIPIENT);
+        } else if (fraudMarked) {
+            // Not when blacklisted: that payment fails anyway, so no money reaches the recipient to review.
+            fired.add(FRAUD_RECIPIENT);
         }
 
         if (Transaction.TRANSFER.equals(txn.channel()) && txn.amt() >= LARGE_AMOUNT) {

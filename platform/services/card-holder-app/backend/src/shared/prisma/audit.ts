@@ -2,9 +2,12 @@ import type { Prisma } from '@platform/db';
 
 export type AuditAction =
   | 'VIEW_CARDHOLDER'
-  | 'BLOCK_MERCHANT'
-  | 'ALLOW_MERCHANT'
-  | 'RELEASE_MERCHANT'
+  | 'BLOCK_RECIPIENT'
+  | 'ALLOW_RECIPIENT'
+  | 'RELEASE_RECIPIENT'
+  | 'CUSTOMER_GENUINE'
+  | 'CUSTOMER_FRAUD'
+  | 'REMOVE_FRAUD_MARK'
   | 'FREEZE_CARD'
   | 'UNFREEZE_CARD'
   | 'CONFIRM_ALERT'

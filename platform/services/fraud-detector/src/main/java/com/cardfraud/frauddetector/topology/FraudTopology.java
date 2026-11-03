@@ -8,6 +8,7 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.GlobalKTable;
 import org.apache.kafka.streams.kstream.Grouped;
 import org.apache.kafka.streams.kstream.Joined;
 import org.apache.kafka.streams.kstream.KStream;
@@ -23,8 +24,10 @@ import com.cardfraud.frauddetector.model.Alert;
 import com.cardfraud.frauddetector.model.CaseSummary;
 import com.cardfraud.frauddetector.model.ControlEvent;
 import com.cardfraud.frauddetector.model.Decision;
+import com.cardfraud.frauddetector.model.FraudMark;
 import com.cardfraud.frauddetector.model.Transaction;
 import com.cardfraud.frauddetector.rules.MockRepeatTransferRule;
+import com.cardfraud.frauddetector.rules.RecipientId;
 import com.cardfraud.frauddetector.serde.JsonSerde;
 
 // The processing pipeline, kept apart from main() so it can be tested with TopologyTestDriver.
@@ -59,9 +62,17 @@ public final class FraudTopology {
                         .withKeySerde(keys)
                         .withValueSerde(flags));
 
-        // 0b. Merchant rules and budgets per card (CardRules), for the rules in step 2.
+        // 0b. Recipient rules and budgets per card (CardRules), for the rules in step 2.
         CardRules.addStores(builder, keys);
-        control.process(CardRules.ControlWriter::new, CardRules.MERCHANT_RULES, CardRules.BUDGETS);
+        control.process(CardRules.ControlWriter::new, CardRules.RECIPIENT_RULES, CardRules.BUDGETS);
+
+        // 0c. Recipients confirmed as fraud, bank-wide. Keyed by recipient, not card, so every task needs all of them.
+        GlobalKTable<String, FraudMark> fraudMarks = builder.globalTable(
+                cfg.fraudMarksTopic(),
+                Consumed.with(keys, JsonSerde.of(FraudMark.class)),
+                Materialized.<String, FraudMark, KeyValueStore<Bytes, byte[]>>as("fraud-marks-store")
+                        .withKeySerde(keys)
+                        .withValueSerde(JsonSerde.of(FraudMark.class)));
 
         // 1. Read transactions as Transaction objects: card payments and app transfers share one topic
         KStream<String, Transaction> transactions = builder
@@ -78,14 +89,19 @@ public final class FraudTopology {
                 .filter((cardId, txn) -> Transaction.TRANSFER.equals(txn.channel()));
 
         // 2. Every transaction -> one decision: DECLINE if the card is frozen, otherwise the rules (Rules.evaluate)
-        //    with the card's merchant rules, budget and spend so far (CardRules.Evaluator)
+        //    with whether the recipient carries a fraud mark
+        //    with the card's recipient rules, budget and spend so far (CardRules.Evaluator)
         KStream<String, Decision> decisions = transactions
                 .leftJoin(
                         frozen,
-                        (txn, isFrozen) -> new CardRules.Screened(txn, Boolean.TRUE.equals(isFrozen)),
+                        (txn, isFrozen) -> new CardRules.Screened(txn, Boolean.TRUE.equals(isFrozen), false),
                         Joined.with(keys, transactionSerde, flags))
+                .leftJoin(
+                        fraudMarks,
+                        (cardId, screened) -> RecipientId.of(screened.txn()),
+                        (screened, mark) -> screened.withFraudMark(mark != null && mark.active()))
                 .processValues(CardRules.Evaluator::new,
-                        CardRules.MERCHANT_RULES, CardRules.BUDGETS, CardRules.SPEND);
+                        CardRules.RECIPIENT_RULES, CardRules.BUDGETS, CardRules.SPEND);
 
         // 3. Every decision, card payment or transfer -> decisions topic
         decisions.to(cfg.decisionsTopic(), Produced.with(keys, decisionSerde));
@@ -97,9 +113,9 @@ public final class FraudTopology {
         // TEST ONLY: repeated same-amount transfers to one account -> MOCK_REPEAT alert. Delete with its file.
         MockRepeatTransferRule.wire(transfers, keys, transactionSerde, alertSerde, cfg.alertsTopic());
 
-        // 5. Every non-ALLOW decision updates the card's case (details: CaseSummary.update).
+        // 5. Every decision an analyst should review updates the card's case (details: CaseSummary.update).
         //    The key (card id) never changes, so no repartition.
-        decisions.filter((cardId, d) -> d.decision() != Decision.Verdict.ALLOW)
+        decisions.filter((cardId, d) -> d.needsReview())
                 .groupByKey(Grouped.with(keys, decisionSerde))
                 .aggregate(() -> CaseSummary.EMPTY,
                         (cardId, d, summary) -> summary.update(cardId, d),

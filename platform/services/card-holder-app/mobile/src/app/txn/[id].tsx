@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { category, categoryIcon, day, money, time } from '@/components/format';
-import { Button, Empty, IconBubble, SectionHeader, StatusPill, Surface, useVerdictTone } from '@/components/ui';
+import { Empty, IconBubble, SectionHeader, StatusPill, Surface, useVerdictTone } from '@/components/ui';
 import { RULE_TEXT } from '@/data/rules';
 import { useStore } from '@/data/store';
 import { space, useColors } from '@/theme';
@@ -12,7 +12,7 @@ export default function TxnScreen() {
   const c = useColors();
   const tones = useVerdictTone();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { transactions, ruleFor, setMerchantRule, releaseMerchant } = useStore();
+  const { transactions } = useStore();
   const txn = transactions.find((t) => t.txnId === id);
 
   if (!txn) {
@@ -29,7 +29,6 @@ export default function TxnScreen() {
   const tone = tones[verdict];
   const flagged = verdict !== 'ALLOW';
   const reasons = refused ? txn.declinedFor : txn.firedRules;
-  const rule = ruleFor(txn.merchant);
 
   const details: [string, string][] = [
     ['Date', `${day(txn.ts)}, ${time(txn.ts)}`],
@@ -112,51 +111,6 @@ export default function TxnScreen() {
           </View>
         ))}
       </Surface>
-
-      {!transfer && (
-        <>
-          <SectionHeader title="This merchant" />
-          {rule ? (
-            <Surface style={{ gap: space.lg }}>
-              <View style={styles.ruleRow}>
-                <IconBubble
-                  name={rule.type === 'BLOCK' ? 'ban' : 'checkmark-done'}
-                  tint={rule.type === 'BLOCK' ? c.decline : c.allow}
-                  bg={rule.type === 'BLOCK' ? c.declineBg : c.allowBg}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.reasonTitle, { color: c.text }]}>
-                    {rule.type === 'BLOCK' ? 'Blocked' : 'Trusted'}
-                  </Text>
-                  <Text style={[styles.reasonDetail, { color: rule.pending ? c.stepUp : c.muted }]}>
-                    {rule.pending
-                      ? 'Taking effect…'
-                      : rule.type === 'BLOCK'
-                        ? 'Future payments here will be declined.'
-                        : 'Fraud checks are skipped for this merchant.'}
-                  </Text>
-                </View>
-              </View>
-              <Button label="Remove rule" variant="secondary" onPress={() => releaseMerchant(txn.merchant)} />
-            </Surface>
-          ) : (
-            <View style={{ gap: space.sm }}>
-              <Button
-                label="Block this merchant"
-                icon="ban"
-                variant="danger"
-                onPress={() => setMerchantRule(txn.merchant, 'BLOCK')}
-              />
-              <Button
-                label="Trust this merchant"
-                icon="checkmark-done"
-                variant="secondary"
-                onPress={() => setMerchantRule(txn.merchant, 'ALLOW')}
-              />
-            </View>
-          )}
-        </>
-      )}
     </ScrollView>
   );
 }
@@ -178,5 +132,4 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space.md, gap: space.lg },
   detailKey: { fontSize: 15 },
   detailValue: { fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
-  ruleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
 });

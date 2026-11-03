@@ -5,18 +5,18 @@ import type { Config } from '../../../../config';
 import { CONFIG } from '../../../../config.module';
 import { auditEntry } from '../../../../shared/prisma/audit';
 import { PrismaService } from '../../../../shared/prisma/prisma.service';
-import { controlEvent, merchantControlId } from '../../types/controls.types';
-import { ReleaseMerchantCommand } from '../commands/release-merchant.command';
+import { controlEvent, recipientControlId } from '../../types/controls.types';
+import { ReleaseRecipientCommand } from '../commands/release-recipient.command';
 
-@CommandHandler(ReleaseMerchantCommand)
-export class ReleaseMerchantHandler implements ICommandHandler<ReleaseMerchantCommand> {
+@CommandHandler(ReleaseRecipientCommand)
+export class ReleaseRecipientHandler implements ICommandHandler<ReleaseRecipientCommand> {
   constructor(
     private readonly db: PrismaService,
     @Inject(CONFIG) private readonly cfg: Config,
   ) {}
 
-  async execute({ cardId, merchant, by }: ReleaseMerchantCommand): Promise<void> {
-    const event = controlEvent('RELEASE_MERCHANT', merchantControlId(merchant), new Date().toISOString());
+  async execute({ cardId, recipientId, by }: ReleaseRecipientCommand): Promise<void> {
+    const event = controlEvent('RELEASE_RECIPIENT', recipientControlId(recipientId), new Date().toISOString());
     await this.db.client.$transaction([
       this.db.client.outbox.createMany({
         data: {
@@ -26,9 +26,9 @@ export class ReleaseMerchantHandler implements ICommandHandler<ReleaseMerchantCo
           payload: event,
         },
       }),
-      ...(by
-        ? [this.db.client.audit_log.createMany({ data: auditEntry(by, 'RELEASE_MERCHANT', cardId, { merchant }) })]
-        : []),
+      this.db.client.audit_log.createMany({
+        data: auditEntry(by, 'RELEASE_RECIPIENT', cardId, { recipient: recipientId }),
+      }),
     ]);
   }
 }

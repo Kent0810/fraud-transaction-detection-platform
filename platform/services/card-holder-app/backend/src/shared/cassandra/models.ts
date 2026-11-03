@@ -66,7 +66,8 @@ export type ControlRow = {
   cardId: string;
   controlId: string;
   kind: string;
-  merchant: string | null;
+  recipientId: string | null;
+  recipientName: string | null;
   rule: string | null;
   budgetLimit: types.BigDecimal | null;
   budgetPeriod: string | null;

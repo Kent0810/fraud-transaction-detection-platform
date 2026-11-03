@@ -3,8 +3,11 @@ import type {
   Activity,
   AuditEntry,
   CardView,
+  Followup,
+  FraudMark,
   LoginStatus,
   QueueItem,
+  RecipientRef,
   RuleType,
   StaffMember,
   StaffSession,
@@ -42,11 +45,24 @@ export const reviewAlert = (
     reason,
   });
 
-export const setMerchantRule = (cardId: string, merchant: string, type: RuleType, reason: string | null) =>
-  request<void>('PUT', `${card(cardId)}/merchant-rules/${encodeURIComponent(merchant)}`, { type, reason });
+export const setRecipientRule = (cardId: string, recipient: RecipientRef, type: RuleType, reason: string | null) =>
+  request<void>('PUT', `${card(cardId)}/recipient-rules`, { recipient, type, reason });
 
-export const releaseMerchant = (cardId: string, merchant: string, reason: string | null) =>
-  request<void>('DELETE', `${card(cardId)}/merchant-rules/${encodeURIComponent(merchant)}`, { reason });
+export const releaseRecipient = (cardId: string, recipientId: string, reason: string | null) =>
+  request<void>('DELETE', `${card(cardId)}/recipient-rules/${encodeURIComponent(recipientId)}`, { reason });
+
+export const fetchFollowups = () => request<Followup[]>('GET', '/ops/follow-ups');
+
+export const resolveFollowup = (f: Followup, outcome: 'GENUINE' | 'FRAUD', reason: string | null) =>
+  request<void>('POST', `/ops/follow-ups/${encodeURIComponent(f.cardId)}/${encodeURIComponent(f.txnId)}`, {
+    outcome,
+    reason,
+  });
+
+export const fetchFraudMarks = () => request<FraudMark[]>('GET', '/ops/fraud-marks');
+
+export const removeFraudMark = (recipientId: string, reason: string | null) =>
+  request<void>('DELETE', `/ops/fraud-marks/${encodeURIComponent(recipientId)}`, { reason });
 
 export const setFrozen = (cardId: string, frozen: boolean, reason: string | null) =>
   request<{ frozen: boolean }>('POST', `${card(cardId)}/${frozen ? 'freeze' : 'unfreeze'}`, { reason });

@@ -21,17 +21,15 @@ import {
 import { MOCK_PASSWORD, useUser } from './auth';
 import { useSettings } from './settings';
 
-import { ACCOUNT, ALERTS, BUDGET, LOOKUP_NAMES, MERCHANT_RULES, PAY_MERCHANTS, TRANSACTIONS } from './mock';
+import { ACCOUNT, ALERTS, BUDGET, LOOKUP_NAMES, PAY_MERCHANTS, TRANSACTIONS } from './mock';
 import type {
   Alert,
   Budget,
   CardNotice,
-  MerchantRule,
   PayMerchant,
   Payment,
   Period,
   Recipient,
-  RuleType,
   Transfer,
   TransferTo,
   Txn,
@@ -55,7 +53,6 @@ type Store = {
   transactions: Txn[];
   alerts: Alert[];
   budget: Budget;
-  rules: MerchantRule[];
   frozen: boolean;
   balance: number;
   accountNumber: string;
@@ -65,9 +62,6 @@ type Store = {
   freezeCard: () => Promise<void>;
   unfreezeCard: (password: string) => Promise<void>;
   setBudget: (limit: number, period: Period) => void;
-  setMerchantRule: (merchant: string, type: RuleType) => void;
-  releaseMerchant: (merchant: string) => void;
-  ruleFor: (merchant: string) => MerchantRule | undefined;
   setDraft: (draft: TransferDraft | null) => void;
   lookupAccount: (account: string) => Promise<string | null>;
   sendTransfer: (draft: TransferDraft, transferId: string, password: string) => Promise<Transfer>;
@@ -166,8 +160,6 @@ async function fetchCardData(): Promise<CardData> {
 
 const sameRecipient = (a: Recipient, b: Recipient) => a.account === b.account;
 
-const toRules = (controls: Controls): MerchantRule[] => controls.merchantRules.map((r) => ({ ...r, pending: false }));
-
 const withControls = (budget: Budget, controls: Controls): Budget =>
   controls.budget ? { ...budget, limit: controls.budget.limit, period: controls.budget.period } : budget;
 
@@ -177,7 +169,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const user = useUser();
   const cardId = user.cardId;
   const [budget, setBudgetState] = useState<Budget>(BUDGET);
-  const [rules, setRules] = useState<MerchantRule[]>(apiEnabled ? [] : MERCHANT_RULES);
   const [frozen, setFrozen] = useState(false);
   const [balance, setBalance] = useState(user.balance);
   const [accountNumber, setAccountNumber] = useState(ACCOUNT.number);
@@ -195,7 +186,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       (data) => {
         setTransactions(data.transactions);
         setAlerts(data.alerts);
-        setRules(toRules(data.controls));
         setBudgetState((b) => withControls(b, data.controls));
         setBalance(data.balance);
         setAccountNumber(data.accountNumber);
@@ -215,7 +205,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const reloadControls = useCallback(() => {
     fetchControls().then(
       (controls) => {
-        setRules(toRules(controls));
         setBudgetState((b) => withControls(b, controls));
       },
       (e: unknown) => setError(message(e)),
@@ -320,30 +309,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (limit: number, period: Period) => {
       setBudgetState((b) => ({ ...b, limit, period }));
       if (apiEnabled) commands.setBudget(limit, period).catch(reloadControls);
-    },
-    [reloadControls],
-  );
-
-  const setMerchantRule = useCallback(
-    (merchant: string, type: RuleType) => {
-      setRules((rs) => [
-        { merchant, type, createdAt: new Date().toISOString(), pending: true },
-        ...rs.filter((r) => r.merchant !== merchant),
-      ]);
-      const settle = () => setRules((rs) => rs.map((r) => (r.merchant === merchant ? { ...r, pending: false } : r)));
-      if (!apiEnabled) {
-        setTimeout(settle, PROPAGATION_MS);
-        return;
-      }
-      commands.setMerchantRule(merchant, type).then(settle, reloadControls);
-    },
-    [reloadControls],
-  );
-
-  const releaseMerchant = useCallback(
-    (merchant: string) => {
-      setRules((rs) => rs.filter((r) => r.merchant !== merchant));
-      if (apiEnabled) commands.releaseMerchant(merchant).catch(reloadControls);
     },
     [reloadControls],
   );
@@ -488,7 +453,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       transactions,
       alerts,
       budget: effectiveBudget,
-      rules,
       frozen,
       balance,
       accountNumber,
@@ -498,9 +462,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       freezeCard,
       unfreezeCard,
       setBudget,
-      setMerchantRule,
-      releaseMerchant,
-      ruleFor: (merchant) => rules.find((r) => r.merchant === merchant),
       setDraft,
       lookupAccount,
       sendTransfer,
@@ -520,7 +481,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       transactions,
       alerts,
       effectiveBudget,
-      rules,
       frozen,
       balance,
       accountNumber,
@@ -530,8 +490,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       freezeCard,
       unfreezeCard,
       setBudget,
-      setMerchantRule,
-      releaseMerchant,
       lookupAccount,
       sendTransfer,
       refreshTransfer,

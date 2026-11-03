@@ -3,20 +3,13 @@ import { BANK_SHORT } from '@/components/brand';
 import { ME, request } from './http';
 import { OUR_BANK } from './mock';
 import type { CardStatus } from './queries';
-import type { Payment, Period, Recipient, RuleType, Transfer, TransferTo } from './types';
+import type { Payment, Period, Recipient, Transfer, TransferTo } from './types';
 
 export const freezeCard = () => request<CardStatus>('POST', `${ME}/card/freeze`);
 
 export const unfreezeCard = (password: string) => request<CardStatus>('POST', `${ME}/card/unfreeze`, { password });
 
-const merchantPath = (merchant: string) => `${ME}/merchant-rules/${encodeURIComponent(merchant)}`;
-
 export const setBudget = (limit: number, period: Period) => request<void>('PUT', `${ME}/budget`, { limit, period });
-
-export const setMerchantRule = (merchant: string, type: RuleType) =>
-  request<void>('PUT', merchantPath(merchant), { type });
-
-export const releaseMerchant = (merchant: string) => request<void>('DELETE', merchantPath(merchant));
 
 // Recipients are always at this bank; the API still names the bank in the path.
 const recipientPath = (r: Recipient) => `${ME}/recipients/${BANK_SHORT}/${encodeURIComponent(r.account)}`;

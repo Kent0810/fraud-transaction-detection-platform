@@ -60,10 +60,41 @@ export type Activity = {
   alerts: CaseAlert[];
 };
 
-export type MerchantRule = {
-  merchant: string;
+export type RecipientRule = {
+  recipientId: string;
+  name: string;
   type: RuleType;
   createdAt: string;
+};
+
+export type RecipientRef =
+  { kind: 'MERCHANT'; name: string } | { kind: 'ACCOUNT'; account: string; name?: string | null };
+
+export type FollowupStatus = 'PENDING' | 'GENUINE' | 'FRAUD';
+
+export type Followup = {
+  cardId: string;
+  txnId: string;
+  ts: string;
+  holderName: string;
+  holderEmail: string;
+  recipientId: string;
+  recipientName: string;
+  amount: number;
+  status: FollowupStatus;
+  confirmedBy: string;
+  confirmedAt: string;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  note: string | null;
+};
+
+export type FraudMark = {
+  recipientId: string;
+  recipientName: string;
+  cardId: string;
+  markedBy: string;
+  markedAt: string;
 };
 
 export type CardView = {
@@ -100,7 +131,7 @@ export type CardView = {
       period: 'DAY' | 'WEEK' | 'MONTH';
       updatedAt: string | null;
     } | null;
-    merchantRules: MerchantRule[];
+    recipientRules: RecipientRule[];
   };
 };
 

@@ -19,8 +19,8 @@ import {
   vnd,
 } from '../data/format';
 import { useLive } from '../data/live';
-import { ACTION_LABEL, ruleTitle } from '../data/rules';
-import type { Activity, AuditEntry, CardView, CaseAlert, LoginStatus, RuleType } from '../data/types';
+import { ACTION_LABEL, recipientIdOf, ruleTitle } from '../data/rules';
+import type { Activity, AuditEntry, CardView, CaseAlert, LoginStatus, RecipientRef, RuleType } from '../data/types';
 import { Kpi, SkeletonTable } from './Queue';
 
 const RANGES = [7, 30, 90];
@@ -39,6 +39,12 @@ const AUDIT_ICON: Record<string, IconName> = {
   BLOCK_MERCHANT: 'ban',
   ALLOW_MERCHANT: 'check',
   RELEASE_MERCHANT: 'x',
+  BLOCK_RECIPIENT: 'ban',
+  ALLOW_RECIPIENT: 'check',
+  RELEASE_RECIPIENT: 'x',
+  CUSTOMER_GENUINE: 'check',
+  CUSTOMER_FRAUD: 'shield',
+  REMOVE_FRAUD_MARK: 'x',
   FREEZE_CARD: 'snow',
   UNFREEZE_CARD: 'unlock',
   CONFIRM_ALERT: 'shield',
@@ -168,7 +174,7 @@ export function Card({ cardId }: { cardId: string }) {
     );
   }
 
-  const rules = new Map(view.controls.merchantRules.map((r) => [r.merchant, r.type]));
+  const rules = new Map(view.controls.recipientRules.map((r) => [r.recipientId, r.type]));
   const needle = search.trim().toLowerCase();
   const all = activity ?? [];
   const rows = all.filter(
@@ -189,13 +195,13 @@ export function Card({ cardId }: { cardId: string }) {
     await loadActivity();
   }
 
-  async function rule(merchant: string, type: RuleType, reason: string | null) {
-    await api.setMerchantRule(cardId, merchant, type, reason);
+  async function rule(recipient: RecipientRef, type: RuleType, reason: string | null) {
+    await api.setRecipientRule(cardId, recipient, type, reason);
     await refreshSoon();
   }
 
-  async function release(merchant: string, reason: string | null) {
-    await api.releaseMerchant(cardId, merchant, reason);
+  async function release(recipientId: string, reason: string | null) {
+    await api.releaseRecipient(cardId, recipientId, reason);
     await refreshSoon();
   }
 
@@ -410,7 +416,11 @@ export function Card({ cardId }: { cardId: string }) {
                 <tbody>
                   {rows.map((t) => {
                     const open = t.alerts.filter((a) => a.status === 'OPEN');
-                    const merchantRule = rules.get(t.merchant);
+                    const recipientRule = t.direction === 'OUT' ? rules.get(recipientIdOf(t)) : undefined;
+                    const recipient: RecipientRef =
+                      t.channel === 'TRANSFER' && t.recipientAccount
+                        ? { kind: 'ACCOUNT', account: t.recipientAccount, name: t.merchant }
+                        : { kind: 'MERCHANT', name: t.merchant };
                     const isOpen = expanded.has(t.txnId);
                     return (
                       <Fragment key={t.txnId}>
@@ -449,9 +459,9 @@ export function Card({ cardId }: { cardId: string }) {
                               </span>
                               <span>
                                 <b>{t.merchant}</b>
-                                {merchantRule && (
-                                  <span className={`rule-type ${merchantRule.toLowerCase()}`}>
-                                    {merchantRule === 'BLOCK' ? 'blocked' : 'allowed'}
+                                {recipientRule && (
+                                  <span className={`rule-type ${recipientRule.toLowerCase()}`}>
+                                    {recipientRule === 'BLOCK' ? 'blacklisted' : 'whitelisted'}
                                   </span>
                                 )}
                                 <small className="muted">
@@ -486,7 +496,7 @@ export function Card({ cardId }: { cardId: string }) {
                             </div>
                           </td>
                           <td className="actions" onClick={(e) => e.stopPropagation()}>
-                            {open.length > 0 && (
+                            {!isAgent && open.length > 0 && (
                               <>
                                 <ReasonAction
                                   label="Fraud"
@@ -495,7 +505,7 @@ export function Card({ cardId }: { cardId: string }) {
                                   description={
                                     <PaymentSummary
                                       t={t}
-                                      note={`${open.length} open ${open.length === 1 ? 'alert' : 'alerts'} will be marked as fraud.`}
+                                      note={`${open.length} open ${open.length === 1 ? 'alert' : 'alerts'} will be marked as fraud, and an agent will call the cardholder to confirm.`}
                                     />
                                   }
                                   icon="shield"
@@ -538,38 +548,41 @@ export function Card({ cardId }: { cardId: string }) {
                                     Payment <b className="mono">{t.txnId}</b>
                                   </span>
                                 </div>
-                                {isAgent && t.channel === 'CARD' && (
+                                {isAgent && t.direction === 'OUT' && (
                                   <div className="detail-merchant">
                                     <span className="muted small">
-                                      {merchantRule === 'BLOCK'
-                                        ? `${t.merchant} is blocked for this card.`
-                                        : merchantRule === 'ALLOW'
-                                          ? `${t.merchant} is always allowed for this card.`
-                                          : `No merchant rule for ${t.merchant}.`}
+                                      {recipientRule === 'BLOCK'
+                                        ? `${t.merchant} is on this card's blacklist.`
+                                        : recipientRule === 'ALLOW'
+                                          ? `${t.merchant} is on this card's whitelist.`
+                                          : `${t.merchant} is on neither of this card's lists.`}
                                     </span>
-                                    {merchantRule !== 'BLOCK' && (
+                                    {recipientRule !== 'BLOCK' && (
                                       <ReasonAction
-                                        label="Block merchant"
-                                        confirm="Block merchant"
-                                        title={`Block ${t.merchant}?`}
+                                        label="Blacklist"
+                                        confirm="Blacklist recipient"
+                                        title={`Blacklist ${t.merchant}?`}
                                         description={
-                                          <p>Every future payment from this card to {t.merchant} will be declined.</p>
+                                          <p>Every future payment from this card to {t.merchant} will fail.</p>
                                         }
                                         icon="ban"
                                         tone="danger"
-                                        onRun={(r) => rule(t.merchant, 'BLOCK', r)}
+                                        onRun={(r) => rule(recipient, 'BLOCK', r)}
                                       />
                                     )}
-                                    {merchantRule !== 'ALLOW' && t.decision !== 'ALLOW' && (
+                                    {recipientRule !== 'ALLOW' && (
                                       <ReasonAction
-                                        label="Always allow"
-                                        confirm="Allow merchant"
-                                        title={`Always allow ${t.merchant}?`}
+                                        label="Whitelist"
+                                        confirm="Whitelist recipient"
+                                        title={`Whitelist ${t.merchant}?`}
                                         description={
-                                          <p>Payments from this card to {t.merchant} skip the merchant checks.</p>
+                                          <p>
+                                            Payments from this card to {t.merchant} skip the anomaly checks. The
+                                            large-amount limit, a frozen card and fraud marks still apply.
+                                          </p>
                                         }
                                         icon="check"
-                                        onRun={(r) => rule(t.merchant, 'ALLOW', r)}
+                                        onRun={(r) => rule(recipient, 'ALLOW', r)}
                                       />
                                     )}
                                   </div>
@@ -595,12 +608,13 @@ export function Card({ cardId }: { cardId: string }) {
                                               ? 'Confirmed fraud'
                                               : 'Cleared'}
                                         </span>
-                                        {a.status === 'OPEN' && (
+                                        {!isAgent && a.status === 'OPEN' && (
                                           <span className="alert-actions">
                                             <ReasonAction
                                               label="Fraud"
                                               confirm="Confirm fraud"
                                               title={`Confirm ${a.ruleId} as fraud?`}
+                                              description={<p>An agent will call the cardholder to confirm.</p>}
                                               icon="shield"
                                               tone="danger"
                                               onRun={(r) => reviewAll([a], 'CONFIRMED', r)}
@@ -706,29 +720,29 @@ export function Card({ cardId }: { cardId: string }) {
           </div>
 
           <div className="panel">
-            <h2>Merchant rules</h2>
-            {view.controls.merchantRules.length === 0 ? (
-              <p className="muted small">No merchant is blocked or allowed for this card.</p>
+            <h2>Recipient lists</h2>
+            {view.controls.recipientRules.length === 0 ? (
+              <p className="muted small">No recipient is blacklisted or whitelisted for this card.</p>
             ) : (
               <ul className="rules-list">
-                {view.controls.merchantRules.map((r) => (
-                  <li key={r.merchant}>
+                {view.controls.recipientRules.map((r) => (
+                  <li key={r.recipientId}>
                     <span className={`rule-icon ${r.type.toLowerCase()}`}>
                       <Icon name={r.type === 'BLOCK' ? 'ban' : 'check'} size={14} />
                     </span>
                     <span className="grow">
-                      <b>{r.merchant}</b>
+                      <b>{r.name}</b>
                       <small className="muted">
-                        {r.type === 'BLOCK' ? 'Blocked' : 'Allowed'} · {ago(r.createdAt)}
+                        {r.type === 'BLOCK' ? 'Blacklisted' : 'Whitelisted'} · {ago(r.createdAt)}
                       </small>
                     </span>
                     {isAgent && (
                       <ReasonAction
                         label="Remove"
-                        confirm="Remove rule"
-                        title={`Remove the rule for ${r.merchant}?`}
+                        confirm="Remove from list"
+                        title={`Remove ${r.name} from this card's list?`}
                         icon="x"
-                        onRun={(reason) => release(r.merchant, reason)}
+                        onRun={(reason) => release(r.recipientId, reason)}
                       />
                     )}
                   </li>
@@ -784,8 +798,13 @@ function PaymentSummary({ t, note }: { t: Activity; note: string }) {
   );
 }
 
-function AddRule({ onAdd }: { onAdd: (merchant: string, type: RuleType, reason: string | null) => Promise<void> }) {
-  const [merchant, setMerchant] = useState('');
+function AddRule({
+  onAdd,
+}: {
+  onAdd: (recipient: RecipientRef, type: RuleType, reason: string | null) => Promise<void>;
+}) {
+  const [kind, setKind] = useState<RecipientRef['kind']>('ACCOUNT');
+  const [value, setValue] = useState('');
   const [type, setType] = useState<RuleType>('BLOCK');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -796,8 +815,10 @@ function AddRule({ onAdd }: { onAdd: (merchant: string, type: RuleType, reason: 
     setBusy(true);
     setError(null);
     try {
-      await onAdd(merchant.trim(), type, reason.trim() || null);
-      setMerchant('');
+      const recipient: RecipientRef =
+        kind === 'ACCOUNT' ? { kind, account: value.trim() } : { kind, name: value.trim() };
+      await onAdd(recipient, type, reason.trim() || null);
+      setValue('');
       setReason('');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -808,19 +829,26 @@ function AddRule({ onAdd }: { onAdd: (merchant: string, type: RuleType, reason: 
 
   return (
     <form className="add-rule" onSubmit={submit}>
-      <div className="seg full" role="group" aria-label="Rule type">
+      <div className="seg full" role="group" aria-label="List">
         {(['BLOCK', 'ALLOW'] as RuleType[]).map((r) => (
           <button key={r} type="button" aria-pressed={type === r} onClick={() => setType(r)}>
             <Icon name={r === 'BLOCK' ? 'ban' : 'check'} size={13} />
-            {r === 'BLOCK' ? 'Block' : 'Allow'}
+            {r === 'BLOCK' ? 'Blacklist' : 'Whitelist'}
+          </button>
+        ))}
+      </div>
+      <div className="seg full" role="group" aria-label="Recipient type">
+        {(['ACCOUNT', 'MERCHANT'] as RecipientRef['kind'][]).map((k) => (
+          <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>
+            {k === 'ACCOUNT' ? 'Account' : 'Merchant'}
           </button>
         ))}
       </div>
       <input
-        placeholder="Merchant name"
-        value={merchant}
+        placeholder={kind === 'ACCOUNT' ? 'Bank code:account, e.g. HCMMB:190300000042' : 'Merchant name'}
+        value={value}
         maxLength={120}
-        onChange={(e) => setMerchant(e.target.value)}
+        onChange={(e) => setValue(e.target.value)}
       />
       <input
         placeholder="Reason (audit log)"
@@ -828,9 +856,9 @@ function AddRule({ onAdd }: { onAdd: (merchant: string, type: RuleType, reason: 
         maxLength={500}
         onChange={(e) => setReason(e.target.value)}
       />
-      <button className="btn primary small" disabled={busy || !merchant.trim()}>
+      <button className="btn primary small" disabled={busy || !value.trim()}>
         <Icon name="plus" size={14} />
-        {busy ? 'Saving…' : 'Add rule'}
+        {busy ? 'Saving…' : 'Add to list'}
       </button>
       {error && <span className="error">{error}</span>}
     </form>

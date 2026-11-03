@@ -1,12 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 import { CurrentCard } from '../../common/decorators/session.decorator';
 import { ZodPipe } from '../../common/validation';
 import { FreezeCardCommand } from './handlers/commands/freeze-card.command';
-import { ReleaseMerchantCommand } from './handlers/commands/release-merchant.command';
 import { SetBudgetCommand } from './handlers/commands/set-budget.command';
-import { SetMerchantRuleCommand } from './handlers/commands/set-merchant-rule.command';
 import { UnfreezeCardCommand } from './handlers/commands/unfreeze-card.command';
 import { GetCardStatusQuery } from './handlers/queries/get-card-status.query';
 import { GetControlsQuery } from './handlers/queries/get-controls.query';
@@ -15,9 +13,6 @@ import {
   BudgetRequest,
   type CardStatusDto,
   type ControlsDto,
-  Merchant,
-  type MerchantRuleDto,
-  MerchantRuleRequest,
   UnfreezeRequest,
 } from './types/controls.types';
 
@@ -38,7 +33,7 @@ export class ControlsController {
     return this.queries.execute(new GetCardStatusQuery(cardId));
   }
 
-  // 200, not 202 like the controls below: the freeze is saved, and blocks transfers, before the response.
+  // 200, not 202 like the budget below: the freeze is saved, and blocks transfers, before the response.
   @Post('card/freeze')
   @HttpCode(200)
   freeze(@CurrentCard() cardId: string): Promise<CardStatusDto> {
@@ -61,24 +56,5 @@ export class ControlsController {
     @Body(new ZodPipe(BudgetRequest)) { limit, period }: BudgetRequest,
   ): Promise<BudgetDto> {
     return this.commands.execute(new SetBudgetCommand(cardId, limit, period));
-  }
-
-  @Put('merchant-rules/:merchant')
-  @HttpCode(202)
-  setMerchantRule(
-    @CurrentCard() cardId: string,
-    @Param('merchant', new ZodPipe(Merchant)) merchant: string,
-    @Body(new ZodPipe(MerchantRuleRequest)) { type }: MerchantRuleRequest,
-  ): Promise<MerchantRuleDto> {
-    return this.commands.execute(new SetMerchantRuleCommand(cardId, merchant, type));
-  }
-
-  @Delete('merchant-rules/:merchant')
-  @HttpCode(202)
-  releaseMerchant(
-    @CurrentCard() cardId: string,
-    @Param('merchant', new ZodPipe(Merchant)) merchant: string,
-  ): Promise<void> {
-    return this.commands.execute(new ReleaseMerchantCommand(cardId, merchant));
   }
 }

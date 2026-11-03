@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { Prisma } from '@platform/db';
 
 import type { Config } from '../../../config';
 import { CONFIG } from '../../../config.module';
@@ -28,31 +29,34 @@ export class CardStatusRepository {
    * the same transaction. Nothing is written when the status doesn't change.
    */
   async setFrozen(cardId: string, frozen: boolean, by?: StaffAudit): Promise<CardStatusDto> {
+    await this.db.client.$transaction((tx) => this.applyFrozen(tx, cardId, frozen, by));
+    return this.forCard(cardId);
+  }
+
+  /** The same change inside a caller's transaction, for when it has to succeed or fail along with something else. */
+  async applyFrozen(tx: Prisma.TransactionClient, cardId: string, frozen: boolean, by?: StaffAudit): Promise<void> {
     const ts = new Date().toISOString();
-    // Unfreeze carries no fields, so the Cassandra sink deletes the card's freeze row (as for a released merchant).
+    // Unfreeze carries no fields, so the Cassandra sink deletes the card's freeze row (as for a released recipient).
     const event = frozen
       ? controlEvent('FREEZE_CARD', FREEZE_ID, ts, { kind: 'FREEZE', updated_at: ts })
       : controlEvent('UNFREEZE_CARD', FREEZE_ID, ts);
 
-    await this.db.client.$transaction(async (tx) => {
-      const changed = await tx.accounts.updateMany({
-        where: {
-          card_id: cardId,
-          status: frozen ? 'ACTIVE' : 'FROZEN',
-        },
-        data: { status: frozen ? 'FROZEN' : 'ACTIVE' },
-      });
-      if (changed.count === 0) return;
-      await tx.outbox.createMany({
-        data: {
-          aggregate_type: this.cfg.controlTopic,
-          aggregate_id: cardId,
-          type: event.action,
-          payload: event,
-        },
-      });
-      if (by) await tx.audit_log.createMany({ data: auditEntry(by, frozen ? 'FREEZE_CARD' : 'UNFREEZE_CARD', cardId) });
+    const changed = await tx.accounts.updateMany({
+      where: {
+        card_id: cardId,
+        status: frozen ? 'ACTIVE' : 'FROZEN',
+      },
+      data: { status: frozen ? 'FROZEN' : 'ACTIVE' },
     });
-    return this.forCard(cardId);
+    if (changed.count === 0) return;
+    await tx.outbox.createMany({
+      data: {
+        aggregate_type: this.cfg.controlTopic,
+        aggregate_id: cardId,
+        type: event.action,
+        payload: event,
+      },
+    });
+    if (by) await tx.audit_log.createMany({ data: auditEntry(by, frozen ? 'FREEZE_CARD' : 'UNFREEZE_CARD', cardId) });
   }
 }

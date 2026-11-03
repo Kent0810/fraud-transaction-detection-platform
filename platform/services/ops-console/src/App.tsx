@@ -14,6 +14,7 @@ import type { StaffRole } from './data/types';
 import { Alerts } from './pages/Alerts';
 import { Card } from './pages/Card';
 import { Find } from './pages/Find';
+import { Followups } from './pages/Followups';
 import { Login } from './pages/Login';
 import { Queue } from './pages/Queue';
 import { Terminal } from './pages/Terminal';
@@ -56,6 +57,7 @@ function Shell({ role }: { role: StaffRole }) {
     '?': () => setHelp(true),
     'g q': () => role === 'ANALYST' && go({ page: 'queue' }),
     'g f': () => go({ page: 'find' }),
+    'g u': () => go({ page: 'followups' }),
     'g a': () => go({ page: 'alerts' }),
     'g m': () => go({ page: 'terminal' }),
   });
@@ -102,6 +104,7 @@ function Shell({ role }: { role: StaffRole }) {
 
         <nav className="side-nav">
           {role === 'ANALYST' && nav({ page: 'queue' }, 'Triage queue', 'queue', 'G Q')}
+          {nav({ page: 'followups' }, 'Fraud follow-ups', 'shield', 'G U')}
           {nav({ page: 'find' }, 'Find a card', 'search', 'G F')}
           {nav(
             { page: 'alerts' },
@@ -152,6 +155,7 @@ function Shell({ role }: { role: StaffRole }) {
       <main className="wrap">
         {page.page === 'queue' && <Queue />}
         {page.page === 'find' && <Find />}
+        {page.page === 'followups' && <Followups role={role} />}
         {page.page === 'alerts' && <Alerts />}
         {page.page === 'terminal' && <Terminal />}
         {page.page === 'card' && <Card key={page.cardId} cardId={page.cardId} />}

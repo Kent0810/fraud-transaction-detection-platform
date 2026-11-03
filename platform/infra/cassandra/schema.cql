@@ -70,16 +70,21 @@ CREATE TABLE IF NOT EXISTS triage_queue (
 ) WITH default_time_to_live = 172800;   -- 2 days
 
 
--- control topic: current budget and merchant rules per card.
--- A RELEASE_MERCHANT event has every non-key column null, so the sink deletes the row.
+-- control topic: current budget and recipient rules per card.
+-- A RELEASE_RECIPIENT event has every non-key column null, so the sink deletes the row.
 CREATE TABLE IF NOT EXISTS controls_by_card (
   card_id        text,
-  control_id     text,      -- 'budget' or 'merchant:<name>'
-  kind           text,      -- BUDGET, MERCHANT
-  merchant       text,
+  control_id     text,      -- 'budget', 'freeze' or 'recipient:<recipient id>'
+  kind           text,      -- BUDGET, RECIPIENT, FREEZE
+  recipient_id   text,      -- 'merchant:<name>' or 'account:<bank code>:<account number>'
+  recipient_name text,
   rule           text,      -- BLOCK, ALLOW
   budget_limit   decimal,
   budget_period  text,      -- DAY, WEEK, MONTH
   updated_at     timestamp,
   PRIMARY KEY ((card_id), control_id)
 );
+
+-- A database made before recipient rules: CREATE TABLE IF NOT EXISTS above left its columns alone.
+ALTER TABLE controls_by_card ADD IF NOT EXISTS recipient_id text;
+ALTER TABLE controls_by_card ADD IF NOT EXISTS recipient_name text;
