@@ -26,7 +26,6 @@ import com.cardfraud.frauddetector.model.ControlEvent;
 import com.cardfraud.frauddetector.model.Decision;
 import com.cardfraud.frauddetector.model.FraudMark;
 import com.cardfraud.frauddetector.model.Transaction;
-import com.cardfraud.frauddetector.rules.MockRepeatTransferRule;
 import com.cardfraud.frauddetector.rules.RecipientId;
 import com.cardfraud.frauddetector.serde.JsonSerde;
 
@@ -64,7 +63,7 @@ public final class FraudTopology {
 
         // 0b. Recipient rules and budgets per card (CardRules), for the rules in step 2.
         CardRules.addStores(builder, keys);
-        control.process(CardRules.ControlWriter::new, CardRules.RECIPIENT_RULES, CardRules.BUDGETS);
+        control.process(CardRules.ControlWriter::new, CardRules.RECIPIENT_RULES_TABLE, CardRules.BUDGETS_TABLE);
 
         // 0c. Recipients confirmed as fraud, bank-wide. Keyed by recipient, not card, so every task needs all of them.
         GlobalKTable<String, FraudMark> fraudMarks = builder.globalTable(
@@ -85,9 +84,6 @@ public final class FraudTopology {
                     }
                 });
 
-        KStream<String, Transaction> transfers = transactions
-                .filter((cardId, txn) -> Transaction.TRANSFER.equals(txn.channel()));
-
         // 2. Every transaction -> one decision: DECLINE if the card is frozen, otherwise the rules (Rules.evaluate)
         //    with whether the recipient carries a fraud mark
         //    with the card's recipient rules, budget and spend so far (CardRules.Evaluator)
@@ -101,7 +97,7 @@ public final class FraudTopology {
                         (cardId, screened) -> RecipientId.of(screened.txn()),
                         (screened, mark) -> screened.withFraudMark(mark != null && mark.active()))
                 .processValues(CardRules.Evaluator::new,
-                        CardRules.RECIPIENT_RULES, CardRules.BUDGETS, CardRules.SPEND);
+                        CardRules.RECIPIENT_RULES_TABLE, CardRules.BUDGETS_TABLE, CardRules.SPEND_TABLE);
 
         // 3. Every decision, card payment or transfer -> decisions topic
         decisions.to(cfg.decisionsTopic(), Produced.with(keys, decisionSerde));
@@ -109,9 +105,6 @@ public final class FraudTopology {
         // 4. Every fired rule -> one alert (details: Alert.fromDecision)
         decisions.flatMapValues(Alert::fromDecision)
                 .to(cfg.alertsTopic(), Produced.with(keys, alertSerde));
-
-        // TEST ONLY: repeated same-amount transfers to one account -> MOCK_REPEAT alert. Delete with its file.
-        MockRepeatTransferRule.wire(transfers, keys, transactionSerde, alertSerde, cfg.alertsTopic());
 
         // 5. Every decision an analyst should review updates the card's case (details: CaseSummary.update).
         //    The key (card id) never changes, so no repartition.

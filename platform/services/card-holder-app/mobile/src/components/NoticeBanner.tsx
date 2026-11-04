@@ -35,14 +35,6 @@ function look(n: CardNotice, c: Colors): { icon: IconName; tint: string; bg: str
         title: `${what} declined · ${money(n.amount)}`,
         detail: `${n.counterparty} · ${n.reasons.map(ruleTitle).join(', ')}`,
       };
-    case 'ALERT':
-      return {
-        icon: 'shield-half',
-        tint: c.stepUp,
-        bg: c.stepUpBg,
-        title: `Check this ${what.toLowerCase()} · ${money(n.amount)}`,
-        detail: `${n.counterparty} · ${n.reasons.map(ruleTitle).join(', ')}`,
-      };
     default:
       return {
         icon: 'checkmark',

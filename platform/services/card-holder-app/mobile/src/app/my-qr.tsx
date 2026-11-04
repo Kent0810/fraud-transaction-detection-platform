@@ -6,7 +6,6 @@ import { accountNumber as printAccount } from '@/components/format';
 import { PopIn } from '@/components/motion';
 import { QrCode } from '@/components/QrCode';
 import { Empty } from '@/components/ui';
-import { apiEnabled } from '@/data/http';
 import { fetchMyQr } from '@/data/queries';
 import type { MyQr } from '@/data/types';
 import { radius, shadow, space, useColors } from '@/theme';
@@ -18,12 +17,10 @@ export default function MyQrScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (apiEnabled) fetchMyQr().then(setQr, () => setError('Could not load your code. Try again later.'));
+    fetchMyQr().then(setQr, () => setError('Could not load your code. Try again later.'));
   }, []);
 
-  if (!apiEnabled || error) {
-    return <Empty icon="qr-code-outline" title="Code not available" detail={error ?? 'Needs the bank connection.'} />;
-  }
+  if (error) return <Empty icon="qr-code-outline" title="Code not available" detail={error} />;
   if (!qr) return <ActivityIndicator color={c.primary} style={{ marginTop: space.xxl }} />;
 
   return (

@@ -1,16 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { apiEnabled, HttpError, request, setAuth } from './http';
+import { HttpError, request, setAuth } from './http';
 import { clearSession, readSession, writeSession } from './session-storage';
-import { userFor, type User } from './users';
+import type { User } from './users';
 
-// token is the backend session (absent in the mock build); email is absent in the mock build.
-type Session = {
-  cardId: string;
-  name: string;
-  email?: string;
-  token?: string;
-};
+// token is the backend session.
+type Session = User & { token: string };
 
 type AuthStore = {
   user: User | null;
@@ -19,19 +14,11 @@ type AuthStore = {
   logout: () => void;
 };
 
-// Mirrors the backend so the mock build (no EXPO_PUBLIC_API_URL) can still sign in.
-export const MOCK_PASSWORD = 'admin1234';
-const MOCK_NAME = 'John Doe';
-
 export const CARD_ID = /^\d{8,19}$/;
 
 export class LoginError extends Error {}
 
 async function signIn(cardId: string, password: string): Promise<Session> {
-  if (!apiEnabled) {
-    if (password !== MOCK_PASSWORD) throw new LoginError('Incorrect card number or password');
-    return { cardId, name: MOCK_NAME };
-  }
   try {
     const s = await request<Session>('POST', '/auth/login', { cardId, password });
     return { cardId: s.cardId, name: s.name, email: s.email, token: s.token };
@@ -54,14 +41,9 @@ function parseSession(raw: string | null): Session | null {
   try {
     const s = JSON.parse(raw) as Partial<Session>;
     if (typeof s.cardId !== 'string' || !CARD_ID.test(s.cardId) || typeof s.name !== 'string') return null;
-    // A session saved before the backend issued tokens can't call the API: sign in again.
-    if (apiEnabled && typeof s.token !== 'string') return null;
-    return {
-      cardId: s.cardId,
-      name: s.name,
-      email: typeof s.email === 'string' ? s.email : undefined,
-      token: typeof s.token === 'string' ? s.token : undefined,
-    };
+    // A session saved without a token or email (an older build) can't be used: sign in again.
+    if (typeof s.token !== 'string' || typeof s.email !== 'string') return null;
+    return { cardId: s.cardId, name: s.name, email: s.email, token: s.token };
   } catch {
     return null;
   }
@@ -96,12 +78,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    if (apiEnabled && session?.token) request<void>('POST', '/auth/logout').catch(() => {});
+    if (session) request<void>('POST', '/auth/logout').catch(() => {});
     forget();
   }, [session, forget]);
 
   const value = useMemo<AuthStore>(
-    () => ({ user: session ? userFor(session.cardId, session.name, session.email) : null, restoring, login, logout }),
+    () => ({ user: session, restoring, login, logout }),
     [session, restoring, login, logout],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

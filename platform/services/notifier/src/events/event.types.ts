@@ -13,15 +13,6 @@ export const DecisionMessage = z.object({
   fired_rules: z.array(z.string()),
 });
 
-export const AlertMessage = z.object({
-  card_id: z.string(),
-  txn_id: z.string(),
-  rule_id: z.string(),
-  score: z.number(),
-  amount: z.number(),
-  ts: z.string(),
-});
-
 export const SettlementMessage = z.object({
   txn_id: z.string(),
   ts: z.string(),
@@ -54,7 +45,7 @@ export type LiveAlertDto = {
 };
 
 export type CardNoticeDto = {
-  kind: 'POSTED' | 'DECLINED' | 'RECEIVED' | 'ALERT';
+  kind: 'POSTED' | 'DECLINED' | 'RECEIVED';
   txnId: string;
   ts: string;
   channel: 'CARD' | 'TRANSFER';

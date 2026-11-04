@@ -4,7 +4,6 @@ export type Config = {
   port: number;
   kafkaBrokers: string[];
   decisionsTopic: string;
-  alertsTopic: string;
   settlementsTopic: string;
   creditsTopic: string;
   postgresHost: string;
@@ -34,7 +33,6 @@ export function loadConfig(): Config {
       .map((h) => h.trim())
       .filter(Boolean),
     decisionsTopic: required('TOPIC_DECISIONS'),
-    alertsTopic: required('TOPIC_ALERTS'),
     settlementsTopic: required('TOPIC_SETTLEMENTS'),
     creditsTopic: required('TOPIC_CREDITS'),
     postgresHost: required('POSTGRES_HOST'),

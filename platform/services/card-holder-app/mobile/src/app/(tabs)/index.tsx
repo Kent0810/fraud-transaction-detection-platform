@@ -63,11 +63,7 @@ export default function HomeScreen() {
 
   return (
     <Screen
-      refreshControl={
-        status === 'mock' ? undefined : (
-          <RefreshControl refreshing={status === 'loading'} onRefresh={refresh} tintColor={c.primary} />
-        )
-      }
+      refreshControl={<RefreshControl refreshing={status === 'loading'} onRefresh={refresh} tintColor={c.primary} />}
     >
       <FadeInUp>
         <View style={styles.brand}>

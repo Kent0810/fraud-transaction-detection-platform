@@ -29,9 +29,9 @@ import com.cardfraud.frauddetector.serde.JsonSerde;
 //   budgets         the card's limit and period, from control      (BUDGET)
 //   spend-window    spent so far this day / week / month           (BUDGET)
 final class CardRules {
-    static final String RECIPIENT_RULES = "recipient-rules";
-    static final String BUDGETS = "budgets";
-    static final String SPEND = "spend-window";
+    static final String RECIPIENT_RULES_TABLE = "recipient-rules";
+    static final String BUDGETS_TABLE = "budgets";
+    static final String SPEND_TABLE = "spend-window";
 
     private static final Logger log = LoggerFactory.getLogger("fraud-detector");
 
@@ -47,11 +47,11 @@ final class CardRules {
 
     static void addStores(StreamsBuilder builder, Serde<String> keys) {
         builder.addStateStore(Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(RECIPIENT_RULES), keys, JsonSerde.of(RecipientRules.class)));
+                Stores.persistentKeyValueStore(RECIPIENT_RULES_TABLE), keys, JsonSerde.of(RecipientRules.class)));
         builder.addStateStore(Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(BUDGETS), keys, JsonSerde.of(Budget.class)));
+                Stores.persistentKeyValueStore(BUDGETS_TABLE), keys, JsonSerde.of(Budget.class)));
         builder.addStateStore(Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(SPEND), keys, JsonSerde.of(Spend.class)));
+                Stores.persistentKeyValueStore(SPEND_TABLE), keys, JsonSerde.of(Spend.class)));
     }
 
     // control -> recipient-rules and budgets. Freezes are handled by the frozen-accounts table.
@@ -61,8 +61,8 @@ final class CardRules {
 
         @Override
         public void init(ProcessorContext<Void, Void> context) {
-            recipientRules = context.getStateStore(RECIPIENT_RULES);
-            budgets = context.getStateStore(BUDGETS);
+            recipientRules = context.getStateStore(RECIPIENT_RULES_TABLE);
+            budgets = context.getStateStore(BUDGETS_TABLE);
         }
 
         @Override
@@ -117,9 +117,9 @@ final class CardRules {
         @Override
         public void init(FixedKeyProcessorContext<String, Decision> context) {
             this.context = context;
-            recipientRules = context.getStateStore(RECIPIENT_RULES);
-            budgets = context.getStateStore(BUDGETS);
-            spend = context.getStateStore(SPEND);
+            recipientRules = context.getStateStore(RECIPIENT_RULES_TABLE);
+            budgets = context.getStateStore(BUDGETS_TABLE);
+            spend = context.getStateStore(SPEND_TABLE);
         }
 
         @Override

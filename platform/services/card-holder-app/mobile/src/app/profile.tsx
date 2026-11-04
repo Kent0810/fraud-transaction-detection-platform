@@ -6,9 +6,7 @@ import { Avatar } from '@/components/Avatar';
 import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp, stagger } from '@/components/motion';
 import { Button, Empty, SectionHeader, Surface } from '@/components/ui';
-import { useAuth, useUser } from '@/data/auth';
-import { apiEnabled } from '@/data/http';
-import { ACCOUNT } from '@/data/mock';
+import { useAuth } from '@/data/auth';
 import { fetchProfile } from '@/data/queries';
 import type { Profile } from '@/data/types';
 import { space, useColors } from '@/theme';
@@ -24,29 +22,13 @@ const mask = (s: string) => `${'•'.repeat(Math.max(0, Math.min(s.length - 4, 1
 // The cardholder's own details. Hidden until asked for, so the screen is safe to open in public.
 export default function ProfileScreen() {
   const c = useColors();
-  const user = useUser();
   const { logout } = useAuth();
-  // Offline, the demo user is all there is; live, the bank has the full record.
-  const [profile, setProfile] = useState<Profile | null>(() =>
-    apiEnabled
-      ? null
-      : {
-          cardId: user.cardId,
-          accountNumber: ACCOUNT.number,
-          name: user.name,
-          email: user.email ?? '',
-          gender: null,
-          dob: null,
-          address: null,
-          job: null,
-          memberSince: new Date().toISOString(),
-        },
-  );
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
-    if (apiEnabled) fetchProfile().then(setProfile, () => setError('Could not load your details. Try again later.'));
+    fetchProfile().then(setProfile, () => setError('Could not load your details. Try again later.'));
   }, []);
 
   if (error) return <Empty icon="person-outline" title="Details not available" detail={error} />;

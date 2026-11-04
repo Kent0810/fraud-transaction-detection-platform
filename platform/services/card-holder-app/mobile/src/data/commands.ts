@@ -1,18 +1,17 @@
-import { BANK_SHORT } from '@/components/brand';
+import { BANK_SHORT, OUR_BANK } from '@/components/brand';
 
-import { ME, request } from './http';
-import { OUR_BANK } from './mock';
+import { request } from './http';
 import type { CardStatus } from './queries';
 import type { Payment, Period, Recipient, Transfer, TransferTo } from './types';
 
-export const freezeCard = () => request<CardStatus>('POST', `${ME}/card/freeze`);
+export const freezeCard = () => request<CardStatus>('POST', '/me/card/freeze');
 
-export const unfreezeCard = (password: string) => request<CardStatus>('POST', `${ME}/card/unfreeze`, { password });
+export const unfreezeCard = (password: string) => request<CardStatus>('POST', '/me/card/unfreeze', { password });
 
-export const setBudget = (limit: number, period: Period) => request<void>('PUT', `${ME}/budget`, { limit, period });
+export const setBudget = (limit: number, period: Period) => request<void>('PUT', '/me/budget', { limit, period });
 
 // Recipients are always at this bank; the API still names the bank in the path.
-const recipientPath = (r: Recipient) => `${ME}/recipients/${BANK_SHORT}/${encodeURIComponent(r.account)}`;
+const recipientPath = (r: Recipient) => `/me/recipients/${BANK_SHORT}/${encodeURIComponent(r.account)}`;
 
 export const saveRecipient = (r: Recipient) => request<void>('PUT', recipientPath(r), { name: r.name });
 
@@ -29,7 +28,7 @@ export type SendTransfer = {
 // Recorded as PENDING: the fraud check decides, then the money moves (or doesn't). Poll fetchTransfer for the outcome.
 // balance: the sender's balance now, straight from the ledger.
 export const sendTransfer = (t: SendTransfer) =>
-  request<Transfer & { balance: number }>('POST', `${ME}/transfers`, {
+  request<Transfer & { balance: number }>('POST', '/me/transfers', {
     transferId: t.transferId,
     toAccount: t.to.account,
     // Another bank: say which, and give the name we were told, since nobody here can look it up.
@@ -48,7 +47,7 @@ export type SendPayment = {
 };
 
 // Recorded as PENDING like a transfer; poll fetchPayment for the outcome. balance: the card's balance now.
-export const sendPayment = (p: SendPayment) => request<Payment & { balance: number }>('POST', `${ME}/payments`, p);
+export const sendPayment = (p: SendPayment) => request<Payment & { balance: number }>('POST', '/me/payments', p);
 
 // The idempotency key for one transfer or payment: made once per confirm screen, so a retry after a timeout can't send twice.
 // Only needs to be unique, not secret, so Math.random is enough where crypto.randomUUID isn't available.

@@ -81,7 +81,7 @@ export async function requestTransfer(db: PrismaClient, t: TransferRequestInput)
   const to = await recipient(db, t);
   const amount = BigInt(t.amount);
   await checkBalance(db, t.fromCard, amount);
-  return refuseIfFrozen(record(db, t, to, amount));
+  return record(db, t, to, amount);
 }
 
 /** Records a card payment made in the app as PENDING, like a transfer; no money moves until settle(). */
@@ -89,7 +89,7 @@ export async function requestPayment(db: PrismaClient, p: PaymentRequestInput): 
   await checkSender(db, p.fromCard, p.password);
   const amount = BigInt(p.amount);
   await checkBalance(db, p.fromCard, amount);
-  return refuseIfFrozen(recordPayment(db, p, amount));
+  return recordPayment(db, p, amount);
 }
 
 /**
@@ -156,13 +156,6 @@ async function checkBalance(db: PrismaClient, card: string, amount: bigint): Pro
   if ((await balanceOf(db, card)) < amount) {
     throw insufficientFunds();
   }
-}
-
-// Frozen after checkSender(): the database refuses the transaction (forbid_frozen_sender).
-function refuseIfFrozen(recording: Promise<TransactionState>): Promise<TransactionState> {
-  return recording.catch((e: unknown) => {
-    throw isFrozenSender(e) ? frozen() : e;
-  });
 }
 
 type Outcome = 'POSTED' | 'DECLINED';

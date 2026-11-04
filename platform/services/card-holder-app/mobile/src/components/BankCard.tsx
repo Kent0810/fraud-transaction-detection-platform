@@ -25,7 +25,7 @@ export function BankCard({ last4, holder, spent, limit, period, frozen }: Props)
   const c = useColors();
   const flip = useState(() => new Animated.Value(0))[0];
   const [back, setBack] = useState(false);
-  const pct = Math.min(1, spent / limit);
+  const pct = limit > 0 ? Math.min(1, spent / limit) : 0;
   const colors: [string, string] = frozen ? ['#4A4A47', '#4A4A47'] : [c.cardFrom, c.cardTo];
 
   const toggle = () => {

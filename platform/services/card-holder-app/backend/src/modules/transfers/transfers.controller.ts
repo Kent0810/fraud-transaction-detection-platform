@@ -26,7 +26,10 @@ export class TransfersController {
   // POST with a client-made transferId: retrying after a timeout returns the same transfer instead of sending twice.
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
-  send(@CurrentCard() cardId: string, @Body(new ZodPipe(TransferRequest)) body: TransferRequest): Promise<TransferDto> {
+  send(
+    @CurrentCard() cardId: string, 
+    @Body(new ZodPipe(TransferRequest)) body: TransferRequest
+  ): Promise<TransferDto> {
     return this.commands.execute(new SendTransferCommand(cardId, body));
   }
 

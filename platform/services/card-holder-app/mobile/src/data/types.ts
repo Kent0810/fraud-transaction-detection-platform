@@ -106,7 +106,7 @@ export type QrTarget =
     };
 
 export type CardNotice = {
-  kind: 'POSTED' | 'DECLINED' | 'RECEIVED' | 'ALERT';
+  kind: 'POSTED' | 'DECLINED' | 'RECEIVED';
   txnId: string;
   ts: string;
   channel: Channel;

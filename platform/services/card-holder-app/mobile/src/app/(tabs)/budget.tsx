@@ -18,15 +18,16 @@ export default function BudgetScreen() {
   const c = useColors();
   const { budget, setBudget } = useStore();
   useFreshOnFocus();
-  const [limitText, setLimitText] = useState(groupThousands(budget.limit));
+  const [limitText, setLimitText] = useState(budget.limit > 0 ? groupThousands(budget.limit) : '');
   const [period, setPeriod] = useState<Period>(budget.period);
   const [saved, setSaved] = useState(false);
 
   const limit = parseVnd(limitText);
   const valid = limit > 0;
   const changed = valid && (limit !== budget.limit || period !== budget.period);
-  const left = budget.limit - budget.spent;
-  const pct = budget.spent / budget.limit;
+  // No budget set yet: nothing is used up or over.
+  const left = budget.limit > 0 ? budget.limit - budget.spent : 0;
+  const pct = budget.limit > 0 ? budget.spent / budget.limit : 0;
 
   const edit = (fn: () => void) => {
     fn();
@@ -64,7 +65,7 @@ export default function BudgetScreen() {
             <View
               style={[
                 styles.amountBox,
-                { backgroundColor: c.surfaceAlt, borderColor: valid ? 'transparent' : c.decline },
+                { backgroundColor: c.surfaceAlt, borderColor: valid || !limitText ? 'transparent' : c.decline },
               ]}
             >
               <TextInput
