@@ -4,7 +4,7 @@ export const RULE_TITLE: Record<string, string> = {
   R3: 'Impossible travel',
   R4: 'New-region burst',
   R5: 'High-risk category',
-  R6: 'Blacklisted recipient',
+  BLOCKED_RECIPIENT: 'Blacklisted recipient',
   FRAUD_RECIPIENT: 'Recipient marked as fraud',
   BUDGET: 'Over budget',
   FROZEN: 'Card frozen',

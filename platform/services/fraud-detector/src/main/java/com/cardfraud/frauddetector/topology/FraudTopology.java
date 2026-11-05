@@ -26,7 +26,9 @@ import com.cardfraud.frauddetector.model.ControlEvent;
 import com.cardfraud.frauddetector.model.Decision;
 import com.cardfraud.frauddetector.model.FraudMark;
 import com.cardfraud.frauddetector.model.Transaction;
+import com.cardfraud.frauddetector.rules.Budget;
 import com.cardfraud.frauddetector.rules.RecipientId;
+import com.cardfraud.frauddetector.rules.RecipientRules;
 import com.cardfraud.frauddetector.serde.JsonSerde;
 
 // The processing pipeline, kept apart from main() so it can be tested with TopologyTestDriver.
@@ -34,6 +36,44 @@ public final class FraudTopology {
     private static final Logger log = LoggerFactory.getLogger("fraud-detector");
 
     private FraudTopology() {}
+
+    private static KTable<String, Boolean> buildFrozenRule (KStream<String, ControlEvent> control) {
+        Serde<String> keys = Serdes.String();
+        Serde<Boolean> flags = Serdes.Boolean();
+
+        return control
+                .filter((cardId, event) -> event.isFreezeChange())
+                .mapValues(ControlEvent::freezes)
+                .toTable(Materialized.<String, Boolean, KeyValueStore<Bytes, byte[]>>as("frozen-accounts")
+                        .withKeySerde(keys)
+                        .withValueSerde(flags));
+    }
+
+    private static KTable<String, Budget> buildBudgetRule(KStream<String, ControlEvent> control) {
+        Serde<String> keys = Serdes.String();
+
+        return control
+                .filter((cardId, event) -> CardRules.isValidBudget(cardId, event))
+                .mapValues(event -> new Budget(event.budgetLimit(), event.budgetPeriod()))
+                .toTable(Materialized.<String, Budget, KeyValueStore<Bytes, byte[]>>as(CardRules.BUDGETS_TABLE)
+                        .withKeySerde(keys)
+                        .withValueSerde(JsonSerde.of(Budget.class)));
+    }
+
+    // A change edits the card's rules so far, hence aggregate and not toTable.
+    private static KTable<String, RecipientRules> buildRecipientRule(KStream<String, ControlEvent> control) {
+        Serde<String> keys = Serdes.String();
+        Serde<ControlEvent> controlSerde = JsonSerde.of(ControlEvent.class);
+
+        return control
+                .filter(CardRules::isValidRecipientChange)
+                .groupByKey(Grouped.with(keys, controlSerde))
+                .aggregate(() -> RecipientRules.NONE,
+                        (cardId, event, rules) -> CardRules.applyRecipientChange(event, rules),
+                        Materialized.<String, RecipientRules, KeyValueStore<Bytes, byte[]>>as(CardRules.RECIPIENT_RULES_TABLE)
+                                .withKeySerde(keys)
+                                .withValueSerde(JsonSerde.of(RecipientRules.class)));
+    }
 
     public static Topology build(Config cfg) {
         AtomicLong received = new AtomicLong();
@@ -51,21 +91,22 @@ public final class FraudTopology {
 
         KStream<String, ControlEvent> control = builder
                 .stream(cfg.controlTopic(), Consumed.with(keys, controlSerde))
-                .filter((cardId, event) -> event != null);
+                .filter((cardId, event) -> event != null)
+                .filter(CardRules::hasAction);
 
         // 0a. Is each card frozen? The cardholder's freeze / unfreeze from the app, latest wins.
-        KTable<String, Boolean> frozen = control
-                .filter((cardId, event) -> event.isFreezeChange())
-                .mapValues(ControlEvent::freezes)
-                .toTable(Materialized.<String, Boolean, KeyValueStore<Bytes, byte[]>>as("frozen-accounts")
-                        .withKeySerde(keys)
-                        .withValueSerde(flags));
+        KTable<String, Boolean> frozen = buildFrozenRule(control);
 
-        // 0b. Recipient rules and budgets per card (CardRules), for the rules in step 2.
-        CardRules.addStores(builder, keys);
-        control.process(CardRules.ControlWriter::new, CardRules.RECIPIENT_RULES_TABLE, CardRules.BUDGETS_TABLE);
+        // 0b. Each card's budget, latest wins.
+        KTable<String, Budget> budgets = buildBudgetRule(control);
 
-        // 0c. Recipients confirmed as fraud, bank-wide. Keyed by recipient, not card, so every task needs all of them.
+        // 0c. Each card's recipient rules.
+        KTable<String, RecipientRules> recipientRules = buildRecipientRule(control);
+
+        // 0d. What each card has spent, for the budget rule in step 2. CardRules.Evaluator reads and updates it.
+        CardRules.addSpendStore(builder, keys);
+
+        // 0e. Recipients confirmed as fraud, bank-wide. Keyed by recipient, not card, so every task needs all of them.
         GlobalKTable<String, FraudMark> fraudMarks = builder.globalTable(
                 cfg.fraudMarksTopic(),
                 Consumed.with(keys, JsonSerde.of(FraudMark.class)),
@@ -90,14 +131,15 @@ public final class FraudTopology {
         KStream<String, Decision> decisions = transactions
                 .leftJoin(
                         frozen,
-                        (txn, isFrozen) -> new CardRules.Screened(txn, Boolean.TRUE.equals(isFrozen), false),
+                        (txn, isFrozen) -> CardRules.Screened.of(txn, Boolean.TRUE.equals(isFrozen)),
                         Joined.with(keys, transactionSerde, flags))
                 .leftJoin(
                         fraudMarks,
                         (cardId, screened) -> RecipientId.of(screened.txn()),
                         (screened, mark) -> screened.withFraudMark(mark != null && mark.active()))
-                .processValues(CardRules.Evaluator::new,
-                        CardRules.RECIPIENT_RULES_TABLE, CardRules.BUDGETS_TABLE, CardRules.SPEND_TABLE);
+                .leftJoin(recipientRules, CardRules.Screened::withRecipientRules)
+                .leftJoin(budgets, CardRules.Screened::withBudget)
+                .processValues(CardRules.Evaluator::new, CardRules.SPEND_TABLE);
 
         // 3. Every decision, card payment or transfer -> decisions topic
         decisions.to(cfg.decisionsTopic(), Produced.with(keys, decisionSerde));

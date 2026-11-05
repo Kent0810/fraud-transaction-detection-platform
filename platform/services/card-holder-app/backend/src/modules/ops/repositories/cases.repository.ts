@@ -114,7 +114,7 @@ export class CasesRepository {
 
 function isFlagged(decision: Verdict, firedRules: string[]): boolean {
   if (firedRules.includes('FRAUD_RECIPIENT')) return true;
-  return decision !== 'ALLOW' && firedRules.some((r) => r !== 'R6');
+  return decision !== 'ALLOW' && firedRules.some((r) => r !== 'BLOCKED_RECIPIENT');
 }
 
 function toAlert(r: AlertRow): CaseAlertDto {

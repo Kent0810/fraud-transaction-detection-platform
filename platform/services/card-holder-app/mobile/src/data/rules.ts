@@ -4,7 +4,7 @@ export const RULE_TEXT: Record<string, { title: string; detail: string }> = {
   R3: { title: 'Impossible travel', detail: 'In-person payments too far apart to travel between in time.' },
   R4: { title: 'New location burst', detail: 'Several payments right after first use in a new state.' },
   R5: { title: 'High-risk category', detail: 'A large payment in a category often targeted by fraud.' },
-  R6: { title: 'Blocked recipient', detail: 'You asked the bank to block this recipient.' },
+  BLOCKED_RECIPIENT: { title: 'Blocked recipient', detail: 'You asked the bank to block this recipient.' },
   BUDGET: { title: 'Over budget', detail: 'This payment takes you past your budget.' },
   FROZEN: { title: 'Card frozen', detail: 'You froze this card, so the payment was declined.' },
   LARGE_AMOUNT: { title: 'Unusually large transfer', detail: 'Transfers this large need extra verification.' },

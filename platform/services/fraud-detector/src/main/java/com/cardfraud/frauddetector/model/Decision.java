@@ -24,7 +24,7 @@ public record Decision(
     public enum Verdict { ALLOW, STEP_UP, DECLINE }
 
     // The recipient is on this card's blacklist: the cardholder asked for that, so there is nothing for an analyst to judge.
-    public static final String BLOCKED_RECIPIENT = "R6";
+    public static final String BLOCKED_RECIPIENT = "BLOCKED_RECIPIENT";
     // The recipient carries a bank-wide fraud mark: the money still moves, and an analyst looks at the sender.
     public static final String FRAUD_RECIPIENT = "FRAUD_RECIPIENT";
 

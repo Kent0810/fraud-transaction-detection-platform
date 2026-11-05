@@ -5,9 +5,6 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.processor.api.FixedKeyProcessor;
 import org.apache.kafka.streams.processor.api.FixedKeyProcessorContext;
 import org.apache.kafka.streams.processor.api.FixedKeyRecord;
-import org.apache.kafka.streams.processor.api.Processor;
-import org.apache.kafka.streams.processor.api.ProcessorContext;
-import org.apache.kafka.streams.processor.api.Record;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
 import org.slf4j.Logger;
@@ -25,7 +22,7 @@ import com.cardfraud.frauddetector.serde.JsonSerde;
 
 // Per-card state the rules read, keyed by card number like every input topic, so a card's control changes and its
 // transactions reach the same task in order:
-//   recipient-rules BLOCK / ALLOW per recipient, from control      (R6, whitelist)
+//   recipient-rules BLOCK / ALLOW per recipient, from control      (BLOCKED_RECIPIENT, whitelist)
 //   budgets         the card's limit and period, from control      (BUDGET)
 //   spend-window    spent so far this day / week / month           (BUDGET)
 final class CardRules {
@@ -38,87 +35,77 @@ final class CardRules {
     private CardRules() {
     }
 
-    // A transaction, whether its card was frozen when it arrived, and whether its recipient carries a fraud mark.
-    record Screened(Transaction txn, boolean frozen, boolean fraudMarked) {
+    // A transaction and what is known about it when it arrives: whether its card is frozen, whether its recipient
+    // carries a fraud mark, and the card's recipient rules and budget (null when the card has none).
+    record Screened(Transaction txn, boolean frozen, boolean fraudMarked, RecipientRules recipientRules, Budget budget) {
+        static Screened of(Transaction txn, boolean frozen) {
+            return new Screened(txn, frozen, false, null, null);
+        }
+
         Screened withFraudMark(boolean marked) {
-            return new Screened(txn, frozen, marked);
+            return new Screened(txn, frozen, marked, recipientRules, budget);
+        }
+
+        Screened withRecipientRules(RecipientRules rules) {
+            return new Screened(txn, frozen, fraudMarked, rules, budget);
+        }
+
+        Screened withBudget(Budget cardBudget) {
+            return new Screened(txn, frozen, fraudMarked, recipientRules, cardBudget);
         }
     }
 
-    static void addStores(StreamsBuilder builder, Serde<String> keys) {
-        builder.addStateStore(Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(RECIPIENT_RULES_TABLE), keys, JsonSerde.of(RecipientRules.class)));
-        builder.addStateStore(Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(BUDGETS_TABLE), keys, JsonSerde.of(Budget.class)));
+    static void addSpendStore(StreamsBuilder builder, Serde<String> keys) {
         builder.addStateStore(Stores.keyValueStoreBuilder(
                 Stores.persistentKeyValueStore(SPEND_TABLE), keys, JsonSerde.of(Spend.class)));
     }
 
-    // control -> recipient-rules and budgets. Freezes are handled by the frozen-accounts table.
-    static final class ControlWriter implements Processor<String, ControlEvent, Void, Void> {
-        private KeyValueStore<String, RecipientRules> recipientRules;
-        private KeyValueStore<String, Budget> budgets;
-
-        @Override
-        public void init(ProcessorContext<Void, Void> context) {
-            recipientRules = context.getStateStore(RECIPIENT_RULES_TABLE);
-            budgets = context.getStateStore(BUDGETS_TABLE);
+    static boolean hasAction(String cardId, ControlEvent e) {
+        if (e.action() == null) {
+            log.warn("skipping a control event with no action for card {}", cardId);
+            return false;
         }
+        return true;
+    }
 
-        @Override
-        public void process(Record<String, ControlEvent> record) {
-            String cardId = record.key();
-            ControlEvent e = record.value();
-            if (e.action() == null) {
-                log.warn("skipping a control event with no action for card {}", cardId);
-                return;
-            }
-            switch (e.action()) {
-                case ControlEvent.SET_RECIPIENT_RULE -> {
-                    String recipient = e.recipientId();
-                    if (recipient == null || !(RecipientRules.BLOCK.equals(e.rule()) || RecipientRules.ALLOW.equals(e.rule()))) {
-                        log.warn("skipping a malformed recipient rule for card {}: {}", cardId, e);
-                        return;
-                    }
-                    recipientRules.put(cardId, rulesOf(cardId).set(recipient, e.rule()));
-                }
-                case ControlEvent.RELEASE_RECIPIENT -> {
-                    String recipient = e.recipientId();
-                    if (recipient != null) {
-                        recipientRules.put(cardId, rulesOf(cardId).release(recipient));
-                    }
-                }
-                case ControlEvent.SET_BUDGET -> {
-                    if (e.budgetLimit() == null || !Budget.PERIODS.contains(e.budgetPeriod())) {
-                        log.warn("skipping a malformed budget for card {}: {}", cardId, e);
-                        return;
-                    }
-                    budgets.put(cardId, new Budget(e.budgetLimit(), e.budgetPeriod()));
-                }
-                default -> {
-                    // freeze and unfreeze: the frozen-accounts table
-                }
-            }
+    static boolean isValidBudget(String cardId, ControlEvent e) {
+        if (!e.isBudgetChange()) {
+            return false;
         }
+        if (e.budgetLimit() == null || !Budget.PERIODS.contains(e.budgetPeriod())) {
+            log.warn("skipping a malformed budget for card {}: {}", cardId, e);
+            return false;
+        }
+        return true;
+    }
 
-        private RecipientRules rulesOf(String cardId) {
-            RecipientRules rules = recipientRules.get(cardId);
-            return rules == null ? RecipientRules.NONE : rules;
+    static boolean isValidRecipientChange(String cardId, ControlEvent e) {
+        if (e.releasesRecipient()) {
+            return e.recipientId() != null;
         }
+        if (!e.setsRecipientRule()) {
+            return false;
+        }
+        if (e.recipientId() == null || !(RecipientRules.BLOCK.equals(e.rule()) || RecipientRules.ALLOW.equals(e.rule()))) {
+            log.warn("skipping a malformed recipient rule for card {}: {}", cardId, e);
+            return false;
+        }
+        return true;
+    }
+
+    static RecipientRules applyRecipientChange(ControlEvent e, RecipientRules rules) {
+        return e.setsRecipientRule() ? rules.set(e.recipientId(), e.rule()) : rules.release(e.recipientId());
     }
 
     // Screened transaction -> its decision. Records the spend of every transaction that was not declined.
+    // Still a processor: it reads the spend and writes it back as one step, which the DSL's tables can't do.
     static final class Evaluator implements FixedKeyProcessor<String, Screened, Decision> {
         private FixedKeyProcessorContext<String, Decision> context;
-        private KeyValueStore<String, RecipientRules> recipientRules;
-        private KeyValueStore<String, Budget> budgets;
         private KeyValueStore<String, Spend> spend;
 
         @Override
         public void init(FixedKeyProcessorContext<String, Decision> context) {
             this.context = context;
-            recipientRules = context.getStateStore(RECIPIENT_RULES_TABLE);
-            budgets = context.getStateStore(BUDGETS_TABLE);
             spend = context.getStateStore(SPEND_TABLE);
         }
 
@@ -131,9 +118,9 @@ final class CardRules {
                 return;
             }
 
-            RecipientRules rules = recipientRules.get(cardId);
+            RecipientRules rules = record.value().recipientRules();
             String recipientRule = rules == null ? null : rules.ruleFor(RecipientId.of(txn));
-            Budget budget = budgets.get(cardId);
+            Budget budget = record.value().budget();
             Spend spent = spend.get(cardId);
             if (spent == null) {
                 spent = Spend.NONE;

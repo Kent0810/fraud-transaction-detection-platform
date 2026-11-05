@@ -25,6 +25,18 @@ public record ControlEvent(
         return FREEZE.equals(action);
     }
 
+    public boolean isBudgetChange() {
+        return SET_BUDGET.equals(action);
+    }
+
+    public boolean setsRecipientRule() {
+        return SET_RECIPIENT_RULE.equals(action);
+    }
+
+    public boolean releasesRecipient() {
+        return RELEASE_RECIPIENT.equals(action);
+    }
+
     // The recipient a SET_RECIPIENT_RULE or RELEASE_RECIPIENT is about, or null when the control id names none.
     public String recipientId() {
         return controlId != null && controlId.startsWith(RECIPIENT_PREFIX)
