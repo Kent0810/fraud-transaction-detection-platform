@@ -6,6 +6,7 @@ import type {
   FlaggedPayment,
   Followup,
   FraudMark,
+  HeldTransfer,
   LoginStatus,
   QueueItem,
   RecipientRef,
@@ -53,6 +54,21 @@ export const setRecipientRule = (cardId: string, recipient: RecipientRef, type: 
 
 export const releaseRecipient = (cardId: string, recipientId: string, reason: string | null) =>
   request<void>('DELETE', `${card(cardId)}/recipient-rules/${encodeURIComponent(recipientId)}`, { reason });
+
+export const fetchHeldTransfers = (cardId?: string) =>
+  request<HeldTransfer[]>('GET', `/ops/held-transfers${cardId ? `?cardId=${encodeURIComponent(cardId)}` : ''}`);
+
+// Agents only. REJECT also freezes the card and marks the recipient as fraud for the whole bank.
+export const resolveHeldTransfer = (
+  cardId: string,
+  txnId: string,
+  outcome: 'CONFIRM' | 'REJECT',
+  reason: string | null,
+) =>
+  request<void>('POST', `/ops/held-transfers/${encodeURIComponent(cardId)}/${encodeURIComponent(txnId)}`, {
+    outcome,
+    reason,
+  });
 
 export const fetchFollowups = () => request<Followup[]>('GET', '/ops/follow-ups');
 

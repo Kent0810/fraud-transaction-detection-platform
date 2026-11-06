@@ -22,6 +22,7 @@ export function VerdictBadge({ verdict }: { verdict: Verdict | null }) {
 export function PostingBadge({ status, declinedFor }: { status: PostingStatus | null; declinedFor: string[] }) {
   if (!status) return null;
   if (status === 'POSTED') return <span className="posting p-posted">Posted</span>;
+  if (status === 'HELD') return <span className="posting p-held">Held for an agent</span>;
   const why = declinedFor.map(ruleTitle).join(', ');
   return (
     <span className="posting p-declined" title={why ? `Not posted: ${why}` : 'Not posted'}>

@@ -35,6 +35,8 @@ type IconName = keyof typeof Ionicons.glyphMap;
 const RESULT: Record<Payment['status'], (c: Colors) => { icon: IconName; title: string; tint: string; bg: string }> = {
   POSTED: (c) => ({ icon: 'checkmark', title: 'Payment approved', tint: c.allow, bg: c.allowBg }),
   PENDING: (c) => ({ icon: 'hourglass-outline', title: 'Being checked', tint: c.stepUp, bg: c.stepUpBg }),
+  // Card payments are never held; only transfers are.
+  HELD: (c) => ({ icon: 'hourglass-outline', title: 'Waiting for bank confirmation', tint: c.stepUp, bg: c.stepUpBg }),
   DECLINED: (c) => ({ icon: 'close', title: 'Payment declined', tint: c.decline, bg: c.declineBg }),
 };
 

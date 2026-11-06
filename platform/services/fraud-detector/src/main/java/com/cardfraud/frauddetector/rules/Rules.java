@@ -9,25 +9,33 @@ import com.cardfraud.frauddetector.model.Decision;
 import com.cardfraud.frauddetector.model.Decision.Verdict;
 import com.cardfraud.frauddetector.model.Transaction;
 
+// Every fraud rule: its name, its weight, when it fires, and what follows from it (alerts, analyst review).
 public final class Rules {
-    public static final Map<String, Double> WEIGHTS = Map.of(
-            "R1", 0.5,   // velocity
-            "R2", 0.5,   // amount spike
-            "R3", 0.6,   // impossible travel
-            "R4", 0.4,   // new-region burst
-            "R5", 0.3,   // high-risk category
-            Decision.BLOCKED_RECIPIENT, 1.0,
-            // Below STEP_UP_AT: a fraud mark alone flags the payment and never stops it. Above 0: it ranks in the queue.
-            Decision.FRAUD_RECIPIENT, 0.3);
-
-    public static final String BLOCKED_RECIPIENT = Decision.BLOCKED_RECIPIENT;
-    public static final String FRAUD_RECIPIENT = Decision.FRAUD_RECIPIENT;
-    public static final String LARGE_AMOUNT_RULE = "LARGE_AMOUNT";
+    // The cardholder froze the card: every payment is declined, and no other rule runs.
+    public static final String FROZEN = "FROZEN";
+    // The recipient is on this card's blacklist: the cardholder asked for that, so there is nothing for an analyst to judge.
+    public static final String BLOCKED_RECIPIENT = "BLOCKED_RECIPIENT";
+    // The recipient carries a bank-wide fraud mark: the money still moves, and an analyst looks at the sender.
+    public static final String FRAUD_RECIPIENT = "FRAUD_RECIPIENT";
+    // A transfer at least SPIKE_FACTOR times the card's average transfer of the last 30 days: held for an agent.
+    public static final String AMOUNT_SPIKE = "AMOUNT_SPIKE";
     // Over the cardholder's budget: alert only, never changes the verdict.
     public static final String BUDGET = "BUDGET";
 
-    // A transfer of at least this much (VND) is declined outright
-    public static final long LARGE_AMOUNT = 50_000_000L;
+    public static final Map<String, Double> WEIGHTS = Map.of(
+            "R1", 0.5,   // velocity
+            "R3", 0.6,   // impossible travel
+            "R4", 0.4,   // new-region burst
+            "R5", 0.3,   // high-risk category
+            BLOCKED_RECIPIENT, 1.0,
+            // Between STEP_UP_AT and DECLINE_AT: on its own the transfer is held, not declined.
+            AMOUNT_SPIKE, 0.5,
+            // Below STEP_UP_AT: a fraud mark alone flags the payment and never stops it. Above 0: it ranks in the queue.
+            FRAUD_RECIPIENT, 0.3);
+
+    public static final long SPIKE_FACTOR = 20;
+    // Fewer past transfers than this and the card has no normal yet: AMOUNT_SPIKE is skipped.
+    public static final int SPIKE_MIN_HISTORY = 3;
 
     public static final double DECLINE_AT = 0.8;
     public static final double STEP_UP_AT = 0.4;
@@ -36,34 +44,38 @@ public final class Rules {
     }
 
     /**
-     * @param recipientRule  the card's rule for this recipient: BLOCK, ALLOW or null
-     * @param fraudMarked   whether this recipient carries a bank-wide fraud mark
-     * @param budget        the card's budget, or null when it has none
-     * @param spentInPeriod spent so far in the budget's current period, before this transaction
+     * @param s             the transaction and everything the joins found about it
+     * @param spentInPeriod spent so far in the budget's current period, before this transaction (0 with no budget)
+     * @param history       the card's allowed transfers of the last 30 days, before this transaction
      */
-    public static Decision evaluate(String cardId, Transaction txn, String recipientRule, boolean fraudMarked,
-                                    Budget budget, long spentInPeriod) {
-        List<String> fired = new ArrayList<>();
-
-        boolean allowListed = RecipientRules.ALLOW.equals(recipientRule);
-        if (!allowListed) {
-            // R1 to R5 go here. A recipient the card whitelists skips them (BR3). None are written yet.
+    public static Decision evaluate(String cardId, Screened s, long spentInPeriod, TransferHistory history) {
+        Transaction txn = s.txn();
+        if (s.frozen()) {
+            return decision(cardId, txn, Verdict.DECLINE, 1.0, List.of(FROZEN));
         }
 
-        if (RecipientRules.BLOCK.equals(recipientRule)) {
+        boolean blocked = s.blockedRecipients() != null && s.blockedRecipients().isBlocked(RecipientId.of(txn));
+        boolean fraudMarked = s.fraudMarked();
+        Budget budget = s.budget();
+        List<String> fired = new ArrayList<>();
+
+        if (blocked) {
             fired.add(BLOCKED_RECIPIENT);
         } else if (fraudMarked) {
             // Not when blacklisted: that payment fails anyway, so no money reaches the recipient to review.
             fired.add(FRAUD_RECIPIENT);
         }
 
-        if (Transaction.TRANSFER.equals(txn.channel()) && txn.amt() >= LARGE_AMOUNT) {
-            fired.add(LARGE_AMOUNT_RULE);
+        // amount >= 20 x average, without division: amount x count >= 20 x sum.
+        if (Transaction.TRANSFER.equals(txn.channel())
+                && history.count() >= SPIKE_MIN_HISTORY
+                && txn.amt() * history.count() >= SPIKE_FACTOR * history.sum()) {
+            fired.add(AMOUNT_SPIKE);
         }
 
         // Sum of the fired rules' weights, capped at 1.0 (0 when nothing fired).
         double score = Math.min(1.0, fired.stream().mapToDouble(r -> WEIGHTS.getOrDefault(r, 0.0)).sum());
-        Verdict verdict = fired.contains(LARGE_AMOUNT_RULE) ? Verdict.DECLINE : verdict(score);
+        Verdict verdict = verdict(score);
 
         // BR5: flag the payment that takes the card over its budget. A declined one spends nothing.
         if (verdict != Verdict.DECLINE && budget != null && spentInPeriod + txn.amt() > budget.limit()) {
@@ -73,8 +85,17 @@ public final class Rules {
         return decision(cardId, txn, verdict, score, fired);
     }
 
-    public static Decision frozen(String cardId, Transaction txn) {
-        return decision(cardId, txn, Verdict.DECLINE, 1.0, List.of("FROZEN"));
+    // The fired rules an analyst sees as alerts.
+    public static List<String> alertRules(Decision d) {
+        return d.firedRules().stream().filter(rule -> !BLOCKED_RECIPIENT.equals(rule)).toList();
+    }
+
+    // Whether this decision goes on the card's case, and so into the triage queue.
+    public static boolean needsReview(Decision d) {
+        if (d.firedRules().contains(FRAUD_RECIPIENT)) {
+            return true;
+        }
+        return d.decision() != Verdict.ALLOW && !alertRules(d).isEmpty();
     }
 
     public static Verdict verdict(double score) {

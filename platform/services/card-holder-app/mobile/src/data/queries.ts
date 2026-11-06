@@ -25,6 +25,10 @@ export type Balance = {
   cardId: string;
   accountNumber: string;
   balance: number;
+  /** What can be spent: the balance less transfers held for the bank to confirm. */
+  available: number;
+  /** Set aside for transfers held for the bank to confirm. */
+  held: number;
   currency: string;
   updatedAt: string;
 };

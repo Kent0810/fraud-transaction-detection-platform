@@ -27,6 +27,14 @@ function look(n: CardNotice, c: Colors): { icon: IconName; tint: string; bg: str
         title: `+${money(n.amount)} received`,
         detail: `From ${n.counterparty}`,
       };
+    case 'HELD':
+      return {
+        icon: 'hourglass-outline',
+        tint: c.stepUp,
+        bg: c.stepUpBg,
+        title: `${what} waiting for bank confirmation · ${money(n.amount)}`,
+        detail: `To ${n.counterparty} · the amount is set aside`,
+      };
     case 'DECLINED':
       return {
         icon: 'close',

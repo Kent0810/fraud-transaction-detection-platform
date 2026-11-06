@@ -23,6 +23,8 @@ export type TxnRow = {
   category: string;
   amount: types.BigDecimal | null;
   currency: string | null;
+  merchLat: number | null;
+  merchLong: number | null;
   decision: string | null;
   score: number | null;
   firedRules: string[] | null;

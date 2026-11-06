@@ -24,7 +24,7 @@ const RECENT_MERCHANTS = 2;
 
 export default function HomeScreen() {
   const c = useColors();
-  const { transactions, budget, frozen, alerts, balance, status, error, refresh } = useStore();
+  const { transactions, budget, frozen, alerts, balance, held, status, error, refresh } = useStore();
   useFreshOnFocus();
   const user = useUser();
   const { hideBalance, theme, update } = useSettings();
@@ -105,6 +105,9 @@ export default function HomeScreen() {
           <View>
             <Text style={[styles.balanceLabel, { color: c.muted }]}>Available balance</Text>
             <Text style={[styles.balance, { color: c.text }]}>{hideBalance ? '•••••• đ' : vnd(balance)}</Text>
+            {held > 0 && !hideBalance && (
+              <Text style={[styles.balanceLabel, { color: c.muted }]}>{vnd(held)} set aside for bank confirmation</Text>
+            )}
           </View>
           <Pressable
             onPress={() => update('hideBalance', !hideBalance)}

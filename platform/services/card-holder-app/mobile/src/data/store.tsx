@@ -53,7 +53,10 @@ type Store = {
   alerts: Alert[];
   budget: Budget;
   frozen: boolean;
+  /** What can be spent: held transfers already taken off. */
   balance: number;
+  /** Set aside for transfers waiting for bank confirmation. */
+  held: number;
   accountNumber: string;
   saved: Recipient[];
   transfers: Transfer[];
@@ -132,6 +135,7 @@ type CardData = {
   alerts: Alert[];
   controls: Controls;
   balance: number;
+  held: number;
   accountNumber: string;
   saved: Recipient[];
   frozen: boolean;
@@ -150,7 +154,8 @@ async function fetchCardData(): Promise<CardData> {
     transactions,
     alerts,
     controls,
-    balance: account.balance,
+    balance: account.available,
+    held: account.held,
     accountNumber: account.accountNumber,
     saved,
     frozen: card.frozen,
@@ -170,6 +175,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [budget, setBudgetState] = useState<Budget>(NO_BUDGET);
   const [frozen, setFrozen] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [held, setHeld] = useState(0);
   const [accountNumber, setAccountNumber] = useState('');
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [saved, setSaved] = useState<Recipient[]>([]);
@@ -187,6 +193,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAlerts(data.alerts);
         setBudgetState((b) => withControls(b, data.controls));
         setBalance(data.balance);
+        setHeld(data.held);
         setAccountNumber(data.accountNumber);
         setSaved(data.saved);
         setFrozen(data.frozen);
@@ -388,6 +395,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       budget: effectiveBudget,
       frozen,
       balance,
+      held,
       accountNumber,
       saved,
       transfers,
@@ -416,6 +424,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       effectiveBudget,
       frozen,
       balance,
+      held,
       accountNumber,
       saved,
       transfers,

@@ -21,9 +21,9 @@ const STAFF_ONLY_RULES = new Set(['FRAUD_RECIPIENT']);
 
 /** A transaction as its cardholder sees it. */
 export function forCardholder(t: TxnDto): TxnDto {
-  return { 
-    ...t, 
-    firedRules: t.firedRules.filter((r) => !STAFF_ONLY_RULES.has(r)) 
+  return {
+    ...t,
+    firedRules: t.firedRules.filter((r) => !STAFF_ONLY_RULES.has(r)),
   };
 }
 
@@ -109,10 +109,12 @@ function toTxn(r: TxnRow): TxnDto {
     category: r.category,
     amount: num(r.amount),
     currency: r.currency ?? 'VND',
+    merchLat: r.merchLat ?? null,
+    merchLong: r.merchLong ?? null,
     decision: (r.decision as Verdict | null) ?? 'ALLOW',
     score: num(r.score),
     firedRules: [...(r.firedRules ?? [])].sort(),
-    status: r.status === 'POSTED' || r.status === 'DECLINED' ? r.status : null,
+    status: r.status === 'HELD' || r.status === 'POSTED' || r.status === 'DECLINED' ? r.status : null,
     declinedFor: [...(r.declinedFor ?? [])].sort(),
   };
 }

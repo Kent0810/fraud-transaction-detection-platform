@@ -102,6 +102,16 @@ export class CasesRepository {
     );
   }
 
+  /** All of one transaction's alerts, confirmed as fraud: an agent rejected the held transfer. */
+  async confirmTransactionAlerts(cardId: string, ts: Date, txnId: string): Promise<void> {
+    const rows = (await this.alerts.find({ cardId, ts })).toArray();
+    await Promise.all(
+      rows
+        .filter((r) => r.txnId === txnId && r.status !== 'CONFIRMED')
+        .map((r) => this.setAlertStatus(cardId, ts, r.alertId, 'CONFIRMED')),
+    );
+  }
+
   async setAlertStatus(cardId: string, ts: Date, alertId: string, status: ReviewStatus): Promise<void> {
     await this.alerts.update({ cardId, ts, alertId, status }, { ifExists: true });
   }

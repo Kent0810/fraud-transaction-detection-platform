@@ -189,6 +189,7 @@ model transactions {
   declined_for                            String[]         @default([])
   created_at                              DateTime         @default(now()) @db.Timestamptz(6)
   decided_at                              DateTime?        @db.Timestamptz(6)
+  held_until                              DateTime?        @db.Timestamptz(6)
   ledger_entries                          ledger_entries[]
   accounts_transactions_card_idToaccounts accounts         @relation("transactions_card_idToaccounts", fields: [card_id], references: [card_id], onUpdate: NoAction)
   accounts_transactions_to_cardToaccounts accounts?        @relation("transactions_to_cardToaccounts", fields: [to_card], references: [card_id], onDelete: Restrict, onUpdate: NoAction)
@@ -196,6 +197,7 @@ model transactions {
   @@index([card_id, created_at(sort: Desc)], map: "transactions_card_idx")
   @@index([created_at], map: "transactions_pending_idx", where: raw("(status = 'PENDING'::text)"))
   @@index([to_card, created_at(sort: Desc)], map: "transactions_to_idx", where: raw("(to_card IS NOT NULL)"))
+  @@index([held_until], map: "transactions_held_idx", where: raw("(status = 'HELD'::text)"))
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

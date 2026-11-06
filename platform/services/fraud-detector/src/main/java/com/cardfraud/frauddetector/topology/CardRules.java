@@ -14,50 +14,38 @@ import com.cardfraud.frauddetector.model.ControlEvent;
 import com.cardfraud.frauddetector.model.Decision;
 import com.cardfraud.frauddetector.model.Transaction;
 import com.cardfraud.frauddetector.rules.Budget;
-import com.cardfraud.frauddetector.rules.RecipientId;
-import com.cardfraud.frauddetector.rules.RecipientRules;
+import com.cardfraud.frauddetector.rules.BlockedRecipients;
 import com.cardfraud.frauddetector.rules.Rules;
+import com.cardfraud.frauddetector.rules.Screened;
 import com.cardfraud.frauddetector.rules.Spend;
+import com.cardfraud.frauddetector.rules.TransferHistory;
 import com.cardfraud.frauddetector.serde.JsonSerde;
 
 // Per-card state the rules read, keyed by card number like every input topic, so a card's control changes and its
 // transactions reach the same task in order:
-//   recipient-rules BLOCK / ALLOW per recipient, from control      (BLOCKED_RECIPIENT, whitelist)
-//   budgets         the card's limit and period, from control      (BUDGET)
-//   spend-window    spent so far this day / week / month           (BUDGET)
+//   blocked-recipients  recipients the card blocked, from control    (BLOCKED_RECIPIENT)
+//   budgets             the card's limit and period, from control    (BUDGET)
+//   spend-window        spent so far this day / week / month         (BUDGET)
+//   transfer-history    allowed transfers of the last 30 days        (AMOUNT_SPIKE)
 final class CardRules {
-    static final String RECIPIENT_RULES_TABLE = "recipient-rules";
+    static final String BLOCKED_RECIPIENTS_TABLE = "blocked-recipients";
     static final String BUDGETS_TABLE = "budgets";
     static final String SPEND_TABLE = "spend-window";
+    static final String TRANSFER_HISTORY_TABLE = "transfer-history";
 
     private static final Logger log = LoggerFactory.getLogger("fraud-detector");
 
     private CardRules() {
     }
 
-    // A transaction and what is known about it when it arrives: whether its card is frozen, whether its recipient
-    // carries a fraud mark, and the card's recipient rules and budget (null when the card has none).
-    record Screened(Transaction txn, boolean frozen, boolean fraudMarked, RecipientRules recipientRules, Budget budget) {
-        static Screened of(Transaction txn, boolean frozen) {
-            return new Screened(txn, frozen, false, null, null);
-        }
-
-        Screened withFraudMark(boolean marked) {
-            return new Screened(txn, frozen, marked, recipientRules, budget);
-        }
-
-        Screened withRecipientRules(RecipientRules rules) {
-            return new Screened(txn, frozen, fraudMarked, rules, budget);
-        }
-
-        Screened withBudget(Budget cardBudget) {
-            return new Screened(txn, frozen, fraudMarked, recipientRules, cardBudget);
-        }
-    }
-
     static void addSpendStore(StreamsBuilder builder, Serde<String> keys) {
         builder.addStateStore(Stores.keyValueStoreBuilder(
                 Stores.persistentKeyValueStore(SPEND_TABLE), keys, JsonSerde.of(Spend.class)));
+    }
+
+    static void addTransferHistoryStore(StreamsBuilder builder, Serde<String> keys) {
+        builder.addStateStore(Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore(TRANSFER_HISTORY_TABLE), keys, JsonSerde.of(TransferHistory.class)));
     }
 
     static boolean hasAction(String cardId, ControlEvent e) {
@@ -86,51 +74,60 @@ final class CardRules {
         if (!e.setsRecipientRule()) {
             return false;
         }
-        if (e.recipientId() == null || !(RecipientRules.BLOCK.equals(e.rule()) || RecipientRules.ALLOW.equals(e.rule()))) {
+        if (e.recipientId() == null || !(BlockedRecipients.BLOCK.equals(e.rule()) || BlockedRecipients.ALLOW.equals(e.rule()))) {
             log.warn("skipping a malformed recipient rule for card {}: {}", cardId, e);
             return false;
         }
         return true;
     }
 
-    static RecipientRules applyRecipientChange(ControlEvent e, RecipientRules rules) {
-        return e.setsRecipientRule() ? rules.set(e.recipientId(), e.rule()) : rules.release(e.recipientId());
+    // BLOCK adds the recipient; ALLOW and release remove it.
+    static BlockedRecipients applyRecipientChange(ControlEvent e, BlockedRecipients blocked) {
+        if (e.setsRecipientRule() && BlockedRecipients.BLOCK.equals(e.rule())) {
+            return blocked.block(e.recipientId());
+        }
+        return blocked.unblock(e.recipientId());
     }
 
-    // Screened transaction -> its decision. Records the spend of every transaction that was not declined.
-    // Still a processor: it reads the spend and writes it back as one step, which the DSL's tables can't do.
+    // Screened transaction -> its decision (Rules.evaluate). Looks up the spend and the transfer history, and records
+    // the spend of every transaction not declined and the history of every transfer allowed. Still a processor: it
+    // reads each store and writes it back as one step, which the DSL's tables can't do.
     static final class Evaluator implements FixedKeyProcessor<String, Screened, Decision> {
         private FixedKeyProcessorContext<String, Decision> context;
         private KeyValueStore<String, Spend> spend;
+        private KeyValueStore<String, TransferHistory> transfers;
 
         @Override
         public void init(FixedKeyProcessorContext<String, Decision> context) {
             this.context = context;
             spend = context.getStateStore(SPEND_TABLE);
+            transfers = context.getStateStore(TRANSFER_HISTORY_TABLE);
         }
 
         @Override
         public void process(FixedKeyRecord<String, Screened> record) {
             String cardId = record.key();
-            Transaction txn = record.value().txn();
-            if (record.value().frozen()) {
-                context.forward(record.withValue(Rules.frozen(cardId, txn)));
-                return;
-            }
-
-            RecipientRules rules = record.value().recipientRules();
-            String recipientRule = rules == null ? null : rules.ruleFor(RecipientId.of(txn));
-            Budget budget = record.value().budget();
+            Screened screened = record.value();
+            Transaction txn = screened.txn();
             Spend spent = spend.get(cardId);
             if (spent == null) {
                 spent = Spend.NONE;
             }
             long at = (long) Math.floor(txn.tsEpoch());
+            TransferHistory history = transfers.get(cardId);
+            if (history == null) {
+                history = TransferHistory.NONE;
+            }
+            history = history.within(at);
 
-            Decision d = Rules.evaluate(cardId, txn, recipientRule, record.value().fraudMarked(), budget,
-                    budget == null ? 0 : spent.in(budget.period(), at));
+            long spentInPeriod = screened.budget() == null ? 0 : spent.in(screened.budget().period(), at);
+            Decision d = Rules.evaluate(cardId, screened, spentInPeriod, history);
             if (d.decision() != Decision.Verdict.DECLINE) {
                 spend.put(cardId, spent.add(at, txn.amt()));
+            }
+            // A held transfer does not raise the card's normal.
+            if (Transaction.TRANSFER.equals(txn.channel()) && d.decision() == Decision.Verdict.ALLOW) {
+                transfers.put(cardId, history.add(at, txn.amt()));
             }
             context.forward(record.withValue(d));
         }

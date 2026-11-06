@@ -4,13 +4,19 @@ export { type Bank, BANKS, bankByBin, OUR_BIN } from './banks';
 export { isCardFrozen, verifyPassword } from './cards';
 export { createPrismaClient, type DbConfig } from './client';
 export {
+  availableBalance,
+  declineHeld,
   type DecisionInput,
+  expireHeld,
   getPayment,
   getTransfer,
+  HOLD_MS,
+  type HeldOutcome,
   OUR_BANK,
   type PaymentRequestInput,
   requestPayment,
   requestTransfer,
+  resolveHeld,
   settle,
   type TransactionState,
   type TransactionStatus,

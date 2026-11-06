@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { availableBalance } from '@platform/db';
 
 import { iso } from '../../../shared/cassandra/models';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
@@ -19,11 +20,14 @@ export class AccountsRepository {
       },
     });
     if (!row) return null;
+    const available = await availableBalance(this.db.client, cardId);
     return {
       cardId,
       accountNumber: row.account_number,
       // Prisma returns bigint as BigInt; Number is exact up to 2^53, far above any demo balance.
       balance: Number(row.balance),
+      available: Number(available),
+      held: Number(row.balance - available),
       currency: row.currency,
       updatedAt: iso(row.updated_at) ?? '',
     };

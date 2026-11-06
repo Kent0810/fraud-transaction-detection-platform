@@ -3,14 +3,14 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { VerdictBadge } from '../components/Badges';
 import { BarList, type Bucket, ScoreMeter, type Series, Spark, StackedColumns } from '../components/Charts';
 import { Icon } from '../components/Icons';
-import { fetchFlaggedPayments, fetchQueue } from '../data/api';
+import { fetchFlaggedPayments, fetchHeldTransfers, fetchQueue } from '../data/api';
 import { ago, cardNumber, compactVnd } from '../data/format';
 import { useHotkeys } from '../data/hotkeys';
 import { useLive } from '../data/live';
 import { useNow } from '../data/now';
 import { go } from '../data/router';
 import { ruleTitle } from '../data/rules';
-import type { FlaggedPayment, QueueItem, Verdict } from '../data/types';
+import type { FlaggedPayment, HeldTransfer, QueueItem, Verdict } from '../data/types';
 
 // New cases reach Cassandra within seconds (BR1), so the queue polls at the same pace.
 const REFRESH_MS = 5_000;
@@ -31,6 +31,7 @@ export function Queue() {
   const now = useNow(1_000);
   const [items, setItems] = useState<QueueItem[] | null>(null);
   const [flaggedPayments, setFlaggedPayments] = useState<FlaggedPayment[] | null>(null);
+  const [held, setHeld] = useState<HeldTransfer[]>([]);
   const [pausedAt, setPausedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
@@ -39,11 +40,19 @@ export function Queue() {
   const [cursor, setCursor] = useState(0);
   const body = useRef<HTMLTableSectionElement>(null);
 
+  // Earliest auto-decline per card with a held transfer (the list is sorted by heldUntil).
+  const heldUntil = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const h of held) if (!m.has(h.cardId)) m.set(h.cardId, h.heldUntil);
+    return m;
+  }, [held]);
+
   const load = useCallback(async () => {
     try {
-      const [queue, flagged] = await Promise.all([fetchQueue(), fetchFlaggedPayments()]);
+      const [queue, flagged, waiting] = await Promise.all([fetchQueue(), fetchFlaggedPayments(), fetchHeldTransfers()]);
       setItems(queue);
       setFlaggedPayments(flagged);
+      setHeld(waiting);
       setError(null);
       setCheckedAt(Date.now());
     } catch (err) {
@@ -280,6 +289,11 @@ export function Queue() {
                   <td className="mono nowrap">
                     {cardNumber(c.cardId)}
                     {fresh.has(c.cardId) && <span className="new-tag">new</span>}
+                    {heldUntil.has(c.cardId) && (
+                      <span className="held-tag" title="A transfer is held until an agent confirms or rejects it">
+                        Held · {timeLeft(heldUntil.get(c.cardId) ?? '', now)}
+                      </span>
+                    )}
                   </td>
                   <td>
                     <span className="prio">
@@ -310,6 +324,15 @@ export function Queue() {
       )}
     </section>
   );
+}
+
+/** Time until a held transfer is declined, e.g. "23h 5m left". */
+export function timeLeft(until: string, now: number): string {
+  const ms = new Date(until).getTime() - now;
+  if (ms <= 0) return 'declining now';
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
 }
 
 export function Kpi({

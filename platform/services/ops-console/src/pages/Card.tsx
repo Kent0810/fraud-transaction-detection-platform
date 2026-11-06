@@ -20,8 +20,18 @@ import {
 } from '../data/format';
 import { useLive } from '../data/live';
 import { ACTION_LABEL, recipientIdOf, ruleTitle } from '../data/rules';
-import type { Activity, AuditEntry, CardView, CaseAlert, LoginStatus, RecipientRef, RuleType } from '../data/types';
-import { Kpi, SkeletonTable } from './Queue';
+import { useNow } from '../data/now';
+import type {
+  Activity,
+  AuditEntry,
+  CardView,
+  CaseAlert,
+  HeldTransfer,
+  LoginStatus,
+  RecipientRef,
+  RuleType,
+} from '../data/types';
+import { Kpi, SkeletonTable, timeLeft } from './Queue';
 
 const RANGES = [7, 30, 90];
 
@@ -73,6 +83,8 @@ export function Card({ cardId }: { cardId: string }) {
   const [view, setView] = useState<CardView | null>(null);
   const [activity, setActivity] = useState<Activity[] | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [held, setHeld] = useState<HeldTransfer[]>([]);
+  const now = useNow(30_000);
   const [days, setDays] = useState(30);
   const [error, setError] = useState<string | null>(null);
   const [onlyFlagged, setOnlyFlagged] = useState(false);
@@ -81,9 +93,14 @@ export function Card({ cardId }: { cardId: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const loadActivity = useCallback(async () => {
-    const [a, log] = await Promise.all([api.fetchActivity(cardId, days), api.fetchAudit(cardId)]);
+    const [a, log, waiting] = await Promise.all([
+      api.fetchActivity(cardId, days),
+      api.fetchAudit(cardId),
+      api.fetchHeldTransfers(cardId),
+    ]);
     setActivity(a);
     setAudit(log);
+    setHeld(waiting);
   }, [cardId, days]);
 
   const loadCard = useCallback(async () => {
@@ -121,6 +138,19 @@ export function Card({ cardId }: { cardId: string }) {
       void api.openCard(cardId).then(setView);
     }, SETTLE_MS);
   }, [cardId, loadActivity]);
+
+  // Card-payment locations, most used first. Transfers carry none.
+  const places = useMemo(() => {
+    const m = new Map<string, { key: string; merchant: string; lat: number; long: number; count: number }>();
+    for (const t of activity ?? []) {
+      if (t.channel !== 'CARD' || t.merchLat === null || t.merchLong === null) continue;
+      const key = `${t.merchant}|${t.merchLat.toFixed(3)}|${t.merchLong.toFixed(3)}`;
+      const p = m.get(key) ?? { key, merchant: t.merchant, lat: t.merchLat, long: t.merchLong, count: 0 };
+      p.count++;
+      m.set(key, p);
+    }
+    return [...m.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+  }, [activity]);
 
   const buckets = useMemo<Bucket[]>(() => {
     const start = new Date();
@@ -211,6 +241,12 @@ export function Card({ cardId }: { cardId: string }) {
     await loadActivity();
   }
 
+  async function resolveHeld(h: HeldTransfer, outcome: 'CONFIRM' | 'REJECT', reason: string | null) {
+    await api.resolveHeldTransfer(cardId, h.txnId, outcome, reason);
+    if (outcome === 'REJECT') void api.openCard(cardId).then(setView);
+    await refreshSoon();
+  }
+
   async function setLogin(enabled: boolean, reason: string | null) {
     const { status } = await api.setLoginEnabled(cardId, enabled, reason);
     setView((v) => (v && v.login ? { ...v, login: { ...v.login, status, failedLogins: 0 } } : v));
@@ -298,6 +334,66 @@ export function Card({ cardId }: { cardId: string }) {
           {view.login.status === 'LOCKED'
             ? 'App sign-in is locked after 5 wrong passwords. An agent can unlock it once the caller is verified.'
             : 'App sign-in is turned off for this cardholder.'}
+        </div>
+      )}
+
+      {held.length > 0 && (
+        <div className="held-panel">
+          {held.map((h) => (
+            <div key={h.txnId} className="held-row">
+              <Icon name="clock" size={16} />
+              <span className="held-what">
+                <b>{vnd(h.amount)}</b> to {h.toName} <span className="mono">{h.toAccount}</span> is held: far above this
+                card's usual transfers. No money has moved. {timeLeft(h.heldUntil, now)} before it is declined.
+              </span>
+              {isAgent ? (
+                <>
+                  <ReasonAction
+                    label="Confirm"
+                    confirm="Confirm transfer"
+                    title="The cardholder made this transfer?"
+                    description={<p>The transfer posts and its alerts close as cleared.</p>}
+                    icon="check"
+                    tone="primary"
+                    onRun={(r) => resolveHeld(h, 'CONFIRM', r)}
+                  />
+                  <ReasonAction
+                    label="Reject"
+                    confirm="Reject as fraud"
+                    title="The cardholder did not make this transfer?"
+                    description={
+                      <p>
+                        The transfer is declined, the card is frozen and <b>{h.toName}</b> is marked as fraud for the
+                        whole bank.
+                      </p>
+                    }
+                    icon="shield"
+                    tone="danger"
+                    onRun={(r) => resolveHeld(h, 'REJECT', r)}
+                  />
+                </>
+              ) : (
+                <span className="muted">An agent confirms or rejects it with the cardholder.</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {places.length > 0 && (
+        <div className="places">
+          <b>Where this card paid</b> <span className="muted">(card payments in the last {days} days)</span>
+          <ul>
+            {places.map((p) => (
+              <li key={p.key}>
+                {p.merchant} ·{' '}
+                <span className="mono">
+                  {p.lat.toFixed(3)}, {p.long.toFixed(3)}
+                </span>
+                {p.count > 1 && <span className="muted"> · {p.count} payments</span>}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -496,7 +592,7 @@ export function Card({ cardId }: { cardId: string }) {
                             </div>
                           </td>
                           <td className="actions" onClick={(e) => e.stopPropagation()}>
-                            {!isAgent && open.length > 0 && (
+                            {!isAgent && open.length > 0 && t.status !== 'HELD' && (
                               <>
                                 <ReasonAction
                                   label="Fraud"

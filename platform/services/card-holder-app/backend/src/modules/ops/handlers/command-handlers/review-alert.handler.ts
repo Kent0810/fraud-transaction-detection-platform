@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CommandHandler, type ICommandHandler } from '@nestjs/cqrs';
 
 import { auditEntry } from '../../../../shared/prisma/audit';
@@ -22,6 +22,12 @@ export class ReviewAlertHandler implements ICommandHandler<ReviewAlertCommand> {
     const at = new Date(ts);
     const alert = await this.cases.alert(cardId, at, alertId);
     if (!alert) throw new NotFoundException('alert not found');
+    // Only the agent's Confirm or Reject decides a held transfer, so its money is decided in one place.
+    const pg = await this.db.client.transactions.findFirst({
+      where: { card_id: cardId, txn_id: alert.txnId },
+      select: { status: true },
+    });
+    if (pg?.status === 'HELD') throw new ConflictException('this transfer is waiting for an agent');
 
     if (status === 'CLEARED') {
       await this.db.client.audit_log.createMany({ data: auditEntry(by, 'CLEAR_ALERT', cardId, { alertId }) });

@@ -19,7 +19,7 @@ export const SettlementMessage = z.object({
   cc_num: z.string(),
   channel: z.enum(['CARD', 'TRANSFER']),
   amt: z.number(),
-  status: z.enum(['POSTED', 'DECLINED']),
+  status: z.enum(['HELD', 'POSTED', 'DECLINED']),
   declined_for: z.array(z.string()),
 });
 
@@ -45,7 +45,7 @@ export type LiveAlertDto = {
 };
 
 export type CardNoticeDto = {
-  kind: 'POSTED' | 'DECLINED' | 'RECEIVED';
+  kind: 'HELD' | 'POSTED' | 'DECLINED' | 'RECEIVED';
   txnId: string;
   ts: string;
   channel: 'CARD' | 'TRANSFER';

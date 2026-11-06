@@ -43,7 +43,7 @@ function Shell({ role }: { role: StaffRole }) {
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
   const route = useRoute() ?? HOME[role];
-  const page = route.page === 'queue' && role !== 'ANALYST' ? HOME[role] : route;
+  const page = route;
 
   const closePalette = useCallback(() => setPalette(false), []);
 
@@ -51,7 +51,7 @@ function Shell({ role }: { role: StaffRole }) {
     'mod+k': () => setPalette(true),
     '/': () => setPalette(true),
     '?': () => setHelp(true),
-    'g q': () => role === 'ANALYST' && go({ page: 'queue' }),
+    'g q': () => go({ page: 'queue' }),
     'g f': () => go({ page: 'find' }),
     'g u': () => go({ page: 'followups' }),
     'g m': () => go({ page: 'terminal' }),
@@ -86,14 +86,15 @@ function Shell({ role }: { role: StaffRole }) {
         </button>
 
         <nav className="side-nav">
-          {role === 'ANALYST' &&
-            nav(
-              { page: 'queue' },
-              'Triage queue',
-              'queue',
-              'G Q',
-              unseen > 0 && page.page !== 'queue' && <span className="count">{unseen > 99 ? '99+' : unseen}</span>,
-            )}
+          {nav(
+            { page: 'queue' },
+            'Triage queue',
+            'queue',
+            'G Q',
+            role === 'ANALYST' && unseen > 0 && page.page !== 'queue' && (
+              <span className="count">{unseen > 99 ? '99+' : unseen}</span>
+            ),
+          )}
           {nav({ page: 'followups' }, 'Fraud follow-ups', 'shield', 'G U')}
           {nav({ page: 'find' }, 'Find a card', 'search', 'G F')}
         </nav>

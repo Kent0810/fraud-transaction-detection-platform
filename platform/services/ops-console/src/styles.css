@@ -1066,6 +1066,42 @@ table.grid {
   color: var(--ctrl);
   font-weight: 600;
 }
+.p-held,
+.held-tag {
+  color: var(--c-step);
+  font-weight: 600;
+}
+.held-tag {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  font-family: inherit;
+}
+.held-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--c-step);
+  margin-bottom: 16px;
+}
+.held-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.held-row .held-what {
+  flex: 1 1 260px;
+}
+.places {
+  margin: 0 0 16px;
+}
+.places ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.86rem;
+}
 .chips {
   display: flex;
   flex-wrap: wrap;

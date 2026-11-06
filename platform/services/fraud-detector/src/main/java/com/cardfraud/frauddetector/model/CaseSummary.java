@@ -4,7 +4,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 
-// Latest summary per card, updated on every decision an analyst should review (Decision.needsReview).
+import com.cardfraud.frauddetector.rules.Rules;
+
+// Latest summary per card, updated on every decision an analyst should review (Rules.needsReview).
 public record CaseSummary(
         String cardId,
         double riskScore,
@@ -24,7 +26,7 @@ public record CaseSummary(
                 Math.max(riskScore, d.score()),
                 Math.max(priority, d.score() * d.amount()),
                 amountSum + d.amount(),
-                openAlerts + d.alertRules().size(),
+                openAlerts + Rules.alertRules(d).size(),
                 d.decision(),
                 LocalDate.now(ZoneOffset.UTC).toString(),
                 Instant.now().toString());
