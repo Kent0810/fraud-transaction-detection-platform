@@ -2,7 +2,9 @@ CREATE SEQUENCE IF NOT EXISTS transaction_reference_seq;
 
 -- Card payments and transfers share one table. Whatever the app sends (a transfer, or a card payment made in the app)
 -- is requested (PENDING) and decided later; a card payment from the event source arrives already decided (POSTED or
--- DECLINED) and is recorded in one go.
+-- DECLINED) and is recorded in one go. A transfer far above the card's normal (AMOUNT_SPIKE) is HELD instead: no money
+-- moves, the amount is set aside from what the card can spend, and an agent confirms it (POSTED) or rejects it
+-- (DECLINED); unconfirmed, it is declined when held_until passes.
 CREATE TABLE IF NOT EXISTS transactions (
   txn_id        text PRIMARY KEY,   -- card payment ids are 32 hex characters, transfer ids are uuids
   reference     text NOT NULL UNIQUE DEFAULT 'FT' || lpad(nextval('transaction_reference_seq')::text, 10, '0'),
@@ -21,12 +23,14 @@ CREATE TABLE IF NOT EXISTS transactions (
   to_bank       text CHECK (to_bank ~ '^\d{6}$'),
   content       text,
   amount        bigint NOT NULL CHECK (amount > 0),
-  status        text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'POSTED', 'DECLINED')),
+  status        text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'HELD', 'POSTED', 'DECLINED')),
   declined_for  text[] NOT NULL DEFAULT '{}',
   created_at    timestamptz NOT NULL DEFAULT now(),
   decided_at    timestamptz,
+  held_until    timestamptz,       -- HELD only: when it is declined if no agent has answered
   CONSTRAINT transactions_declined_check CHECK ((status = 'DECLINED') = (cardinality(declined_for) > 0)),
-  CONSTRAINT transactions_decided_check CHECK ((status = 'PENDING') = (decided_at IS NULL)),
+  CONSTRAINT transactions_decided_check CHECK ((status IN ('PENDING', 'HELD')) = (decided_at IS NULL)),
+  CONSTRAINT transactions_held_check CHECK ((status = 'HELD') = (held_until IS NOT NULL)),
   CONSTRAINT transactions_channel_check CHECK (CASE channel
     WHEN 'TRANSFER' THEN to_account IS NOT NULL AND to_name IS NOT NULL AND content IS NOT NULL
                          AND (to_card IS NULL) <> (to_bank IS NULL)
@@ -36,6 +40,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS transactions_card_idx ON transactions (card_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS transactions_to_idx ON transactions (to_card, created_at DESC) WHERE to_card IS NOT NULL;
 CREATE INDEX IF NOT EXISTS transactions_pending_idx ON transactions (created_at) WHERE status = 'PENDING';
+CREATE INDEX IF NOT EXISTS transactions_held_idx ON transactions (held_until) WHERE status = 'HELD';
 
 -- Every entry except OPENING belongs to a transaction: -amount for the card, +amount for the recipient of a transfer
 -- inside this bank.
@@ -71,7 +76,7 @@ CREATE TRIGGER ledger_entries_match_transaction BEFORE INSERT ON ledger_entries
   FOR EACH ROW WHEN (NEW.reference IS NOT NULL) EXECUTE FUNCTION check_ledger_entry();
 
 -- function 2: by commit, a transaction has its entries (one for a card payment, two for a transfer, none unless
--- POSTED) and the outbox event for its status.
+-- POSTED) and the outbox event for its status (HELD: TransactionHeld).
 CREATE OR REPLACE FUNCTION check_transaction_posted() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF (SELECT count(*) FROM ledger_entries WHERE reference = NEW.reference)
@@ -79,6 +84,7 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM outbox
                     WHERE aggregate_id = NEW.card_id
                       AND type = CASE NEW.status WHEN 'PENDING' THEN 'TransactionRequested'
+                                                 WHEN 'HELD' THEN 'TransactionHeld'
                                                  WHEN 'POSTED' THEN 'TransactionPosted'
                                                  ELSE 'TransactionDeclined' END
                       AND payload ->> 'txn_id' = NEW.txn_id) THEN
@@ -92,12 +98,14 @@ DROP TRIGGER IF EXISTS transactions_posted ON transactions;
 CREATE CONSTRAINT TRIGGER transactions_posted AFTER INSERT OR UPDATE ON transactions
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_transaction_posted();
 
--- function 3: a PENDING transaction is decided once; nothing else about it changes.
+-- function 3: a PENDING transaction is decided once, outright or by way of HELD, which is then decided once. Nothing
+-- else about it changes.
 CREATE OR REPLACE FUNCTION check_transaction_decision() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF OLD.status <> 'PENDING' OR NEW.status = 'PENDING'
-     OR to_jsonb(NEW) - '{status,declined_for,decided_at}'::text[]
-        <> to_jsonb(OLD) - '{status,declined_for,decided_at}'::text[] THEN
+  IF NOT ((OLD.status = 'PENDING' AND NEW.status IN ('HELD', 'POSTED', 'DECLINED'))
+          OR (OLD.status = 'HELD' AND NEW.status IN ('POSTED', 'DECLINED')))
+     OR to_jsonb(NEW) - '{status,declined_for,decided_at,held_until}'::text[]
+        <> to_jsonb(OLD) - '{status,declined_for,decided_at,held_until}'::text[] THEN
     RAISE EXCEPTION 'transaction % is % and can only be decided once', OLD.reference, OLD.status
       USING ERRCODE = 'insufficient_privilege';
   END IF;

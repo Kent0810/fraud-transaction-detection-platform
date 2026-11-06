@@ -17,12 +17,11 @@ import {
 
 import { Avatar } from '@/components/Avatar';
 import { BankPicker } from '@/components/BankPicker';
+import { OUR_BANK } from '@/components/brand';
 import { accountNumber as printAccount } from '@/components/format';
 import { FadeInUp, ScalePressable, stagger } from '@/components/motion';
 import { Button } from '@/components/ui';
 import { groupThousands, parseVnd, toAccountName, vnd, vndInWords } from '@/components/vnd';
-import { apiEnabled } from '@/data/http';
-import { ACCOUNT, OUR_BANK } from '@/data/mock';
 import { fetchBanks } from '@/data/queries';
 import { useUser } from '@/data/auth';
 import { useSettings } from '@/data/settings';
@@ -67,7 +66,7 @@ export default function TransferFormScreen() {
   const [save, setSave] = useState(false);
 
   useEffect(() => {
-    if (apiEnabled) fetchBanks().then(setBanks, () => null);
+    fetchBanks().then(setBanks, () => null);
   }, []);
 
   const bank = banks.find((b) => b.bin === bankBin) ?? OUR_BANK;
@@ -75,7 +74,7 @@ export default function TransferFormScreen() {
   const external = bank.bin !== OUR_BANK.bin;
   const amount = parseVnd(amountText);
   const alreadySaved = external || saved.some((r) => r.account === account);
-  const toSelf = !external && account === accountNumber;
+  const toSelf = !external && !!account && account === accountNumber;
 
   const lookupKey = !external && account.length >= 6 && !toSelf ? account : null;
   useEffect(() => {
@@ -141,9 +140,7 @@ export default function TransferFormScreen() {
             style={styles.source}
           >
             <Text style={styles.sourceLabel}>From account</Text>
-            <Text style={styles.sourceNumber}>
-              {ACCOUNT.label} · {printAccount(accountNumber)}
-            </Text>
+            <Text style={styles.sourceNumber}>Payment account · {printAccount(accountNumber)}</Text>
             <View style={styles.sourceRow}>
               <View>
                 <Text style={styles.sourceLabel}>Available balance</Text>

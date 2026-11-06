@@ -16,8 +16,8 @@ export type Txn = {
   decision: Verdict;
   score: number;
   firedRules: string[];
-  // Null until the ledger has posted or declined it (never for a fraud DECLINE).
-  status: 'POSTED' | 'DECLINED' | null;
+  // Null until the ledger has posted or declined it (never for a fraud DECLINE); HELD while the bank confirms it.
+  status: 'HELD' | 'POSTED' | 'DECLINED' | null;
   declinedFor: string[];
 };
 
@@ -53,8 +53,8 @@ export type Bank = { bin: string; code: string; name: string };
 /** Who a transfer goes to: at this bank, or at another bank through NAPAS. */
 export type TransferTo = Recipient & { bank: Bank };
 
-// PENDING until the bank's fraud check decides; only POSTED moved the money.
-export type TransferStatus = 'PENDING' | 'POSTED' | 'DECLINED';
+// PENDING until the bank's fraud check decides; HELD while the bank confirms an unusual one; only POSTED moved the money.
+export type TransferStatus = 'PENDING' | 'HELD' | 'POSTED' | 'DECLINED';
 
 export type Transfer = {
   transferId: string;
@@ -106,7 +106,7 @@ export type QrTarget =
     };
 
 export type CardNotice = {
-  kind: 'POSTED' | 'DECLINED' | 'RECEIVED' | 'ALERT';
+  kind: 'HELD' | 'POSTED' | 'DECLINED' | 'RECEIVED';
   txnId: string;
   ts: string;
   channel: Channel;

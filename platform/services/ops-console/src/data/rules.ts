@@ -1,16 +1,16 @@
 export const RULE_TITLE: Record<string, string> = {
   R1: 'Velocity',
-  R2: 'Amount spike',
   R3: 'Impossible travel',
   R4: 'New-region burst',
   R5: 'High-risk category',
-  R6: 'Blacklisted recipient',
+  BLOCKED_RECIPIENT: 'Blacklisted recipient',
   FRAUD_RECIPIENT: 'Recipient marked as fraud',
   BUDGET: 'Over budget',
   FROZEN: 'Card frozen',
-  LARGE_AMOUNT: 'Large transfer',
+  AMOUNT_SPIKE: 'Unusual transfer amount',
+  REJECTED_BY_BANK: 'Rejected by agent',
+  NOT_CONFIRMED: 'Not confirmed in 24 h',
   INSUFFICIENT_FUNDS: 'Insufficient funds',
-  MOCK_REPEAT: 'Same transfer repeated (test rule)',
 };
 
 export const ruleTitle = (id: string) => RULE_TITLE[id] ?? id;
@@ -32,6 +32,8 @@ export const ACTION_LABEL: Record<string, string> = {
   CLEAR_ALERT: 'Cleared an alert',
   DISABLE_LOGIN: 'Turned off app sign-in',
   RESTORE_LOGIN: 'Restored app sign-in',
+  CONFIRM_HELD_TRANSFER: 'Confirmed a held transfer',
+  REJECT_HELD_TRANSFER: 'Rejected a held transfer',
 };
 
 /** The fraud detector's id for who a transaction paid (RecipientId.java), to find this card's rule for it. */

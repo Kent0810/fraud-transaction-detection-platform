@@ -1,6 +1,8 @@
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+if (!API_URL) {
+  throw new Error('EXPO_PUBLIC_API_URL is not set. Copy .env.example to .env.local and set it.');
+}
 
-export const apiEnabled = !!API_URL;
 export const apiUrl = API_URL;
 
 export const notifierUrl = (process.env.EXPO_PUBLIC_NOTIFIER_URL ?? 'http://localhost:8081').replace(/\/$/, '');
@@ -56,6 +58,3 @@ export async function request<T>(method: Method, path: string, body?: unknown): 
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
-
-// The signed-in card comes from the token, so the API never takes a card number in the URL.
-export const ME = '/me';

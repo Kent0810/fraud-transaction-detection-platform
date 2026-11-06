@@ -1,5 +1,10 @@
+import type { Bank } from '@/data/types';
+
 export const BANK_NAME = 'HCM Mock Banking';
 export const BANK_SHORT = 'HCMMB';
+
+/** This bank, as the bank list names it. */
+export const OUR_BANK: Bank = { bin: '970999', code: BANK_SHORT, name: BANK_NAME };
 
 // Fixed so the logo looks the same in light and dark mode and matches the app icon.
 export const BRAND_FROM = '#1E2B26';

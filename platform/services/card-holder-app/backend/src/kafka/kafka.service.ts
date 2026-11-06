@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { KafkaJS } from '@confluentinc/kafka-javascript';
 
 import type { Config } from '../config';
@@ -6,11 +6,10 @@ import { CONFIG } from '../config.module';
 
 @Injectable()
 export class KafkaService implements OnApplicationShutdown {
-  private readonly log = new Logger(KafkaService.name);
   private readonly kafka: KafkaJS.Kafka;
   private readonly consumers: KafkaJS.Consumer[] = [];
 
-  constructor(@Inject(CONFIG) private readonly cfg: Config) {
+  constructor(@Inject(CONFIG) cfg: Config) {
     this.kafka = new KafkaJS.Kafka({ kafkaJS: { brokers: cfg.kafkaBrokers, clientId: 'cardholder-app' } });
   }
 
@@ -30,7 +29,6 @@ export class KafkaService implements OnApplicationShutdown {
     this.consumers.push(consumer);
     await consumer.connect();
     await consumer.subscribe({ topics: [topic] });
-    this.log.log(`consuming ${topic} as ${groupId} from ${this.cfg.kafkaBrokers.join(',')}`);
     await consumer.run({
       eachMessage: async ({ message }) => {
         if (!message.value) return;

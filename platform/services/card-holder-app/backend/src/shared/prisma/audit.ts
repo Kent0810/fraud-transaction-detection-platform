@@ -13,7 +13,9 @@ export type AuditAction =
   | 'CONFIRM_ALERT'
   | 'CLEAR_ALERT'
   | 'DISABLE_LOGIN'
-  | 'RESTORE_LOGIN';
+  | 'RESTORE_LOGIN'
+  | 'CONFIRM_HELD_TRANSFER'
+  | 'REJECT_HELD_TRANSFER';
 
 /** The staff member behind a change made from the operations console. */
 export type StaffAudit = {

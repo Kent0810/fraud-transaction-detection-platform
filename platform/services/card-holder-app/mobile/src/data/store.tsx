@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
 
 import * as commands from './commands';
-import { apiEnabled, HttpError } from './http';
+import { HttpError } from './http';
 import { followNotices } from './live';
 import {
   type Controls,
@@ -18,10 +18,9 @@ import {
   fetchTransactions,
   fetchTransfer,
 } from './queries';
-import { MOCK_PASSWORD, useUser } from './auth';
+import { useUser } from './auth';
 import { useSettings } from './settings';
 
-import { ACCOUNT, ALERTS, BUDGET, LOOKUP_NAMES, PAY_MERCHANTS, TRANSACTIONS } from './mock';
 import type {
   Alert,
   Budget,
@@ -42,7 +41,7 @@ export type TransferDraft = {
   save: boolean;
 };
 
-export type DataStatus = 'mock' | 'loading' | 'ready' | 'error';
+export type DataStatus = 'loading' | 'ready' | 'error';
 
 type Store = {
   status: DataStatus;
@@ -54,7 +53,10 @@ type Store = {
   alerts: Alert[];
   budget: Budget;
   frozen: boolean;
+  /** What can be spent: held transfers already taken off. */
   balance: number;
+  /** Set aside for transfers waiting for bank confirmation. */
+  held: number;
   accountNumber: string;
   saved: Recipient[];
   transfers: Transfer[];
@@ -75,9 +77,9 @@ type Store = {
 
 const StoreContext = createContext<Store | null>(null);
 
-const PROPAGATION_MS = 1500;
-const LOOKUP_MS = 700;
-const TRANSFER_MS = 1200;
+// A card with no budget set: the limit stays 0 until the cardholder chooses one.
+const NO_BUDGET: Budget = { limit: 0, period: 'MONTH', spent: 0 };
+
 // How long sendTransfer waits for the fraud check before handing back a PENDING transfer.
 const DECISION_POLL_MS = 500;
 const DECISION_WAIT_MS = 10_000;
@@ -133,6 +135,7 @@ type CardData = {
   alerts: Alert[];
   controls: Controls;
   balance: number;
+  held: number;
   accountNumber: string;
   saved: Recipient[];
   frozen: boolean;
@@ -151,7 +154,8 @@ async function fetchCardData(): Promise<CardData> {
     transactions,
     alerts,
     controls,
-    balance: account.balance,
+    balance: account.available,
+    held: account.held,
     accountNumber: account.accountNumber,
     saved,
     frozen: card.frozen,
@@ -168,17 +172,18 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export function StoreProvider({ children }: { children: ReactNode }) {
   const user = useUser();
   const cardId = user.cardId;
-  const [budget, setBudgetState] = useState<Budget>(BUDGET);
+  const [budget, setBudgetState] = useState<Budget>(NO_BUDGET);
   const [frozen, setFrozen] = useState(false);
-  const [balance, setBalance] = useState(user.balance);
-  const [accountNumber, setAccountNumber] = useState(ACCOUNT.number);
+  const [balance, setBalance] = useState(0);
+  const [held, setHeld] = useState(0);
+  const [accountNumber, setAccountNumber] = useState('');
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [saved, setSaved] = useState<Recipient[]>([]);
   const [draft, setDraft] = useState<TransferDraft | null>(null);
-  const [status, setStatus] = useState<DataStatus>(apiEnabled ? 'loading' : 'mock');
+  const [status, setStatus] = useState<DataStatus>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<Txn[]>(apiEnabled ? [] : TRANSACTIONS);
-  const [alerts, setAlerts] = useState<Alert[]>(apiEnabled ? [] : ALERTS);
+  const [transactions, setTransactions] = useState<Txn[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
 
   // A background poll that fails keeps what is on screen instead of showing the error banner.
   const load = useCallback((background = false) => {
@@ -188,6 +193,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAlerts(data.alerts);
         setBudgetState((b) => withControls(b, data.controls));
         setBalance(data.balance);
+        setHeld(data.held);
         setAccountNumber(data.accountNumber);
         setSaved(data.saved);
         setFrozen(data.frozen);
@@ -212,12 +218,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (apiEnabled) load();
+    load();
   }, [load]);
 
   // There is no push channel: fetch again whenever the app comes back to the foreground (screens do so on focus).
   useEffect(() => {
-    if (!apiEnabled) return;
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') load(true);
     });
@@ -225,13 +230,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const refresh = useCallback(() => {
-    if (!apiEnabled) return;
     setStatus('loading');
     load();
   }, [load]);
 
   const reload = useCallback(() => {
-    if (apiEnabled) load(true);
+    load(true);
   }, [load]);
 
   const { notifyDeclines, notifyTransfers } = useSettings();
@@ -242,7 +246,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState<CardNotice | null>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
   useEffect(() => {
-    if (!apiEnabled) return;
     let pending: ReturnType<typeof setTimeout> | null = null;
     const stop = followNotices((n) => {
       if (!pending) {
@@ -253,7 +256,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       const show = showRef.current;
       const shown =
-        n.kind === 'DECLINED' || n.kind === 'ALERT'
+        n.kind === 'DECLINED'
           ? show.notifyDeclines
           : show.notifyTransfers && (n.kind === 'RECEIVED' || n.channel === 'TRANSFER');
       if (shown) setNotice(n);
@@ -265,7 +268,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [load]);
 
   const effectiveBudget = useMemo<Budget>(() => {
-    if (!apiEnabled) return budget;
     const now = new Date();
     const spent = transactions
       .filter((t) => t.direction !== 'IN' && t.decision !== 'DECLINE' && t.status !== 'DECLINED')
@@ -279,11 +281,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Not optimistic: the card shows as frozen only once the bank has saved it, so it never looks safer than it is.
   const freezeCard = useCallback(async () => {
-    if (!apiEnabled) {
-      await wait(PROPAGATION_MS / 3);
-      setFrozen(true);
-      return;
-    }
     const status = await commands.freezeCard().catch((e: unknown) => {
       throw new CardError(`Could not freeze the card: ${message(e)}`);
     });
@@ -291,12 +288,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const unfreezeCard = useCallback(async (password: string) => {
-    if (!apiEnabled) {
-      await wait(PROPAGATION_MS / 3);
-      if (password !== MOCK_PASSWORD) throw new CardError('Incorrect password');
-      setFrozen(false);
-      return;
-    }
     const status = await commands.unfreezeCard(password).catch((e: unknown) => {
       throw new CardError(
         e instanceof HttpError && e.status === 403 ? 'Incorrect password' : `Could not unfreeze: ${message(e)}`,
@@ -308,7 +299,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setBudget = useCallback(
     (limit: number, period: Period) => {
       setBudgetState((b) => ({ ...b, limit, period }));
-      if (apiEnabled) commands.setBudget(limit, period).catch(reloadControls);
+      commands.setBudget(limit, period).catch(reloadControls);
     },
     [reloadControls],
   );
@@ -317,26 +308,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     fetchRecipients().then(setSaved, (e: unknown) => setError(message(e)));
   }, []);
 
-  const lookupAccount = useCallback(
-    async (account: string) => {
-      if (apiEnabled) return fetchAccountHolder(account);
-      await wait(LOOKUP_MS);
-      if (account.length < 6) return null;
-      const known = saved.find((r) => r.account === account);
-      if (known) return known.name;
-      const sum = [...account].reduce((acc, d) => acc + Number(d), 0);
-      return LOOKUP_NAMES[sum % LOOKUP_NAMES.length];
-    },
-    [saved],
-  );
-
   const keepTransfer = useCallback((transfer: Transfer) => {
     setTransfers((ts) => [transfer, ...ts.filter((t) => t.transferId !== transfer.transferId)]);
   }, []);
 
   const refreshTransfer = useCallback(
     async (transferId: string) => {
-      if (!apiEnabled) return null;
       const { balance: now, ...transfer } = await fetchTransfer(transferId);
       keepTransfer(transfer);
       setBalance(now);
@@ -347,43 +324,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const sendTransfer = useCallback(
     async (d: TransferDraft, transferId: string, password: string) => {
-      let transfer: Transfer;
-      if (apiEnabled) {
-        // The server checks the password, the balance and the recipient and records the transfer as PENDING; the fraud
-        // check then approves it (the money moves) or declines it. Wait a little for that before showing the receipt.
-        const { balance: now, ...requested } = await commands
-          .sendTransfer({ transferId, to: d.to, amount: d.amount, content: d.content, password })
-          .catch((e: unknown) => {
-            throw transferError(e);
-          });
-        transfer = requested;
-        setBalance(now);
-        for (let waited = 0; transfer.status === 'PENDING' && waited < DECISION_WAIT_MS; waited += DECISION_POLL_MS) {
-          await wait(DECISION_POLL_MS);
-          transfer = (await refreshTransfer(transferId).catch(() => null)) ?? transfer;
-        }
-      } else {
-        await wait(TRANSFER_MS);
-        if (password !== MOCK_PASSWORD) throw new TransferError('Incorrect password');
-        const now = new Date();
-        transfer = {
-          transferId,
-          reference: `FT${String(now.getTime()).slice(-10)}`,
-          to: d.to,
-          amount: d.amount,
-          fee: 0,
-          content: d.content,
-          status: 'POSTED',
-          declinedFor: [],
-          ts: now.toISOString(),
-        };
-        setBalance((b) => b - d.amount);
+      // The server checks the password, the balance and the recipient and records the transfer as PENDING; the fraud
+      // check then approves it (the money moves) or declines it. Wait a little for that before showing the receipt.
+      const { balance: now, ...requested } = await commands
+        .sendTransfer({ transferId, to: d.to, amount: d.amount, content: d.content, password })
+        .catch((e: unknown) => {
+          throw transferError(e);
+        });
+      let transfer: Transfer = requested;
+      setBalance(now);
+      for (let waited = 0; transfer.status === 'PENDING' && waited < DECISION_WAIT_MS; waited += DECISION_POLL_MS) {
+        await wait(DECISION_POLL_MS);
+        transfer = (await refreshTransfer(transferId).catch(() => null)) ?? transfer;
       }
       keepTransfer(transfer);
       if (d.save && transfer.status !== 'DECLINED') {
         const r = { account: d.to.account, name: d.to.name };
         setSaved((rs) => (rs.some((x) => sameRecipient(x, r)) ? rs : [r, ...rs]));
-        if (apiEnabled) commands.saveRecipient(r).catch(reloadSaved);
+        commands.saveRecipient(r).catch(reloadSaved);
       }
       return transfer;
     },
@@ -393,12 +351,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const removeSaved = useCallback(
     (recipient: Recipient) => {
       setSaved((rs) => rs.filter((r) => !sameRecipient(r, recipient)));
-      if (apiEnabled) commands.removeRecipient(recipient).catch(reloadSaved);
+      commands.removeRecipient(recipient).catch(reloadSaved);
     },
     [reloadSaved],
   );
-
-  const merchantsNearby = useCallback(() => (apiEnabled ? fetchMerchants() : Promise.resolve(PAY_MERCHANTS)), []);
 
   // Like sendTransfer: recorded PENDING, then wait a little for the fraud check before showing the result.
   const pay = useCallback(
@@ -409,22 +365,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       password: string,
       qr?: string,
     ): Promise<Payment> => {
-      if (!apiEnabled) {
-        await wait(TRANSFER_MS);
-        if (password !== MOCK_PASSWORD) throw new PaymentError('Incorrect password');
-        setBalance((b) => b - amount);
-        const now = new Date();
-        return {
-          paymentId,
-          reference: `CP${String(now.getTime()).slice(-10)}`,
-          merchant: merchant.name,
-          category: merchant.category,
-          amount,
-          status: 'POSTED',
-          declinedFor: [],
-          ts: now.toISOString(),
-        };
-      }
       let { balance: now, ...payment } = await commands
         .sendPayment({ paymentId, merchantId: merchant.merchantId, amount, password, qr })
         .catch((e: unknown) => {
@@ -455,6 +395,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       budget: effectiveBudget,
       frozen,
       balance,
+      held,
       accountNumber,
       saved,
       transfers,
@@ -463,10 +404,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       unfreezeCard,
       setBudget,
       setDraft,
-      lookupAccount,
+      lookupAccount: fetchAccountHolder,
       sendTransfer,
       refreshTransfer,
-      merchantsNearby,
+      merchantsNearby: fetchMerchants,
       pay,
       removeSaved,
     }),
@@ -483,6 +424,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       effectiveBudget,
       frozen,
       balance,
+      held,
       accountNumber,
       saved,
       transfers,
@@ -490,10 +432,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       freezeCard,
       unfreezeCard,
       setBudget,
-      lookupAccount,
       sendTransfer,
       refreshTransfer,
-      merchantsNearby,
       pay,
       removeSaved,
     ],

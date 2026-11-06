@@ -23,6 +23,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 const LOOK: Record<TransferStatus, (c: Colors) => { icon: IconName; title: string; tint: string; bg: string }> = {
   POSTED: (c) => ({ icon: 'checkmark', title: 'Transfer successful', tint: c.allow, bg: c.allowBg }),
   PENDING: (c) => ({ icon: 'hourglass-outline', title: 'Being checked', tint: c.stepUp, bg: c.stepUpBg }),
+  HELD: (c) => ({ icon: 'hourglass-outline', title: 'Waiting for bank confirmation', tint: c.stepUp, bg: c.stepUpBg }),
   DECLINED: (c) => ({ icon: 'close', title: 'Transfer declined', tint: c.decline, bg: c.declineBg }),
 };
 
@@ -71,7 +72,9 @@ export default function TransferDoneScreen() {
               <Text style={[styles.noteText, { color: c.text }]}>
                 {transfer.status === 'PENDING'
                   ? 'Our fraud check is still looking at this transfer. No money has left your account yet.'
-                  : `No money left your account. Reason: ${transfer.declinedFor.map(ruleTitle).join(', ')}.`}
+                  : transfer.status === 'HELD'
+                    ? 'Waiting for bank confirmation. No money has left your account; the amount is set aside.'
+                    : `No money left your account. Reason: ${transfer.declinedFor.map(ruleTitle).join(', ')}.`}
               </Text>
             </View>
           )}
@@ -94,7 +97,7 @@ export default function TransferDoneScreen() {
       </View>
 
       <FadeInUp delay={450} style={styles.actions}>
-        {transfer.status === 'PENDING' && (
+        {(transfer.status === 'PENDING' || transfer.status === 'HELD') && (
           <Button
             label={checking ? 'Checking…' : 'Check again'}
             icon="refresh"

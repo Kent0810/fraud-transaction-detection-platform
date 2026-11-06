@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { Client, mapping } from 'cassandra-driver';
 
 import type { CassandraConfig, Config } from '../../config';
@@ -20,19 +20,15 @@ export function createMapper(client: Client): mapping.Mapper {
 
 @Injectable()
 export class CassandraService implements OnModuleInit, OnApplicationShutdown {
-  private readonly log = new Logger(CassandraService.name);
   readonly client: Client;
   readonly mapper: mapping.Mapper;
 
-  constructor(@Inject(CONFIG) private readonly cfg: Config) {
+  constructor(@Inject(CONFIG) cfg: Config) {
     this.client = createClient(cfg);
     this.mapper = createMapper(this.client);
   }
 
   async onModuleInit(): Promise<void> {
-    this.log.log(
-      `connecting to cassandra ${this.cfg.contactPoints.join(',')}:${this.cfg.cassandraPort} (dc ${this.cfg.localDc}, keyspace ${this.cfg.keyspace})`,
-    );
     await this.client.connect();
   }
 

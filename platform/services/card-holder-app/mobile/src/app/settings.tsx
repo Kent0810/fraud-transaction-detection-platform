@@ -8,7 +8,7 @@ import { FadeInUp, stagger } from '@/components/motion';
 import { Button, SectionHeader, Surface } from '@/components/ui';
 import { useAuth, useUser } from '@/data/auth';
 import { useSettings, type Settings } from '@/data/settings';
-import { apiEnabled, apiUrl } from '@/data/http';
+import { apiUrl } from '@/data/http';
 import { useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
 
@@ -42,9 +42,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.name, { color: c.text }]}>{user.name}</Text>
               <Text style={[styles.muted, { color: c.muted }]}>{user.email}</Text>
-              <Text style={[styles.muted, { color: c.muted }]}>
-                Card •••• {user.cardId.slice(-4)} · member since {user.memberSince}
-              </Text>
+              <Text style={[styles.muted, { color: c.muted }]}>Card •••• {user.cardId.slice(-4)}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={c.muted} />
           </Surface>
@@ -112,14 +110,8 @@ export default function SettingsScreen() {
           <Row
             icon="document-text-outline"
             label="Card data"
-            detail={
-              apiEnabled
-                ? `Live from ${apiUrl} (queries: Cassandra, commands: Kafka)`
-                : 'Mock data (set EXPO_PUBLIC_API_URL to go live)'
-            }
+            detail={`Live from ${apiUrl} (queries: Cassandra, commands: Kafka)`}
           />
-          <Divider />
-          <Row icon="swap-horizontal-outline" label="Transfers, budget, merchants" detail="Mock data for now" />
         </Surface>
       </FadeInUp>
 

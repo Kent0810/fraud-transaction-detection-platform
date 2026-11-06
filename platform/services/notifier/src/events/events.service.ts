@@ -7,7 +7,6 @@ import { CONFIG } from '../config.module';
 import { KafkaService } from '../kafka/kafka.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  AlertMessage,
   type CardNoticeDto,
   CreditMessage,
   DecisionMessage,
@@ -15,8 +14,6 @@ import {
   SettlementMessage,
 } from './event.types';
 import { staffShouldSee } from './staff-feed';
-
-const ALERT_ONLY_RULES = new Set(['MOCK_REPEAT']);
 
 @Injectable()
 export class EventsService implements OnApplicationBootstrap {
@@ -48,10 +45,6 @@ export class EventsService implements OnApplicationBootstrap {
         this.parsed(DecisionMessage, 'decision', (d) => this.onDecision(d)),
       ),
       this.kafka.follow(
-        this.cfg.alertsTopic,
-        this.parsed(AlertMessage, 'alert', (a) => this.onAlert(a)),
-      ),
-      this.kafka.follow(
         this.cfg.settlementsTopic,
         this.parsed(SettlementMessage, 'settlement', (s) => this.onSettlement(s)),
       ),
@@ -77,32 +70,6 @@ export class EventsService implements OnApplicationBootstrap {
       firedRules: d.fired_rules,
     });
     return Promise.resolve();
-  }
-
-  private async onAlert(a: z.infer<typeof AlertMessage>): Promise<void> {
-    if (!ALERT_ONLY_RULES.has(a.rule_id)) return;
-    const t = await this.counterparty(a.txn_id);
-    this.ops.next({
-      txnId: a.txn_id,
-      cardId: a.card_id,
-      ts: a.ts,
-      merchant: t.name,
-      category: t.channel === 'TRANSFER' ? 'transfer' : t.category,
-      amount: a.amount,
-      currency: 'VND',
-      decision: 'ALLOW',
-      score: a.score,
-      firedRules: [a.rule_id],
-    });
-    this.toCard(a.card_id, {
-      kind: 'ALERT',
-      txnId: a.txn_id,
-      ts: a.ts,
-      channel: t.channel,
-      counterparty: t.name,
-      amount: a.amount,
-      reasons: [a.rule_id],
-    });
   }
 
   private async onSettlement(s: z.infer<typeof SettlementMessage>): Promise<void> {

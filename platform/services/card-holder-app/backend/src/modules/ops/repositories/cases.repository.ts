@@ -5,7 +5,14 @@ import { CassandraService } from '../../../shared/cassandra/cassandra.service';
 import { type AlertRow, iso, num, type TriageRow } from '../../../shared/cassandra/models';
 import { CardsRepository } from '../../cards/repositories/cards.repository';
 import type { Verdict } from '../../cards/types/cards.types';
-import type { ActivityDto, CaseAlertDto, FlaggedPaymentDto, QueueItemDto, ReviewStatus } from '../types/ops.types';
+import type {
+  ActivityDto,
+  CardStateDto,
+  CaseAlertDto,
+  FlaggedPaymentDto,
+  QueueItemDto,
+  ReviewStatus,
+} from '../types/ops.types';
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -51,6 +58,26 @@ export class CasesRepository {
       }))
       .sort((a, b) => b.priority - a.priority)
       .slice(0, limit);
+  }
+
+  /** The card's latest case row from today's or yesterday's queue partition; null when not flagged in two days. */
+  async caseFor(cardId: string): Promise<CardStateDto | null> {
+    const now = new Date();
+    const days = [bucket(now), bucket(new Date(now.getTime() - DAY_MS))];
+    const rows = (await Promise.all(days.map((b) => this.triage.get({ bucket: b, cardId })))).filter(
+      (r): r is TriageRow => r !== null,
+    );
+    const row = rows.sort((a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0))[0];
+    if (!row) return null;
+    return {
+      cardId: row.cardId,
+      riskScore: num(row.riskScore),
+      priority: num(row.priority),
+      amountSum: num(row.amountSum),
+      openAlerts: row.openAlerts ?? 0,
+      lastDecision: row.lastDecision as Verdict | null,
+      updatedAt: iso(row.updatedAt),
+    };
   }
 
   /**
@@ -102,6 +129,16 @@ export class CasesRepository {
     );
   }
 
+  /** All of one transaction's alerts, confirmed as fraud: an agent rejected the held transfer. */
+  async confirmTransactionAlerts(cardId: string, ts: Date, txnId: string): Promise<void> {
+    const rows = (await this.alerts.find({ cardId, ts })).toArray();
+    await Promise.all(
+      rows
+        .filter((r) => r.txnId === txnId && r.status !== 'CONFIRMED')
+        .map((r) => this.setAlertStatus(cardId, ts, r.alertId, 'CONFIRMED')),
+    );
+  }
+
   async setAlertStatus(cardId: string, ts: Date, alertId: string, status: ReviewStatus): Promise<void> {
     await this.alerts.update({ cardId, ts, alertId, status }, { ifExists: true });
   }
@@ -114,7 +151,7 @@ export class CasesRepository {
 
 function isFlagged(decision: Verdict, firedRules: string[]): boolean {
   if (firedRules.includes('FRAUD_RECIPIENT')) return true;
-  return decision !== 'ALLOW' && firedRules.some((r) => r !== 'R6');
+  return decision !== 'ALLOW' && firedRules.some((r) => r !== 'BLOCKED_RECIPIENT');
 }
 
 function toAlert(r: AlertRow): CaseAlertDto {

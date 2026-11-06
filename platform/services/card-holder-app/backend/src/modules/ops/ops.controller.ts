@@ -11,6 +11,7 @@ import { accountRecipient, merchantRecipient } from '../controls/types/recipient
 import { OpenCardCommand } from './handlers/commands/open-card.command';
 import { RemoveFraudMarkCommand } from './handlers/commands/remove-fraud-mark.command';
 import { ResolveFollowupCommand } from './handlers/commands/resolve-followup.command';
+import { ResolveHeldTransferCommand } from './handlers/commands/resolve-held-transfer.command';
 import { ReviewAlertCommand } from './handlers/commands/review-alert.command';
 import { SetCardFrozenCommand } from './handlers/commands/set-card-frozen.command';
 import { SetLoginEnabledCommand } from './handlers/commands/set-login-enabled.command';
@@ -20,6 +21,7 @@ import { GetAuditTrailQuery } from './handlers/queries/get-audit-trail.query';
 import { GetFlaggedPaymentsQuery } from './handlers/queries/get-flagged-payments.query';
 import { GetFollowupsQuery } from './handlers/queries/get-followups.query';
 import { GetFraudMarksQuery } from './handlers/queries/get-fraud-marks.query';
+import { GetHeldTransfersQuery } from './handlers/queries/get-held-transfers.query';
 import { GetQueueQuery } from './handlers/queries/get-queue.query';
 import { GetRecentCardsQuery } from './handlers/queries/get-recent-cards.query';
 import {
@@ -33,6 +35,8 @@ import {
   type FollowupDto,
   FollowupOutcomeRequest,
   type FraudMarkDto,
+  HeldOutcomeRequest,
+  type HeldTransferDto,
   Lookup,
   type LoginStatus,
   type QueueItemDto,
@@ -52,13 +56,14 @@ export class OpsController {
     private readonly queries: QueryBus,
   ) {}
 
-  @Staff('ANALYST')
+  // Both roles: agents confirm or reject the transfers held there.
+  @Staff()
   @Get('queue')
   queue(): Promise<QueueItemDto[]> {
     return this.queries.execute(new GetQueueQuery(100));
   }
 
-  @Staff('ANALYST')
+  @Staff()
   @Get('flagged-payments')
   flaggedPayments(): Promise<FlaggedPaymentDto[]> {
     return this.queries.execute(new GetFlaggedPaymentsQuery(24));
@@ -162,6 +167,27 @@ export class OpsController {
     @Body(new ZodPipe(FollowupOutcomeRequest)) { outcome, reason }: FollowupOutcomeRequest,
   ): Promise<void> {
     return this.commands.execute(new ResolveFollowupCommand(cardId, txnId, outcome, audit(staff, reason)));
+  }
+
+  @Staff()
+  @Get('held-transfers')
+  heldTransfers(
+    @Query('cardId', new ZodPipe(CardId.optional())) cardId: string | undefined,
+  ): Promise<HeldTransferDto[]> {
+    return this.queries.execute(new GetHeldTransfersQuery(cardId));
+  }
+
+  // Only agents: they ask the cardholder. Reject also freezes the card and marks the recipient.
+  @Staff('AGENT')
+  @Post('held-transfers/:cardId/:txnId')
+  @HttpCode(204)
+  resolveHeldTransfer(
+    @CurrentStaff() staff: StaffMember,
+    @Param('cardId', new ZodPipe(CardId)) cardId: string,
+    @Param('txnId', new ZodPipe(TxnId)) txnId: string,
+    @Body(new ZodPipe(HeldOutcomeRequest)) { outcome, reason }: HeldOutcomeRequest,
+  ): Promise<void> {
+    return this.commands.execute(new ResolveHeldTransferCommand(cardId, txnId, outcome, audit(staff, reason)));
   }
 
   @Staff()

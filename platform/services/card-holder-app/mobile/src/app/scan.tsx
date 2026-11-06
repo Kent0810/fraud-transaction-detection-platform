@@ -8,7 +8,7 @@ import { FadeInUp } from '@/components/motion';
 import { pickQrImage } from '@/components/qr-image';
 import { Button, IconBubble } from '@/components/ui';
 import { vnd } from '@/components/vnd';
-import { HttpError, apiEnabled } from '@/data/http';
+import { HttpError } from '@/data/http';
 import { resolveQr } from '@/data/queries';
 import type { QrTarget } from '@/data/types';
 import { radius, space, useColors } from '@/theme';
@@ -84,16 +84,6 @@ export default function ScanScreen() {
     if (payload) await open(payload);
     else setError('No QR code found in that picture.');
   };
-
-  if (!apiEnabled) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: c.muted, textAlign: 'center' }}>
-          Scanning needs the bank connection (demo data only).
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

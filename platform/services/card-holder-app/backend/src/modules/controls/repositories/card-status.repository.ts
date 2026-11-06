@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Prisma } from '@platform/db';
+import { declineHeld, type Prisma } from '@platform/db';
 
 import type { Config } from '../../../config';
 import { CONFIG } from '../../../config.module';
@@ -49,6 +49,8 @@ export class CardStatusRepository {
       data: { status: frozen ? 'FROZEN' : 'ACTIVE' },
     });
     if (changed.count === 0) return;
+    // A frozen card can't send money: anything held for an agent is declined now, and its money is free again.
+    if (frozen) await declineHeld(tx, cardId, 'FROZEN');
     await tx.outbox.createMany({
       data: {
         aggregate_type: this.cfg.controlTopic,

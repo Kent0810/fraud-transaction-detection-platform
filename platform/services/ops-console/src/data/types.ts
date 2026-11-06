@@ -21,7 +21,7 @@ export type RuleType = 'BLOCK' | 'ALLOW';
 export type LoginStatus = 'ACTIVE' | 'LOCKED' | 'DISABLED';
 
 // What the ledger did with an allowed transaction; null until it has, and for anything not allowed.
-export type PostingStatus = 'POSTED' | 'DECLINED';
+export type PostingStatus = 'HELD' | 'POSTED' | 'DECLINED';
 
 export type QueueItem = {
   cardId: string;
@@ -60,12 +60,26 @@ export type Activity = {
   category: string;
   amount: number;
   currency: string;
+  // Where a card payment was made; null for transfers.
+  merchLat: number | null;
+  merchLong: number | null;
   decision: Verdict;
   score: number;
   firedRules: string[];
   status: PostingStatus | null;
   declinedFor: string[];
   alerts: CaseAlert[];
+};
+
+/** A transfer held for an agent: no money has moved, and it is declined at heldUntil if nobody answers. */
+export type HeldTransfer = {
+  cardId: string;
+  txnId: string;
+  ts: string;
+  amount: number;
+  toName: string;
+  toAccount: string;
+  heldUntil: string;
 };
 
 export type RecipientRule = {

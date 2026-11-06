@@ -13,11 +13,14 @@ export type TxnDto = {
   category: string;
   amount: number;
   currency: string;
+  // Where a card payment was made; null for transfers.
+  merchLat: number | null;
+  merchLong: number | null;
   decision: Verdict;
   score: number;
   firedRules: string[];
-  // Null until the ledger has posted or declined it.
-  status: 'POSTED' | 'DECLINED' | null;
+  // Null until the ledger has posted or declined it; HELD while a stepped-up transfer waits for an agent.
+  status: 'HELD' | 'POSTED' | 'DECLINED' | null;
   declinedFor: string[];
 };
 
@@ -31,14 +34,4 @@ export type AlertDto = {
   amount: number;
   merchant: string;
   status: AlertStatus;
-};
-
-export type CardStateDto = {
-  cardId: string;
-  riskScore: number;
-  priority: number;
-  amountSum: number;
-  openAlerts: number;
-  lastDecision: Verdict | null;
-  updatedAt: string | null;
 };

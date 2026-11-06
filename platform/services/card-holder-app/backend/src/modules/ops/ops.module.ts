@@ -7,6 +7,7 @@ import { StaffGuard } from './guards/staff.guard';
 import { OpenCardHandler } from './handlers/command-handlers/open-card.handler';
 import { RemoveFraudMarkHandler } from './handlers/command-handlers/remove-fraud-mark.handler';
 import { ResolveFollowupHandler } from './handlers/command-handlers/resolve-followup.handler';
+import { ResolveHeldTransferHandler } from './handlers/command-handlers/resolve-held-transfer.handler';
 import { ReviewAlertHandler } from './handlers/command-handlers/review-alert.handler';
 import { SetCardFrozenHandler } from './handlers/command-handlers/set-card-frozen.handler';
 import { SetLoginEnabledHandler } from './handlers/command-handlers/set-login-enabled.handler';
@@ -18,6 +19,7 @@ import { GetAuditTrailHandler } from './handlers/query-handlers/get-audit-trail.
 import { GetFlaggedPaymentsHandler } from './handlers/query-handlers/get-flagged-payments.handler';
 import { GetFollowupsHandler } from './handlers/query-handlers/get-followups.handler';
 import { GetFraudMarksHandler } from './handlers/query-handlers/get-fraud-marks.handler';
+import { GetHeldTransfersHandler } from './handlers/query-handlers/get-held-transfers.handler';
 import { GetQueueHandler } from './handlers/query-handlers/get-queue.handler';
 import { GetRecentCardsHandler } from './handlers/query-handlers/get-recent-cards.handler';
 import { OpsAuthController } from './ops-auth.controller';
@@ -25,6 +27,7 @@ import { OpsController } from './ops.controller';
 import { CardholderFilesRepository } from './repositories/cardholder-files.repository';
 import { CasesRepository } from './repositories/cases.repository';
 import { FollowupsRepository } from './repositories/followups.repository';
+import { HeldTransfersRepository } from './repositories/held-transfers.repository';
 import { LoginsRepository } from './repositories/logins.repository';
 import { StaffRepository } from './repositories/staff.repository';
 
@@ -38,7 +41,10 @@ import { StaffRepository } from './repositories/staff.repository';
     CardholderFilesRepository,
     LoginsRepository,
     FollowupsRepository,
+    HeldTransfersRepository,
     ResolveFollowupHandler,
+    ResolveHeldTransferHandler,
+    GetHeldTransfersHandler,
     RemoveFraudMarkHandler,
     GetFollowupsHandler,
     GetFraudMarksHandler,

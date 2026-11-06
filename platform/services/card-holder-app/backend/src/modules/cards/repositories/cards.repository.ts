@@ -2,17 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { mapping } from 'cassandra-driver';
 
 import { CassandraService } from '../../../shared/cassandra/cassandra.service';
-import {
-  type AlertRow,
-  type CardStateRow,
-  iso,
-  num,
-  type Page,
-  pageOptions,
-  toPage,
-  type TxnRow,
-} from '../../../shared/cassandra/models';
-import type { AlertDto, AlertStatus, CardStateDto, Channel, TxnDto, Verdict } from '../types/cards.types';
+import { type AlertRow, iso, num, type Page, pageOptions, toPage, type TxnRow } from '../../../shared/cassandra/models';
+import type { AlertDto, AlertStatus, Channel, TxnDto, Verdict } from '../types/cards.types';
 
 type ByCard = { cardId: string };
 
@@ -21,9 +12,9 @@ const STAFF_ONLY_RULES = new Set(['FRAUD_RECIPIENT']);
 
 /** A transaction as its cardholder sees it. */
 export function forCardholder(t: TxnDto): TxnDto {
-  return { 
-    ...t, 
-    firedRules: t.firedRules.filter((r) => !STAFF_ONLY_RULES.has(r)) 
+  return {
+    ...t,
+    firedRules: t.firedRules.filter((r) => !STAFF_ONLY_RULES.has(r)),
   };
 }
 
@@ -31,13 +22,11 @@ export function forCardholder(t: TxnDto): TxnDto {
 export class CardsRepository {
   private readonly txns: mapping.ModelMapper<TxnRow>;
   private readonly alertRows: mapping.ModelMapper<AlertRow>;
-  private readonly states: mapping.ModelMapper<CardStateRow>;
   private readonly txnById: (doc: ByCard & { txnId: string }) => Promise<mapping.Result<TxnRow>>;
 
   constructor(db: CassandraService) {
     this.txns = db.mapper.forModel<TxnRow>('Txn');
     this.alertRows = db.mapper.forModel<AlertRow>('Alert');
-    this.states = db.mapper.forModel<CardStateRow>('CardState');
     this.txnById = this.txns.mapWithQuery(
       'SELECT * FROM txn_by_card WHERE card_id = ? AND txn_id = ? ALLOW FILTERING',
       (doc: ByCard & { txnId: string }) => [doc.cardId, doc.txnId],
@@ -82,20 +71,6 @@ export class CardsRepository {
         status: (r.status as AlertStatus | null) ?? 'OPEN',
       }));
   }
-
-  async cardState(cardId: string): Promise<CardStateDto | null> {
-    const row = await this.states.get({ cardId });
-    if (!row) return null;
-    return {
-      cardId: row.cardId,
-      riskScore: num(row.riskScore),
-      priority: num(row.priority),
-      amountSum: num(row.amountSum),
-      openAlerts: row.openAlerts ?? 0,
-      lastDecision: row.lastDecision as Verdict | null,
-      updatedAt: iso(row.updatedAt),
-    };
-  }
 }
 
 function toTxn(r: TxnRow): TxnDto {
@@ -109,10 +84,12 @@ function toTxn(r: TxnRow): TxnDto {
     category: r.category,
     amount: num(r.amount),
     currency: r.currency ?? 'VND',
+    merchLat: r.merchLat ?? null,
+    merchLong: r.merchLong ?? null,
     decision: (r.decision as Verdict | null) ?? 'ALLOW',
     score: num(r.score),
     firedRules: [...(r.firedRules ?? [])].sort(),
-    status: r.status === 'POSTED' || r.status === 'DECLINED' ? r.status : null,
+    status: r.status === 'HELD' || r.status === 'POSTED' || r.status === 'DECLINED' ? r.status : null,
     declinedFor: [...(r.declinedFor ?? [])].sort(),
   };
 }

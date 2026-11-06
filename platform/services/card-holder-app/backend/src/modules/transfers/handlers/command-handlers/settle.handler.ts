@@ -28,7 +28,6 @@ export class SettleHandler implements ICommandHandler<SettleCommand> {
       this.log.warn(`decision for unknown ${d.channel} ${d.txn_id} on card ${d.card_id}`);
       return false;
     }
-    this.log.log(`${d.channel} ${settled.reference} ${settled.status} ${settled.declined_for.join(',')}`);
     return true;
   }
 }

@@ -27,20 +27,20 @@ function look(n: CardNotice, c: Colors): { icon: IconName; tint: string; bg: str
         title: `+${money(n.amount)} received`,
         detail: `From ${n.counterparty}`,
       };
+    case 'HELD':
+      return {
+        icon: 'hourglass-outline',
+        tint: c.stepUp,
+        bg: c.stepUpBg,
+        title: `${what} waiting for bank confirmation · ${money(n.amount)}`,
+        detail: `To ${n.counterparty} · the amount is set aside`,
+      };
     case 'DECLINED':
       return {
         icon: 'close',
         tint: c.decline,
         bg: c.declineBg,
         title: `${what} declined · ${money(n.amount)}`,
-        detail: `${n.counterparty} · ${n.reasons.map(ruleTitle).join(', ')}`,
-      };
-    case 'ALERT':
-      return {
-        icon: 'shield-half',
-        tint: c.stepUp,
-        bg: c.stepUpBg,
-        title: `Check this ${what.toLowerCase()} · ${money(n.amount)}`,
         detail: `${n.counterparty} · ${n.reasons.map(ruleTitle).join(', ')}`,
       };
     default:

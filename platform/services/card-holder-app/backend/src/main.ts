@@ -19,7 +19,7 @@ async function bootstrap(): Promise<void> {
     throw e;
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: ['warn', 'error', 'fatal'] });
   app.enableCors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -28,7 +28,6 @@ async function bootstrap(): Promise<void> {
   });
   app.enableShutdownHooks();
   await app.listen(port, '0.0.0.0');
-  log.log(`listening on :${port}`);
 }
 
 void bootstrap();

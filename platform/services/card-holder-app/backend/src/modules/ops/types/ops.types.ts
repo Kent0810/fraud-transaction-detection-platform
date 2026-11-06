@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { StaffMember } from '../../../common/decorators/staff.decorator';
 import { Password, text } from '../../../common/validation';
-import type { CardStateDto, TxnDto, Verdict } from '../../cards/types/cards.types';
+import type { TxnDto, Verdict } from '../../cards/types/cards.types';
 import type { ControlsDto } from '../../controls/types/controls.types';
 import { RULE_TYPES } from '../../controls/types/controls.types';
 
@@ -52,6 +52,17 @@ export type LoginDto = {
   status: LoginStatus;
   failedLogins: number;
   lastLoginAt: string | null;
+};
+
+/** The card's case as the triage queue holds it: only while the card was flagged in the last two days. */
+export type CardStateDto = {
+  cardId: string;
+  riskScore: number;
+  priority: number;
+  amountSum: number;
+  openAlerts: number;
+  lastDecision: Verdict | null;
+  updatedAt: string | null;
 };
 
 export type CardViewDto = {
@@ -152,6 +163,23 @@ export const FollowupOutcomeRequest = z.object({
   reason: Reason,
 });
 export type FollowupOutcomeRequest = z.infer<typeof FollowupOutcomeRequest>;
+
+export const HeldOutcomeRequest = z.object({
+  outcome: z.enum(['CONFIRM', 'REJECT']),
+  reason: Reason,
+});
+export type HeldOutcomeRequest = z.infer<typeof HeldOutcomeRequest>;
+
+/** A transfer held for an agent: no money has moved, and it is declined at heldUntil if nobody answers. */
+export type HeldTransferDto = {
+  cardId: string;
+  txnId: string;
+  ts: string;
+  amount: number;
+  toName: string;
+  toAccount: string;
+  heldUntil: string;
+};
 
 export const TxnId = text(200);
 
