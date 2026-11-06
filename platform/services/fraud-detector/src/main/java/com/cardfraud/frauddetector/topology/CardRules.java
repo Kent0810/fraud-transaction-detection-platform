@@ -21,17 +21,23 @@ import com.cardfraud.frauddetector.rules.Spend;
 import com.cardfraud.frauddetector.rules.TransferHistory;
 import com.cardfraud.frauddetector.serde.JsonSerde;
 
-// Per-card state the rules read, keyed by card number like every input topic, so a card's control changes and its
-// transactions reach the same task in order:
+// Every state store of the topology. All but fraud-marks-store are keyed by card number like every input topic, so a
+// card's control changes and its transactions reach the same task in order:
+//   frozen-accounts     whether the card is frozen, from control     (FROZEN)
 //   blocked-recipients  recipients the card blocked, from control    (BLOCKED_RECIPIENT)
 //   budgets             the card's limit and period, from control    (BUDGET)
 //   spend-window        spent so far this day / week / month         (BUDGET)
 //   transfer-history    allowed transfers of the last 30 days        (AMOUNT_SPIKE)
+//   fraud-marks-store   recipients marked as fraud, bank-wide        (FRAUD_RECIPIENT)
+//   case-summaries      each card's running case                     (cases topic)
 final class CardRules {
+    static final String FROZEN_TABLE = "frozen-accounts";
     static final String BLOCKED_RECIPIENTS_TABLE = "blocked-recipients";
     static final String BUDGETS_TABLE = "budgets";
     static final String SPEND_TABLE = "spend-window";
     static final String TRANSFER_HISTORY_TABLE = "transfer-history";
+    static final String FRAUD_MARKS_TABLE = "fraud-marks-store";
+    static final String CASE_SUMMARIES_TABLE = "case-summaries";
 
     private static final Logger log = LoggerFactory.getLogger("fraud-detector");
 

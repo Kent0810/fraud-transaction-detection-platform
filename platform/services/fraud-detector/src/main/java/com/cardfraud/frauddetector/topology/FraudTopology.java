@@ -46,7 +46,7 @@ public final class FraudTopology {
         return control
                 .filter((cardId, event) -> event.isFreezeChange())
                 .mapValues(event -> event.freezes())
-                .toTable(Materialized.<String, Boolean, KeyValueStore<Bytes, byte[]>>as("frozen-accounts")
+                .toTable(Materialized.<String, Boolean, KeyValueStore<Bytes, byte[]>>as(CardRules.FROZEN_TABLE)
                         .withKeySerde(keys)
                         .withValueSerde(flags));
     }
@@ -114,7 +114,7 @@ public final class FraudTopology {
         GlobalKTable<String, FraudMark> fraudMarks = builder.globalTable(
                 cfg.fraudMarksTopic(),
                 Consumed.with(keys, JsonSerde.of(FraudMark.class)),
-                Materialized.<String, FraudMark, KeyValueStore<Bytes, byte[]>>as("fraud-marks-store")
+                Materialized.<String, FraudMark, KeyValueStore<Bytes, byte[]>>as(CardRules.FRAUD_MARKS_TABLE)
                         .withKeySerde(keys)
                         .withValueSerde(JsonSerde.of(FraudMark.class)));
 
@@ -160,7 +160,7 @@ public final class FraudTopology {
                 .groupByKey(Grouped.with(keys, decisionSerde))
                 .aggregate(() -> CaseSummary.EMPTY,
                         (cardId, d, summary) -> summary.update(cardId, d),
-                        Materialized.<String, CaseSummary, KeyValueStore<Bytes, byte[]>>as("case-summaries")
+                        Materialized.<String, CaseSummary, KeyValueStore<Bytes, byte[]>>as(CardRules.CASE_SUMMARIES_TABLE)
                                 .withKeySerde(keys)
                                 .withValueSerde(caseSerde))
                 .toStream()
