@@ -35,13 +35,3 @@ export type AlertDto = {
   merchant: string;
   status: AlertStatus;
 };
-
-export type CardStateDto = {
-  cardId: string;
-  riskScore: number;
-  priority: number;
-  amountSum: number;
-  openAlerts: number;
-  lastDecision: Verdict | null;
-  updatedAt: string | null;
-};

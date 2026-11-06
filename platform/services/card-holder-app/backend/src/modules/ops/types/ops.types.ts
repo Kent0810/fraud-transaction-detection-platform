@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { StaffMember } from '../../../common/decorators/staff.decorator';
 import { Password, text } from '../../../common/validation';
-import type { CardStateDto, TxnDto, Verdict } from '../../cards/types/cards.types';
+import type { TxnDto, Verdict } from '../../cards/types/cards.types';
 import type { ControlsDto } from '../../controls/types/controls.types';
 import { RULE_TYPES } from '../../controls/types/controls.types';
 
@@ -52,6 +52,17 @@ export type LoginDto = {
   status: LoginStatus;
   failedLogins: number;
   lastLoginAt: string | null;
+};
+
+/** The card's case as the triage queue holds it: only while the card was flagged in the last two days. */
+export type CardStateDto = {
+  cardId: string;
+  riskScore: number;
+  priority: number;
+  amountSum: number;
+  openAlerts: number;
+  lastDecision: Verdict | null;
+  updatedAt: string | null;
 };
 
 export type CardViewDto = {

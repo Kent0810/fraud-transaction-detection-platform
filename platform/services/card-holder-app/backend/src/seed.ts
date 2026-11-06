@@ -23,18 +23,13 @@ async function main(): Promise<void> {
   const mapper = createMapper(client);
   const txns = mapper.forModel('Txn');
   const alerts = mapper.forModel('Alert');
-  const states = mapper.forModel('CardState');
   const opts = { prepare: true };
 
-  for (const table of ['txn_by_card', 'alerts_by_card', 'card_state']) {
+  for (const table of ['txn_by_card', 'alerts_by_card']) {
     await client.execute(`DELETE FROM ${table} WHERE card_id = ?`, [cardId], opts);
   }
 
   const now = Date.now();
-  let flaggedSum = 0;
-  let openAlerts = 0;
-  let topScore = 0;
-  let topPriority = 0;
 
   for (const [minutes, txnId, merchant, category, amount, decision, score, rules] of TXNS) {
     const ts = new Date(now - minutes * 60_000);
@@ -56,24 +51,9 @@ async function main(): Promise<void> {
     for (const rule of rules) {
       const status = decision !== 'ALLOW' ? 'OPEN' : 'CLEARED';
       await alerts.insert({ cardId, ts, alertId: `${txnId}:${rule}`, txnId, ruleId: rule, score, amount: amt, status });
-      if (status === 'OPEN') openAlerts++;
-    }
-    if (decision !== 'ALLOW') {
-      flaggedSum += Number(amount);
-      topScore = Math.max(topScore, score);
-      topPriority = Math.max(topPriority, score * Number(amount));
     }
   }
 
-  await states.insert({
-    cardId,
-    riskScore: topScore,
-    priority: topPriority,
-    amountSum: types.BigDecimal.fromString(String(flaggedSum)),
-    openAlerts,
-    lastDecision: 'DECLINE',
-    updatedAt: new Date(now),
-  });
   await client.shutdown();
   console.log(`seeded ${TXNS.length} transactions for card ${cardId}`);
 }

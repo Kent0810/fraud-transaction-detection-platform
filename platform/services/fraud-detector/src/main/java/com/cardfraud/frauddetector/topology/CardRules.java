@@ -89,19 +89,16 @@ final class CardRules {
         return blocked.unblock(e.recipientId());
     }
 
-    // Screened transaction -> its decision (Rules.evaluate). Looks up the spend and the transfer history, and records
-    // the spend of every transaction not declined and the history of every transfer allowed. Still a processor: it
-    // reads each store and writes it back as one step, which the DSL's tables can't do.
     static final class Evaluator implements FixedKeyProcessor<String, Screened, Decision> {
         private FixedKeyProcessorContext<String, Decision> context;
-        private KeyValueStore<String, Spend> spend;
-        private KeyValueStore<String, TransferHistory> transfers;
+        private KeyValueStore<String, Spend> spendKeyValueStore;
+        private KeyValueStore<String, TransferHistory> transferKeyValueStore;
 
         @Override
         public void init(FixedKeyProcessorContext<String, Decision> context) {
             this.context = context;
-            spend = context.getStateStore(SPEND_TABLE);
-            transfers = context.getStateStore(TRANSFER_HISTORY_TABLE);
+            spendKeyValueStore = context.getStateStore(SPEND_TABLE);
+            transferKeyValueStore = context.getStateStore(TRANSFER_HISTORY_TABLE);
         }
 
         @Override
@@ -109,12 +106,12 @@ final class CardRules {
             String cardId = record.key();
             Screened screened = record.value();
             Transaction txn = screened.txn();
-            Spend spent = spend.get(cardId);
+            Spend spent = spendKeyValueStore.get(cardId);
             if (spent == null) {
                 spent = Spend.NONE;
             }
             long at = (long) Math.floor(txn.tsEpoch());
-            TransferHistory history = transfers.get(cardId);
+            TransferHistory history = transferKeyValueStore.get(cardId);
             if (history == null) {
                 history = TransferHistory.NONE;
             }
@@ -123,11 +120,11 @@ final class CardRules {
             long spentInPeriod = screened.budget() == null ? 0 : spent.in(screened.budget().period(), at);
             Decision d = Rules.evaluate(cardId, screened, spentInPeriod, history);
             if (d.decision() != Decision.Verdict.DECLINE) {
-                spend.put(cardId, spent.add(at, txn.amt()));
+                spendKeyValueStore.put(cardId, spent.add(at, txn.amt()));
             }
-            // A held transfer does not raise the card's normal.
+
             if (Transaction.TRANSFER.equals(txn.channel()) && d.decision() == Decision.Verdict.ALLOW) {
-                transfers.put(cardId, history.add(at, txn.amt()));
+                transferKeyValueStore.put(cardId, history.add(at, txn.amt()));
             }
             context.forward(record.withValue(d));
         }

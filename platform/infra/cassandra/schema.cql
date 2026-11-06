@@ -46,17 +46,6 @@ CREATE TABLE IF NOT EXISTS alerts_by_card (
   AND default_time_to_live = 7776000;
 
 -- cases topic
-CREATE TABLE IF NOT EXISTS card_state (
-  card_id        text PRIMARY KEY,
-  risk_score     double,
-  priority       double,
-  amount_sum     decimal,
-  open_alerts    int,
-  last_decision  text,
-  updated_at     timestamp
-);
-
--- cases topic
 CREATE TABLE IF NOT EXISTS triage_queue (
   bucket         text,   -- UTC day, e.g. 2026-10-20
   card_id        text,
