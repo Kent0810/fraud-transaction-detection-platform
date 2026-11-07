@@ -15,7 +15,7 @@ public final class Rules {
     public static final String FROZEN = "FROZEN";
     // The recipient is on this card's blacklist: the cardholder asked for that, so there is nothing for an analyst to judge.
     public static final String BLOCKED_RECIPIENT = "BLOCKED_RECIPIENT";
-    // The recipient carries a bank-wide fraud mark: the money still moves, and an analyst looks at the sender.
+    // The recipient carries a bank-wide fraud mark: a transfer is held for an agent, a card payment is declined.
     public static final String FRAUD_RECIPIENT = "FRAUD_RECIPIENT";
     // A transfer at least SPIKE_FACTOR times the card's average transfer of the last 30 days: held for an agent.
     public static final String AMOUNT_SPIKE = "AMOUNT_SPIKE";
@@ -30,8 +30,8 @@ public final class Rules {
             BLOCKED_RECIPIENT, 1.0,
             // Between STEP_UP_AT and DECLINE_AT: on its own the transfer is held, not declined.
             AMOUNT_SPIKE, 0.5,
-            // Below STEP_UP_AT: a fraud mark alone flags the payment and never stops it. Above 0: it ranks in the queue.
-            FRAUD_RECIPIENT, 0.3);
+            // Between STEP_UP_AT and DECLINE_AT: on its own, a transfer is held and a card payment declined.
+            FRAUD_RECIPIENT, 0.5);
 
     public static final long SPIKE_FACTOR = 20;
     // Fewer past transfers than this and the card has no normal yet: AMOUNT_SPIKE is skipped.
