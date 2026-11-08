@@ -19,6 +19,8 @@ export type Controls = {
 
 export const fetchTransactions = () => request<Txn[]>('GET', '/me/transactions?limit=100');
 
+export const fetchTransaction = (txnId: string) => request<Txn>('GET', `/me/transactions/${encodeURIComponent(txnId)}`);
+
 export const fetchAlerts = () => request<Alert[]>('GET', '/me/alerts?limit=100');
 
 export type Balance = {

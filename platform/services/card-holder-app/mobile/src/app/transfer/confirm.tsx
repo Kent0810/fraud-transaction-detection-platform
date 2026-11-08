@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { type NativeStackNavigationProp, useNavigation } from 'expo-router';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -11,14 +11,10 @@ import { newTransferId } from '@/data/commands';
 import { TransferError, useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
 
-// The root stack's routes this screen resets to.
-type Routes = { '(tabs)': undefined; 'transfer/done': { transferId: string } };
-
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function ConfirmTransferScreen() {
   const c = useColors();
-  const navigation = useNavigation<NativeStackNavigationProp<Routes>>();
   const { draft, accountNumber, sendTransfer, setDraft } = useStore();
   const [password, setPassword] = useState('');
   const [reveal, setReveal] = useState(false);
@@ -46,12 +42,11 @@ export default function ConfirmTransferScreen() {
     setError(null);
     try {
       const transfer = await sendTransfer(draft, transferId, password);
-      setDraft(null);
       // Home, then the receipt: back from the receipt goes Home, not to the finished transfer's form.
-      navigation.reset({
-        index: 1,
-        routes: [{ name: '(tabs)' }, { name: 'transfer/done', params: { transferId: transfer.transferId } }],
-      });
+      // Leave first, then drop the draft, so this screen never renders its empty state on the way out.
+      router.dismissTo('/');
+      router.push({ pathname: '/transfer/done', params: { transferId: transfer.transferId } });
+      setDraft(null);
     } catch (e) {
       setError(e instanceof TransferError ? e.message : `Could not send: ${message(e)}`);
       setPassword('');

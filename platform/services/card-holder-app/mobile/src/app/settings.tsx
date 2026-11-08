@@ -8,7 +8,6 @@ import { FadeInUp, stagger } from '@/components/motion';
 import { Button, SectionHeader, Surface } from '@/components/ui';
 import { useAuth, useUser } from '@/data/auth';
 import { useSettings, type Settings } from '@/data/settings';
-import { apiUrl } from '@/data/http';
 import { useStore } from '@/data/store';
 import { radius, space, useColors } from '@/theme';
 
@@ -106,12 +105,6 @@ export default function SettingsScreen() {
         <SectionHeader title="About" />
         <Surface style={styles.group}>
           <Row icon="information-circle-outline" label="Version" detail="1.0.0 · demo build" />
-          <Divider />
-          <Row
-            icon="document-text-outline"
-            label="Card data"
-            detail={`Live from ${apiUrl} (queries: Cassandra, commands: Kafka)`}
-          />
         </Surface>
       </FadeInUp>
 

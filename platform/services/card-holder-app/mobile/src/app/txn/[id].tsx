@@ -1,11 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { category, categoryIcon, day, money, time } from '@/components/format';
 import { Empty, IconBubble, SectionHeader, StatusPill, Surface, useVerdictTone } from '@/components/ui';
+import { fetchTransaction } from '@/data/queries';
 import { RULE_TEXT } from '@/data/rules';
 import { useStore } from '@/data/store';
+import type { Txn } from '@/data/types';
 import { space, useColors } from '@/theme';
 
 export default function TxnScreen() {
@@ -13,9 +16,39 @@ export default function TxnScreen() {
   const tones = useVerdictTone();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { transactions } = useStore();
-  const txn = transactions.find((t) => t.txnId === id);
+  const listed = transactions.find((t) => t.txnId === id);
+  const inList = listed !== undefined;
+  // The store holds only the latest 100: an older one, e.g. opened from an alert, is fetched on its own.
+  const [fetched, setFetched] = useState<Txn | null>(null);
+  const [missing, setMissing] = useState(false);
 
+  useEffect(() => {
+    if (inList || !id) {
+      return;
+    }
+    let live = true;
+    fetchTransaction(id).then(
+      (t) => {
+        if (live) {
+          setFetched(t);
+        }
+      },
+      () => {
+        if (live) {
+          setMissing(true);
+        }
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [id, inList]);
+
+  const txn = listed ?? fetched;
   if (!txn) {
+    if (!missing) {
+      return <ActivityIndicator color={c.primary} style={{ marginTop: space.xxl }} />;
+    }
     return <Empty icon="search" title="Transaction not found" detail="History goes back 90 days." />;
   }
 

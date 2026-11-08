@@ -16,7 +16,7 @@ cd ../../services/batch-loader && uv lock --exclude-newer "<7 days ago, RFC 3339
 cd ../.. && docker compose up -d --build
 ```
 
-Metabase: http://localhost:3001 → Add database → BigQuery → upload `secrets/gcp-sa-reporting.json`, dataset `fraud_mart`.
+Metabase: http://localhost:3001, set up as in `../metabase/README.md`.
 
 ## Layout
 

@@ -56,14 +56,14 @@ export class OpsController {
     private readonly queries: QueryBus,
   ) {}
 
-  // Both roles: agents confirm or reject the transfers held there.
-  @Staff()
+  // Analysts only: agents get confirmed fraud through follow-ups and resolve held transfers on the card page.
+  @Staff('ANALYST')
   @Get('queue')
   queue(): Promise<QueueItemDto[]> {
     return this.queries.execute(new GetQueueQuery(100));
   }
 
-  @Staff()
+  @Staff('ANALYST')
   @Get('flagged-payments')
   flaggedPayments(): Promise<FlaggedPaymentDto[]> {
     return this.queries.execute(new GetFlaggedPaymentsQuery(24));

@@ -70,7 +70,7 @@ export function Followups({ role }: { role: StaffRole }) {
       {error && <p className="error banner">{error}</p>}
 
       <div className="panel">
-        <h2>Waiting for a call ({pending.length})</h2>
+        <h2>Calls to make ({pending.length})</h2>
         {pending.length === 0 ? (
           <p className="muted small">{followups ? 'Nothing is waiting.' : 'Loading…'}</p>
         ) : (
@@ -114,12 +114,12 @@ export function Followups({ role }: { role: StaffRole }) {
       </div>
 
       <div className="panel">
-        <h2>Outcomes</h2>
+        <h2>Call results</h2>
         {closed.length === 0 ? <p className="muted small">No calls recorded yet.</p> : <FollowupTable rows={closed} />}
       </div>
 
       <div className="panel">
-        <h2>Recipients marked as fraud ({marks.length})</h2>
+        <h2>Fraud-flagged recipients, all cards ({marks.length})</h2>
         {marks.length === 0 ? (
           <p className="muted small">No recipient is marked.</p>
         ) : (
