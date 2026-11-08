@@ -1,7 +1,7 @@
 import { type FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { PostingBadge, RuleChip, VerdictBadge } from '../components/Badges';
-import { type Bucket, Gauge, type Series, StackedColumns } from '../components/Charts';
+import { type Bucket, Gauge, type Place, PlaceMap, type Series, StackedColumns } from '../components/Charts';
 import { Icon, type IconName } from '../components/Icons';
 import { ReasonAction } from '../components/Reason';
 import * as api from '../data/api';
@@ -37,6 +37,11 @@ const RANGES = [7, 30, 90];
 
 // The Cassandra sink and the outbox relay take a moment; re-read after a change or a live alert for this card.
 const SETTLE_MS = 2_500;
+
+// What reviewing a held transfer's alerts does: the backend decides the transfer as an agent's answer would.
+const HELD_FRAUD_NOTE =
+  'This transfer is held: it is declined, the card is frozen and the recipient is marked as fraud for the whole bank.';
+const HELD_CLEAR_NOTE = 'This transfer is held: it posts now and all its alerts close as cleared.';
 
 const SERIES: Series[] = [
   { key: 'ALLOW', label: 'Allowed', color: 'var(--c-allow)' },
@@ -141,7 +146,7 @@ export function Card({ cardId }: { cardId: string }) {
 
   // Card-payment locations, most used first. Transfers carry none.
   const places = useMemo(() => {
-    const m = new Map<string, { key: string; merchant: string; lat: number; long: number; count: number }>();
+    const m = new Map<string, Place>();
     for (const t of activity ?? []) {
       if (t.channel !== 'CARD' || t.merchLat === null || t.merchLong === null) continue;
       const key = `${t.merchant}|${t.merchLat.toFixed(3)}|${t.merchLong.toFixed(3)}`;
@@ -149,7 +154,7 @@ export function Card({ cardId }: { cardId: string }) {
       p.count++;
       m.set(key, p);
     }
-    return [...m.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+    return [...m.values()].sort((a, b) => b.count - a.count).slice(0, 50);
   }, [activity]);
 
   const buckets = useMemo<Bucket[]>(() => {
@@ -220,8 +225,16 @@ export function Card({ cardId }: { cardId: string }) {
     await api.reviewAlert(cardId, alert, status, reason);
   }
 
-  async function reviewAll(alerts: CaseAlert[], status: 'CONFIRMED' | 'CLEARED', reason: string | null) {
-    for (const a of alerts) await review(a, status, reason);
+  // A held transfer is decided by its first review, which closes all its alerts, so only that one is sent.
+  async function reviewAll(
+    t: { status: string | null },
+    alerts: CaseAlert[],
+    status: 'CONFIRMED' | 'CLEARED',
+    reason: string | null,
+  ) {
+    for (const a of t.status === 'HELD' ? alerts.slice(0, 1) : alerts) {
+      await review(a, status, reason);
+    }
     await loadActivity();
   }
 
@@ -383,17 +396,24 @@ export function Card({ cardId }: { cardId: string }) {
       {places.length > 0 && (
         <div className="places">
           <b>Where this card paid</b> <span className="muted">(card payments in the last {days} days)</span>
-          <ul>
-            {places.map((p) => (
-              <li key={p.key}>
-                {p.merchant} ·{' '}
-                <span className="mono">
-                  {p.lat.toFixed(3)}, {p.long.toFixed(3)}
-                </span>
-                {p.count > 1 && <span className="muted"> · {p.count} payments</span>}
-              </li>
-            ))}
-          </ul>
+          <PlaceMap
+            places={places}
+            caption={`Where this card paid in the last ${days} days: ${places.length} places, dot size by number of payments`}
+          />
+          <details>
+            <summary>As a list</summary>
+            <ul>
+              {places.map((p) => (
+                <li key={p.key}>
+                  {p.merchant} ·{' '}
+                  <span className="mono">
+                    {p.lat.toFixed(3)}, {p.long.toFixed(3)}
+                  </span>
+                  {p.count > 1 && <span className="muted"> · {p.count} payments</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
         </div>
       )}
 
@@ -592,7 +612,7 @@ export function Card({ cardId }: { cardId: string }) {
                             </div>
                           </td>
                           <td className="actions" onClick={(e) => e.stopPropagation()}>
-                            {!isAgent && open.length > 0 && t.status !== 'HELD' && (
+                            {!isAgent && open.length > 0 && (
                               <>
                                 <ReasonAction
                                   label="Fraud"
@@ -601,12 +621,16 @@ export function Card({ cardId }: { cardId: string }) {
                                   description={
                                     <PaymentSummary
                                       t={t}
-                                      note={`${open.length} open ${open.length === 1 ? 'alert' : 'alerts'} will be marked as fraud, and an agent will call the cardholder to confirm.`}
+                                      note={
+                                        t.status === 'HELD'
+                                          ? HELD_FRAUD_NOTE
+                                          : `${open.length} open ${open.length === 1 ? 'alert' : 'alerts'} will be marked as fraud, and an agent will call the cardholder to confirm.`
+                                      }
                                     />
                                   }
                                   icon="shield"
                                   tone="danger"
-                                  onRun={(r) => reviewAll(open, 'CONFIRMED', r)}
+                                  onRun={(r) => reviewAll(t, open, 'CONFIRMED', r)}
                                 />
                                 <ReasonAction
                                   label="Clear"
@@ -615,11 +639,15 @@ export function Card({ cardId }: { cardId: string }) {
                                   description={
                                     <PaymentSummary
                                       t={t}
-                                      note="The payment was genuine; the alerts close as cleared."
+                                      note={
+                                        t.status === 'HELD'
+                                          ? HELD_CLEAR_NOTE
+                                          : 'The payment was genuine; the alerts close as cleared.'
+                                      }
                                     />
                                   }
                                   icon="check"
-                                  onRun={(r) => reviewAll(open, 'CLEARED', r)}
+                                  onRun={(r) => reviewAll(t, open, 'CLEARED', r)}
                                 />
                               </>
                             )}
@@ -710,17 +738,24 @@ export function Card({ cardId }: { cardId: string }) {
                                               label="Fraud"
                                               confirm="Confirm fraud"
                                               title={`Confirm ${a.ruleId} as fraud?`}
-                                              description={<p>An agent will call the cardholder to confirm.</p>}
+                                              description={
+                                                <p>
+                                                  {t.status === 'HELD'
+                                                    ? HELD_FRAUD_NOTE
+                                                    : 'An agent will call the cardholder to confirm.'}
+                                                </p>
+                                              }
                                               icon="shield"
                                               tone="danger"
-                                              onRun={(r) => reviewAll([a], 'CONFIRMED', r)}
+                                              onRun={(r) => reviewAll(t, [a], 'CONFIRMED', r)}
                                             />
                                             <ReasonAction
                                               label="Clear"
                                               confirm="Clear alert"
                                               title={`Clear ${a.ruleId}?`}
+                                              description={t.status === 'HELD' ? <p>{HELD_CLEAR_NOTE}</p> : undefined}
                                               icon="check"
-                                              onRun={(r) => reviewAll([a], 'CLEARED', r)}
+                                              onRun={(r) => reviewAll(t, [a], 'CLEARED', r)}
                                             />
                                           </span>
                                         )}

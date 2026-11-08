@@ -22,6 +22,7 @@
   --c-allow: #2f6db3;
   --c-step: #c27a0e;
   --c-decline: #b8372e;
+  --c-place: #1f8a8a;
   --side: #0f2236;
   --side-2: #16304a;
   --side-ink: #e6eef6;
@@ -1101,6 +1102,54 @@ table.grid {
   margin: 6px 0 0;
   padding-left: 18px;
   font-size: 0.86rem;
+}
+.places details {
+  margin-top: 6px;
+  font-size: 0.8rem;
+}
+.places summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.placemap {
+  max-width: 640px;
+  margin-top: 8px;
+}
+.placemap-plot {
+  position: relative;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.placemap-plot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.placemap-grid line {
+  stroke: var(--rule);
+  stroke-dasharray: 3 3;
+}
+.placemap-grid text {
+  font: 10px var(--mono);
+  fill: var(--muted);
+}
+.placemap-dot circle:not(.hit) {
+  fill: var(--c-place);
+  fill-opacity: 0.85;
+  stroke: var(--card);
+  stroke-width: 2;
+}
+.placemap-dot .hit {
+  fill: transparent;
+}
+.placemap-dot {
+  cursor: pointer;
+  outline: none;
+}
+.placemap-dot.hot circle:not(.hit) {
+  fill-opacity: 1;
+  stroke: var(--ink);
 }
 .chips {
   display: flex;

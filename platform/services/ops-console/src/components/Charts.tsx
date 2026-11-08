@@ -192,3 +192,121 @@ export function Spark({ values, height = 28 }: { values: number[]; height?: numb
     </svg>
   );
 }
+
+export type Place = { key: string; merchant: string; lat: number; long: number; count: number };
+
+/**
+ * Where a card paid, as dots at their longitude and latitude (east-west distance corrected for latitude, so the
+ * shape is true), sized by how many payments were made there. Hover or focus a dot for its merchant.
+ */
+export function PlaceMap({ places, caption }: { places: Place[]; caption: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const W = 640;
+  const PAD = 28;
+
+  const lats = places.map((p) => p.lat);
+  const longs = places.map((p) => p.long);
+  const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const kx = Math.cos((midLat * Math.PI) / 180);
+  // At least 0.1° each way, so one place or a tight cluster still sits in a readable frame.
+  const spanLat = Math.max(Math.max(...lats) - Math.min(...lats), 0.1);
+  const spanLong = Math.max(Math.max(...longs) - Math.min(...longs), 0.1);
+  // As tall as the places' true shape needs, within reason.
+  const H = Math.round(Math.min(320, Math.max(200, (spanLat / (spanLong * kx)) * (W - 2 * PAD) + 2 * PAD)));
+  const scale = Math.min((W - 2 * PAD) / (spanLong * kx), (H - 2 * PAD) / spanLat);
+  const cLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const cLong = (Math.min(...longs) + Math.max(...longs)) / 2;
+  const x = (long: number) => W / 2 + (long - cLong) * kx * scale;
+  const y = (lat: number) => H / 2 - (lat - cLat) * scale;
+
+  // Graticule: per axis, the round step that gives at most `lines` lines across the frame.
+  const grid = (from: number, to: number, lines: number) => {
+    const step = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10].find((s) => (to - from) / s <= lines) ?? 20;
+    const digits = step < 0.1 ? 2 : step < 1 ? 1 : 0;
+    const out: { v: number; label: string }[] = [];
+    for (let v = Math.ceil(from / step) * step; v <= to; v += step) out.push({ v, label: `${v.toFixed(digits)}°` });
+    return out;
+  };
+  // No label where it would be clipped by the right edge or run into the longitude labels along the bottom.
+  const longTicks = grid(cLong - W / 2 / (kx * scale), cLong + W / 2 / (kx * scale), 6).map((t) => ({
+    ...t,
+    label: x(t.v) > W - 40 ? '' : t.label,
+  }));
+  const latTicks = grid(cLat - H / 2 / scale, cLat + H / 2 / scale, 5).map((t) => ({
+    ...t,
+    label: y(t.v) > H - 22 || y(t.v) < 14 ? '' : t.label,
+  }));
+
+  const maxCount = Math.max(...places.map((p) => p.count), 1);
+  const r = (count: number) => 4 + 6 * Math.sqrt(count / maxCount);
+  // Big dots first, so a small one on top of a big one can still be hovered.
+  const order = places.map((_, i) => i).sort((a, b) => places[b].count - places[a].count);
+  const active = hover === null ? null : places[hover];
+
+  return (
+    <figure className="chart placemap" onMouseLeave={() => setHover(null)}>
+      <div className="placemap-plot">
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={caption}>
+          <g className="placemap-grid" aria-hidden>
+            {longTicks.map(({ v, label }) => (
+              <g key={`x${v}`}>
+                <line x1={x(v)} x2={x(v)} y1={0} y2={H} />
+                <text x={x(v) + 4} y={H - 6}>
+                  {label}
+                </text>
+              </g>
+            ))}
+            {latTicks.map(({ v, label }) => (
+              <g key={`y${v}`}>
+                <line x1={0} x2={W} y1={y(v)} y2={y(v)} />
+                <text x={4} y={y(v) - 4}>
+                  {label}
+                </text>
+              </g>
+            ))}
+          </g>
+          {order.map((i) => {
+            const p = places[i];
+            return (
+              <g
+                key={p.key}
+                className={`placemap-dot${hover === i ? ' hot' : ''}`}
+                tabIndex={0}
+                aria-label={`${p.merchant}, ${p.count} payment${p.count > 1 ? 's' : ''}`}
+                onMouseEnter={() => setHover(i)}
+                onFocus={() => setHover(i)}
+                onBlur={() => setHover(null)}
+              >
+                <circle cx={x(p.long)} cy={y(p.lat)} r={Math.max(r(p.count) + 6, 12)} className="hit" />
+                <circle cx={x(p.long)} cy={y(p.lat)} r={r(p.count)} />
+              </g>
+            );
+          })}
+        </svg>
+        {active && hover !== null && (
+          <div
+            className="tip"
+            style={{
+              left: `${(x(active.long) / W) * 100}%`,
+              top: `${(y(active.lat) / H) * 100}%`,
+              transform: `translate(${x(active.long) > W / 2 ? 'calc(-100% - 14px)' : '14px'}, -50%)`,
+            }}
+          >
+            <strong>{active.merchant}</strong>
+            <div className="tip-row">
+              <span>Payments</span>
+              <b>{active.count}</b>
+            </div>
+            <div className="tip-row">
+              <span>Lat, long</span>
+              <b className="mono">
+                {active.lat.toFixed(3)}, {active.long.toFixed(3)}
+              </b>
+            </div>
+          </div>
+        )}
+      </div>
+      <figcaption className="sr-only">{caption}</figcaption>
+    </figure>
+  );
+}
