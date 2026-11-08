@@ -1,15 +1,13 @@
 export const RULE_TEXT: Record<string, { title: string; detail: string }> = {
-  R1: { title: 'Many payments at once', detail: '5 or more payments on your card within a minute.' },
-  R3: { title: 'Impossible travel', detail: 'In-person payments too far apart to travel between in time.' },
-  R4: { title: 'New location burst', detail: 'Several payments right after first use in a new state.' },
-  R5: { title: 'High-risk category', detail: 'A large payment in a category often targeted by fraud.' },
-  BLOCKED_RECIPIENT: { title: 'Blocked recipient', detail: 'You asked the bank to block this recipient.' },
-  BUDGET: { title: 'Over budget', detail: 'This payment takes you past your budget.' },
-  FROZEN: { title: 'Card frozen', detail: 'You froze this card, so the payment was declined.' },
-  AMOUNT_SPIKE: {
-    title: 'Unusually large transfer',
-    detail: 'Much larger than what you usually spend, so the bank confirms it with you first.',
+  R1: { title: 'Card frozen', detail: 'You froze this card, so the payment was declined.' },
+  R2: { title: 'Blocked recipient', detail: 'You asked the bank to block this recipient.' },
+  R4: {
+    title: 'Unusually large amount',
+    detail: 'Much larger than what you usually spend: a transfer waits for the bank to confirm it with you.',
   },
+  R5: { title: 'Many payments at once', detail: '5 or more payments on your card within an hour.' },
+  R6: { title: 'Impossible travel', detail: 'In-person payments too far apart to travel between in time.' },
+  R7: { title: 'Over budget', detail: 'This payment takes you past your budget.' },
   REJECTED_BY_BANK: { title: 'Rejected by the bank', detail: 'You told us you did not make this transfer.' },
   NOT_CONFIRMED: {
     title: 'Not confirmed in time',

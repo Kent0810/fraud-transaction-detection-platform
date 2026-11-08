@@ -423,7 +423,7 @@ export function Card({ cardId }: { cardId: string }) {
       {frozen && (
         <div className="frozen-banner">
           <Icon name="snow" size={16} />
-          This card is frozen. Every payment on it is declined with rule FROZEN.
+          This card is frozen. Every payment on it is declined with rule R1.
         </div>
       )}
 

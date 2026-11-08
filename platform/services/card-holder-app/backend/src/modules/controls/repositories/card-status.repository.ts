@@ -50,7 +50,7 @@ export class CardStatusRepository {
     });
     if (changed.count === 0) return;
     // A frozen card can't send money: anything held for an agent is declined now, and its money is free again.
-    if (frozen) await declineHeld(tx, cardId, 'FROZEN');
+    if (frozen) await declineHeld(tx, cardId);
     await tx.outbox.createMany({
       data: {
         aggregate_type: this.cfg.controlTopic,

@@ -7,7 +7,7 @@ import type { HeldTransferDto } from '../types/ops.types';
 
 type Transaction = Omit<TransactionState, 'balance'>;
 
-/** Transfers held for an agent (AMOUNT_SPIKE). PostgreSQL is the record: the money waits on its status. */
+/** Transfers held for an agent (R3, R4). PostgreSQL is the record: the money waits on its status. */
 @Injectable()
 export class HeldTransfersRepository {
   constructor(private readonly db: PrismaService) {}

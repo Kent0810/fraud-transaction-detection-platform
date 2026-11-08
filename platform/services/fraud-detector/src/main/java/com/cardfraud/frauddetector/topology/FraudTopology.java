@@ -107,8 +107,10 @@ public final class FraudTopology {
 
         // 0d. What each card has spent, for the budget rule in step 2. CardRules.Evaluator reads and updates it.
         CardRules.addSpendStore(builder, keys);
-        // 0e. Each card's allowed payments and transfers of the last 30 days, for AMOUNT_SPIKE. Also read and updated there.
+        // 0e. Each card's allowed payments and transfers of the last 30 days, for R4 (amount spike). Also read and updated there.
         CardRules.addPaymentHistoryStore(builder, keys);
+        // 0e'. Each card's recent payments and last in-person place, for R5 and R6.
+        CardRules.addCardActivityStore(builder, keys);
 
         // 0f. Recipients confirmed as fraud, bank-wide. Keyed by recipient, not card, so every task needs all of them.
         GlobalKTable<String, FraudMark> fraudMarks = builder.globalTable(
@@ -145,7 +147,8 @@ public final class FraudTopology {
                         (screened, blocked) -> screened.withBlockedRecipients(blocked))
                 .leftJoin(budgets, 
                         (screened, budget) -> screened.withBudget(budget))
-                .processValues(() -> new CardRules.Evaluator(), CardRules.SPEND_TABLE, CardRules.PAYMENT_HISTORY_TABLE);
+                .processValues(() -> new CardRules.Evaluator(cfg.timeScale()), CardRules.SPEND_TABLE,
+                        CardRules.PAYMENT_HISTORY_TABLE, CardRules.CARD_ACTIVITY_TABLE);
 
         // 3. Every decision, card payment or transfer -> decisions topic
         decisions.to(cfg.decisionsTopic(), Produced.with(keys, decisionSerde));

@@ -112,6 +112,7 @@ services:
       NUM_STANDBY_REPLICAS: 0
       STATE_DIR: /var/lib/kafka-streams
       LOG_EVERY: 1000
+      TIME_SCALE: ${REPLAY_SPEED:-3600}
     volumes:
       - streams-state:/var/lib/kafka-streams
     depends_on:

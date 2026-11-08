@@ -4,6 +4,9 @@ import { Prisma, type PrismaClient, type transactions } from './generated/prisma
 
 export const OUR_BANK = 'HCMMB';
 
+const FROZEN = 'R1';
+const FRAUD_RECIPIENT = 'R3';
+
 const REQUESTS_TOPIC = 'transactions';
 const OUTCOMES_TOPIC = 'settlements';
 const CREDITS_TOPIC = 'credits';
@@ -105,7 +108,7 @@ export async function requestPayment(db: PrismaClient, p: PaymentRequestInput): 
 export async function settle(db: PrismaClient, d: DecisionInput): Promise<TransactionState | null> {
   const approve = d.verdict === 'ALLOW';
   // A fraud mark never stops a payment by itself, and the cardholder sees these reasons: it stays between staff.
-  const fired = d.firedRules.filter((r) => r !== 'FRAUD_RECIPIENT');
+  const fired = d.firedRules.filter((r) => r !== FRAUD_RECIPIENT);
   const reasons = fired.length ? fired : [d.verdict];
   const run = d.channel === 'CARD' ? cardPayment(db, d) : transfer(db, d);
 
@@ -116,7 +119,7 @@ export async function settle(db: PrismaClient, d: DecisionInput): Promise<Transa
       if (t !== NO_FUNDS) return t;
       return run('DECLINED', ['INSUFFICIENT_FUNDS']);
     } catch (e) {
-      if (isFrozenSender(e)) return run('DECLINED', ['FROZEN']);
+      if (isFrozenSender(e)) return run('DECLINED', [FROZEN]);
       throw e;
     }
   }
@@ -127,7 +130,7 @@ export async function settle(db: PrismaClient, d: DecisionInput): Promise<Transa
     return await run('POSTED', []);
   } catch (e) {
     if (isOverdraft(e)) return run('DECLINED', ['INSUFFICIENT_FUNDS']);
-    if (isFrozenSender(e)) return run('DECLINED', ['FROZEN']);
+    if (isFrozenSender(e)) return run('DECLINED', [FROZEN]);
     throw e;
   }
 }
@@ -274,7 +277,7 @@ export async function resolveHeld(
   if (outcome === 'REJECT') return finishHeld(tx, t, 'DECLINED', ['REJECTED_BY_BANK']);
 
   const { status } = await tx.accounts.findUniqueOrThrow({ where: { card_id: cardId }, select: { status: true } });
-  if (status === 'FROZEN') return finishHeld(tx, t, 'DECLINED', ['FROZEN']);
+  if (status === 'FROZEN') return finishHeld(tx, t, 'DECLINED', [FROZEN]);
   // Available still counts this transfer as held, and that held amount is the money being spent now.
   if ((await availableBalance(tx, cardId)) < 0n) {
     return finishHeld(tx, t, 'DECLINED', ['INSUFFICIENT_FUNDS']);
@@ -283,11 +286,11 @@ export async function resolveHeld(
 }
 
 /** Declines every transfer the card has held, inside the caller's transaction (a freeze). Returns how many. */
-export async function declineHeld(tx: Prisma.TransactionClient, cardId: string, reason: 'FROZEN'): Promise<number> {
+export async function declineHeld(tx: Prisma.TransactionClient, cardId: string): Promise<number> {
   const held = await tx.transactions.findMany({ where: { card_id: cardId, status: 'HELD' } });
   let n = 0;
   for (const t of held) {
-    if (await finishHeld(tx, t, 'DECLINED', [reason])) n++;
+    if (await finishHeld(tx, t, 'DECLINED', [FROZEN])) n++;
   }
   return n;
 }

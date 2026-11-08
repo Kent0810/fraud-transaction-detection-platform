@@ -6,13 +6,13 @@ import { createClient, createMapper } from './shared/cassandra/cassandra.service
 const DEFAULT_CARD = '2291163933867244';
 
 const TXNS: [number, string, string, string, string, string, number, string[]][] = [
-  [3, 't-1009', 'Kuhn LLC', 'shopping_net', '22999750', 'DECLINE', 0.8, ['AMOUNT_SPIKE', 'R5']],
-  [4, 't-1008', 'Kuhn LLC', 'shopping_net', '21127500', 'DECLINE', 0.8, ['AMOUNT_SPIKE', 'R5']],
+  [3, 't-1009', 'Kuhn LLC', 'shopping_net', '22999750', 'STEP_UP', 0.5, ['R4']],
+  [4, 't-1008', 'Kuhn LLC', 'shopping_net', '21127500', 'STEP_UP', 0.5, ['R4']],
   [6, 't-1007', 'Kuhn LLC', 'shopping_net', '7810000', 'ALLOW', 0.3, ['R5']],
   [95, 't-1006', 'Kirlin and Sons', 'personal_care', '71500', 'ALLOW', 0, []],
   [180, 't-1005', 'Sporer-Keebler', 'personal_care', '746000', 'ALLOW', 0, []],
   [26 * 60, 't-1004', 'Swaniawski, Nitzsche and Welch', 'health_fitness', '1032000', 'ALLOW', 0, []],
-  [27 * 60, 't-1003', 'Haley Group', 'misc_pos', '1501250', 'STEP_UP', 0.4, ['R4']],
+  [27 * 60, 't-1003', 'Haley Group', 'misc_pos', '1501250', 'STEP_UP', 0.6, ['R5', 'R6']],
   [50 * 60, 't-1002', 'Johnston-Casper', 'travel', '79750', 'ALLOW', 0, []],
   [52 * 60, 't-1001', 'Daugherty LLC', 'kids_pets', '488750', 'ALLOW', 0, []],
 ];
