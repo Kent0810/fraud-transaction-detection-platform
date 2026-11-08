@@ -21,7 +21,8 @@ export type Txn = {
   declinedFor: string[];
 };
 
-export type AlertStatus = 'OPEN' | 'CONFIRMED' | 'CLEARED';
+// APPROVED: a flag on a payment that went through (e.g. over budget); nobody reviews it.
+export type AlertStatus = 'OPEN' | 'CONFIRMED' | 'CLEARED' | 'APPROVED';
 
 export type Alert = {
   alertId: string;

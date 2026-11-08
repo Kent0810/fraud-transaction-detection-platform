@@ -39,6 +39,8 @@ export class CardholderFilesRepository {
         city: true,
         state: true,
         dob: true,
+        lat: true,
+        long: true,
         accounts: {
           select: {
             account_number: true,
@@ -63,6 +65,7 @@ export class CardholderFilesRepository {
         city: row.city,
         state: row.state,
         dob: iso(row.dob)?.slice(0, 10) ?? null,
+        home: row.lat === null || row.long === null ? null : { lat: row.lat, long: row.long },
       },
       account: row.accounts
         ? {

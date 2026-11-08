@@ -25,6 +25,7 @@ export default function AlertsScreen() {
     OPEN: { label: 'Needs review', fg: c.decline, bg: c.declineBg },
     CONFIRMED: { label: 'Confirmed fraud', fg: c.decline, bg: c.declineBg },
     CLEARED: { label: 'Cleared', fg: c.allow, bg: c.allowBg },
+    APPROVED: { label: 'Approved', fg: c.allow, bg: c.allowBg },
   };
 
   return (

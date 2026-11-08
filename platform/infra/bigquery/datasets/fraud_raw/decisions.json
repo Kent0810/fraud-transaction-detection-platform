@@ -1,0 +1,17 @@
+[
+  {"name": "txn_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "card_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "ts", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "channel", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "merchant", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "recipient_account", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "category", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "amount", "type": "INT64", "mode": "REQUIRED"},
+  {"name": "currency", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "merch_lat", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "merch_long", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "decision", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "score", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "fired_rules", "type": "STRING", "mode": "REPEATED"},
+  {"name": "decided_at", "type": "TIMESTAMP", "mode": "NULLABLE"}
+]

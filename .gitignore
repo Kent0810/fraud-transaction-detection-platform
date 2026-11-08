@@ -43,11 +43,17 @@ npm-debug.log*
 yarn-error.log*
 
 # ───────── Datasets (cloned + downloaded locally, see datasets/README.md) ─────────
-# Upstream generator repo + data files (simulate_data.csv is ~150 MB)
 datasets/Sparkov_Data_Generation/
 
 # ───────── Infra artifacts ─────────
-# Cassandra sink connector jar, downloaded and unpacked locally
 platform/infra/connect/plugins/
 *.jar
 !**/gradle/wrapper/gradle-wrapper.jar
+
+# ───────── Terraform (state holds service-account private keys) ─────────
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

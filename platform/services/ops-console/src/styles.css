@@ -1094,13 +1094,14 @@ table.grid {
 .held-row .held-what {
   flex: 1 1 260px;
 }
-.places {
+.reach {
   margin: 0 0 16px;
+  font-size: 0.9rem;
+  color: var(--ink-2);
 }
-.places ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  font-size: 0.86rem;
+.reach-flag {
+  color: var(--ctrl);
+  font-weight: 600;
 }
 .chips {
   display: flex;

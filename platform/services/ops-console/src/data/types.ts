@@ -127,6 +127,7 @@ export type CardView = {
     city: string | null;
     state: string | null;
     dob: string | null;
+    home: { lat: number; long: number } | null;
   };
   account: {
     accountNumber: string;

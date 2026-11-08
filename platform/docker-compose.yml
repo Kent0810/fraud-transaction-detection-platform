@@ -25,11 +25,9 @@ x-cassandra-env: &cassandra-env
   CASSANDRA_KEYSPACE: fraud
 
 x-bigquery-env: &bigquery-env
-  BQ_PROJECT: ${BQ_PROJECT:-fraud-local}
-  BQ_DATASET_RAW: ${BQ_DATASET_RAW:-raw}
-  BQ_DATASET_MART: ${BQ_DATASET_MART:-mart}
-  # Empty = real BigQuery. With the emulator profile set to http://bigquery-emulator:9050
-  BQ_API_ENDPOINT: ${BQ_API_ENDPOINT:-}
+  BQ_PROJECT: ${BQ_PROJECT:-}       # empty = the project in the key file
+  BQ_DATASET_RAW: fraud_raw         # created by infra/bigquery (Terraform)
+  BQ_DATASET_MART: fraud_mart
   GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp-sa.json
 
 services:
@@ -95,7 +93,7 @@ services:
       <<: *kafka-env
       EVENTS_SOURCE_FILE: /data/stream/events.csv
       REPLAY_SPEED: ${REPLAY_SPEED:-3600}   # 1 real second = 1 simulated hour; 1 = real time
-      MAX_EVENTS: ${MAX_EVENTS:-1000}          # stop after this many events; 0 = the whole file (~555k)
+      MAX_EVENTS: 0         # stop after this many events; 0 = the whole file (~555k)
     volumes:
       - ../datasets/Sparkov_Data_Generation/data:/data:ro
     depends_on:
@@ -150,50 +148,6 @@ services:
         condition: service_healthy
     restart: on-failure
 
-  # # ───────────────────────── Cold path ─────────────────────────
-  # batch-loader:                       # all topics + side files -> BigQuery (idempotent, counted)
-  #   build: ./services/batch-loader
-  #   environment:
-  #     <<: [*kafka-env, *bigquery-env]
-  #     KAFKA_GROUP_ID: batch-loader
-  #     KAFKA_ISOLATION_LEVEL: read_committed
-  #     LOAD_INTERVAL_SECONDS: ${LOAD_INTERVAL_SECONDS:-300}
-  #     # Loaded straight from the source files, never via Kafka
-  #     GROUND_TRUTH_FILE: /data/stream/ground_truth.csv
-  #     DIM_CARD_FILE: /data/stream/dim_card.csv
-  #   volumes:
-  #     - ../datasets/Sparkov_Data_Generation/data:/data:ro
-  #     - ${GCP_SA_KEY_FILE:-./secrets/gcp-sa.json}:/secrets/gcp-sa.json:ro   # file must exist, see notes
-  #   depends_on:
-  #     kafka-init:
-  #       condition: service_completed_successfully
-  #     bigquery-emulator:
-  #       condition: service_started
-  #       required: false               # only when --profile bq-emulator is on
-  #   restart: on-failure
-
-  # bigquery-emulator:                  # local stand-in for BigQuery: --profile bq-emulator
-  #   image: ghcr.io/goccy/bigquery-emulator:${BQ_EMULATOR_VERSION:-0.6.6}
-  #   profiles: [bq-emulator]
-  #   platform: linux/amd64             # no arm64 image published
-  #   command:
-  #     - --project=${BQ_PROJECT:-fraud-local}
-  #     - --data-from-yaml=/seed/datasets.yaml
-  #   ports:
-  #     - "9050:9050"                   # REST
-  #     - "9060:9060"                   # gRPC
-  #   volumes:
-  #     - ./infra/bigquery:/seed:ro     # datasets.yaml: raw + mart datasets
-
-  # risk-dashboards:                    # loss and trends, SQL on BigQuery (real BigQuery only)
-  #   image: metabase/metabase:${METABASE_VERSION:-v0.58-lts}
-  #   ports:
-  #     - "3001:3000"
-  #   environment:
-  #     MB_DB_FILE: /metabase-data/metabase.db
-  #   volumes:
-  #     - metabase-data:/metabase-data
-
   # # ───────────────────────── Control loop ─────────────────────────
   postgres:
     image: postgres:17
@@ -224,6 +178,8 @@ services:
       FLYWAY_PLACEHOLDERS_DEBEZIUM_PASSWORD: &postgres-debezium-password ${POSTGRES_DEBEZIUM_PASSWORD:-debezium_password}
       FLYWAY_PLACEHOLDERS_NOTIFIER_USER: &postgres-notifier-user ${POSTGRES_NOTIFIER_USER:-notifier}
       FLYWAY_PLACEHOLDERS_NOTIFIER_PASSWORD: &postgres-notifier-password ${POSTGRES_NOTIFIER_PASSWORD:-notifier_password}
+      FLYWAY_PLACEHOLDERS_LOADER_USER: &postgres-loader-user ${POSTGRES_LOADER_USER:-batch_loader}
+      FLYWAY_PLACEHOLDERS_LOADER_PASSWORD: &postgres-loader-password ${POSTGRES_LOADER_PASSWORD:-batch_loader_password}
     volumes:
       - ./infra/postgres/migrations:/flyway/migrations:ro
     command: migrate
@@ -238,7 +194,7 @@ services:
       <<: *postgres-env
       CARD_HOLDER_FILE: /data/stream/dim_card.csv
       DEMO_PASSWORD: admin1234
-      OPENING_BALANCE: ${OPENING_BALANCE:-100000000}   # VND, every new account; existing balances are kept
+      OPENING_BALANCE: ${OPENING_BALANCE:-1000000000}   # VND, every new account; existing balances are kept
     volumes:
       - ./infra/postgres/seed:/seed:ro
       - ../datasets/Sparkov_Data_Generation/data:/data:ro
@@ -366,9 +322,40 @@ services:
         condition: service_completed_successfully
     restart: on-failure
 
+  # ───────────────────────── Cold path: --profile warehouse ─────────────────────────
+  batch-loader:                       # topics, audit_log reviews and side files -> BigQuery load jobs
+    build: ./services/batch-loader
+    environment:
+      <<: [*kafka-env, *postgres-env, *bigquery-env]
+      POSTGRES_USER: *postgres-loader-user
+      POSTGRES_PASSWORD: *postgres-loader-password
+      KAFKA_GROUP_ID: batch-loader
+      LOAD_INTERVAL_SECONDS: ${LOAD_INTERVAL_SECONDS:-300}
+      GROUND_TRUTH_FILE: /data/stream/ground_truth.csv
+      DIM_CARD_FILE: /data/stream/dim_card.csv
+    volumes:
+      - ../datasets/Sparkov_Data_Generation/data:/data:ro
+      - ${GCP_SA_KEY_FILE:-./secrets/gcp-sa.json}:/secrets/gcp-sa.json:ro
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres-migrate:
+        condition: service_completed_successfully
+    restart: on-failure
+
+  risk-dashboards:                    # Metabase on fraud_mart (BR8), http://localhost:3001
+    image: metabase/metabase:${METABASE_VERSION:-v0.64.3.4}
+    ports:
+      - "3001:3000"
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    volumes:
+      - metabase-data:/metabase-data
+    restart: on-failure
+
 volumes:
   kafka-data:
   pg-data:
   cassandra-data:
   streams-state:
-  # metabase-data:
+  metabase-data:
