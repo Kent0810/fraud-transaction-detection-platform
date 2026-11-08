@@ -18,7 +18,8 @@ public record Config(
         String casesTopic,
         String controlTopic,
         String fraudMarksTopic,
-        long logEvery) {
+        long logEvery,
+        double timeScale) {
 
     public static class ConfigException extends RuntimeException {
         public ConfigException(String message) {
@@ -45,7 +46,8 @@ public record Config(
                 require("TOPIC_CASES"),
                 require("TOPIC_CONTROL"),
                 require("TOPIC_FRAUD_MARKS"),
-                logEvery);
+                logEvery,
+                parseTimeScale());
     }
 
     public Properties toStreamsProperties() {
@@ -60,6 +62,22 @@ public record Config(
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         return props;
+    }
+
+    private static double parseTimeScale() {
+        String raw = System.getenv("TIME_SCALE");
+        if (raw == null || raw.isBlank()) {
+            return 1;
+        }
+        try {
+            double scale = Double.parseDouble(raw.trim());
+            if (scale <= 0) {
+                throw new ConfigException("TIME_SCALE must be greater than 0, got " + raw);
+            }
+            return scale;
+        } catch (NumberFormatException e) {
+            throw new ConfigException("TIME_SCALE must be a number, got '" + raw + "'");
+        }
     }
 
     private static String require(String name) {

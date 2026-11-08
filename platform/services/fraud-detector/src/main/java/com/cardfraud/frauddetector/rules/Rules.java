@@ -12,27 +12,26 @@ import com.cardfraud.frauddetector.model.Transaction;
 // Every fraud rule: its name, its weight, when it fires, and what follows from it (alerts, analyst review).
 public final class Rules {
     // The cardholder froze the card: every payment is declined, and no other rule runs.
-    public static final String FROZEN = "FROZEN";
+    public static final String FROZEN = "R1";
     // The recipient is on this card's blacklist: the cardholder asked for that, so there is nothing for an analyst to judge.
-    public static final String BLOCKED_RECIPIENT = "BLOCKED_RECIPIENT";
+    public static final String BLOCKED_RECIPIENT = "R2";
     // The recipient carries a bank-wide fraud mark: a transfer is held for an agent, a card payment is declined.
-    public static final String FRAUD_RECIPIENT = "FRAUD_RECIPIENT";
-    // A transfer of at least SPIKE_FLOOR and SPIKE_FACTOR times the card's average payment or transfer of the last
-    // 30 days: held for an agent.
-    public static final String AMOUNT_SPIKE = "AMOUNT_SPIKE";
+    public static final String FRAUD_RECIPIENT = "R3";
+    // A payment or transfer of at least SPIKE_FLOOR and SPIKE_FACTOR times the card's average of the last 30 days:
+    // a transfer is held for an agent, a card payment is declined.
+    public static final String AMOUNT_SPIKE = "R4";
+    // Card payments only: one alone only alerts, both decline.
+    public static final String VELOCITY = "R5";
+    public static final String IMPOSSIBLE_TRAVEL = "R6";
     // Over the cardholder's budget: alert only, never changes the verdict.
-    public static final String BUDGET = "BUDGET";
+    public static final String BUDGET = "R7";
 
     public static final Map<String, Double> WEIGHTS = Map.of(
-            "R1", 0.5,   // velocity
-            "R3", 0.6,   // impossible travel
-            "R4", 0.4,   // new-region burst
-            "R5", 0.3,   // high-risk category
             BLOCKED_RECIPIENT, 1.0,
-            // Between STEP_UP_AT and DECLINE_AT: on its own the transfer is held, not declined.
+            FRAUD_RECIPIENT, 0.5,
             AMOUNT_SPIKE, 0.5,
-            // Between STEP_UP_AT and DECLINE_AT: on its own, a transfer is held and a card payment declined.
-            FRAUD_RECIPIENT, 0.5);
+            VELOCITY, 0.3,
+            IMPOSSIBLE_TRAVEL, 0.3);
 
     public static final long SPIKE_FACTOR = 20;
     // VND. A smaller transfer is never a spike, however small the card's usual payments.
@@ -40,18 +39,18 @@ public final class Rules {
     // Fewer past payments and transfers than this and the card has no normal yet: AMOUNT_SPIKE is skipped.
     public static final int SPIKE_MIN_HISTORY = 3;
 
-    public static final double DECLINE_AT = 0.8;
+    public static final int VELOCITY_COUNT = 5;
+    public static final double TRAVEL_MIN_KM = 50;
+    public static final double TRAVEL_MAX_KMH = 800;
+
+    public static final double DECLINE_AT = 0.9;
     public static final double STEP_UP_AT = 0.4;
 
     private Rules() {
     }
 
-    /**
-     * @param s             the transaction and everything the joins found about it
-     * @param spentInPeriod spent so far in the budget's current period, before this transaction (0 with no budget)
-     * @param history       the card's allowed payments and transfers of the last 30 days, before this transaction
-     */
-    public static Decision evaluate(String cardId, Screened s, long spentInPeriod, PaymentHistory history) {
+    public static Decision evaluate(String cardId, Screened s, long spentInPeriod, PaymentHistory history,
+                                    CardActivity activity, long simAt) {
         Transaction txn = s.txn();
         if (s.frozen()) {
             return decision(cardId, txn, Verdict.DECLINE, 1.0, List.of(FROZEN));
@@ -70,11 +69,14 @@ public final class Rules {
         }
 
         // amount >= 20 x average, without division: amount x count >= 20 x sum.
-        if (Transaction.TRANSFER.equals(txn.channel())
-                && txn.amt() >= SPIKE_FLOOR
+        if (txn.amt() >= SPIKE_FLOOR
                 && history.count() >= SPIKE_MIN_HISTORY
                 && txn.amt() * history.count() >= SPIKE_FACTOR * history.sum()) {
             fired.add(AMOUNT_SPIKE);
+        }
+
+        if (Transaction.CARD.equals(txn.channel())) {
+            fired.addAll(cardRules(txn, activity, simAt));
         }
 
         // Sum of the fired rules' weights, capped at 1.0 (0 when nothing fired).
@@ -87,6 +89,31 @@ public final class Rules {
         }
 
         return decision(cardId, txn, verdict, score, fired);
+    }
+
+    private static List<String> cardRules(Transaction txn, CardActivity activity, long simAt) {
+        List<String> fired = new ArrayList<>();
+        int recent = activity.paymentsWithinHour(simAt);
+        if (recent + 1 >= VELOCITY_COUNT) {
+            fired.add(VELOCITY);
+        }
+
+        Double lat = txn.merchLat();
+        Double lng = txn.merchLong();
+        CardActivity.Place last = activity.lastInPerson();
+        if (isInPerson(txn) && last != null && lat != null && lng != null) {
+            double km = Geo.km(last.lat(), last.lng(), lat, lng);
+            double hours = Math.max(simAt - last.at(), 60) / 3600.0;
+            if (km > TRAVEL_MIN_KM && km / hours > TRAVEL_MAX_KMH) {
+                fired.add(IMPOSSIBLE_TRAVEL);
+            }
+        }
+        return fired;
+    }
+
+    // Dataset categories end in _pos (in person) or _net (online).
+    public static boolean isInPerson(Transaction txn) {
+        return txn.category() != null && txn.category().endsWith("_pos");
     }
 
     // The fired rules an analyst sees as alerts.

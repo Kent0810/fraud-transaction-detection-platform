@@ -7,8 +7,8 @@ import type { AlertDto, AlertStatus, Channel, TxnDto, Verdict } from '../types/c
 
 type ByCard = { cardId: string };
 
-// A fraud mark is the bank's suspicion about someone else, and can be wrong: only staff see it.
-const STAFF_ONLY_RULES = new Set(['FRAUD_RECIPIENT']);
+// R3, a fraud mark, is the bank's suspicion about someone else, and can be wrong: only staff see it.
+const STAFF_ONLY_RULES = new Set(['R3']);
 
 /** A transaction as its cardholder sees it. */
 export function forCardholder(t: TxnDto): TxnDto {

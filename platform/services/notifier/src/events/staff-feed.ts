@@ -1,5 +1,5 @@
-const BLACKLISTED = 'BLOCKED_RECIPIENT';
-const FRAUD_RECIPIENT = 'FRAUD_RECIPIENT';
+const BLACKLISTED = 'R2';
+const FRAUD_RECIPIENT = 'R3';
 
 /**
  * What goes on the staff's live feed: every decline or step-up, and every payment to a fraud-marked recipient. Not a

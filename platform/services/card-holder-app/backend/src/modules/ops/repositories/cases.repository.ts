@@ -150,8 +150,9 @@ export class CasesRepository {
 }
 
 function isFlagged(decision: Verdict, firedRules: string[]): boolean {
-  if (firedRules.includes('FRAUD_RECIPIENT')) return true;
-  return decision !== 'ALLOW' && firedRules.some((r) => r !== 'BLOCKED_RECIPIENT');
+  // R3: recipient marked as fraud. R2: the cardholder's own blacklist (Rules.java).
+  if (firedRules.includes('R3')) return true;
+  return decision !== 'ALLOW' && firedRules.some((r) => r !== 'R2');
 }
 
 function toAlert(r: AlertRow): CaseAlertDto {

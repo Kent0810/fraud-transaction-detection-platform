@@ -29,7 +29,7 @@ recipient is looked up by account number, and its name comes from the cardholder
 card payment made in the app (retry with the same `paymentId`). `settle()` applies a decision, approving only `ALLOW`: for
 a transfer it posts the ledger entries and both balances (locking in a fixed order) or declines it; a card payment, PENDING
 from the app or recorded now from the event source, gets its `CARD_PAYMENT` entry, and is declined with
-`INSUFFICIENT_FUNDS` or `FROZEN` when the account can't pay. Either way a `TransactionPosted` or `TransactionDeclined` event goes to the `settlements` topic
+`INSUFFICIENT_FUNDS` or `R1` (card frozen) when the account can't pay. Either way a `TransactionPosted` or `TransactionDeclined` event goes to the `settlements` topic
 in the same transaction, and a decision delivered twice changes nothing. Don't write those tables any other way: an app
 login may update `accounts.balance` and insert history, so a hand-rolled write would pass the grants and break the
 ledger. Refusals arrive as `TransferRefusedError` with a code such as `INSUFFICIENT_FUNDS`.
