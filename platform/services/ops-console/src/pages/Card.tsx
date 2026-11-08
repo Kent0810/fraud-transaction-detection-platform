@@ -1,7 +1,7 @@
 import { type FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { PostingBadge, RuleChip, VerdictBadge } from '../components/Badges';
-import { type Bucket, Gauge, type Place, PlaceMap, type Series, StackedColumns } from '../components/Charts';
+import { type Bucket, Gauge, type Series, StackedColumns } from '../components/Charts';
 import { Icon, type IconName } from '../components/Icons';
 import { ReasonAction } from '../components/Reason';
 import * as api from '../data/api';
@@ -76,6 +76,15 @@ const LOGIN_LABEL: Record<LoginStatus, string> = {
 
 type Channel = 'ALL' | 'CARD' | 'TRANSFER';
 
+// Great-circle distance in km.
+function kmBetween(a: { lat: number; long: number }, b: { lat: number; long: number }): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h =
+    Math.sin(rad(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.long - a.long) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
 function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
@@ -144,18 +153,24 @@ export function Card({ cardId }: { cardId: string }) {
     }, SETTLE_MS);
   }, [cardId, loadActivity]);
 
-  // Card-payment locations, most used first. Transfers carry none.
-  const places = useMemo(() => {
-    const m = new Map<string, Place>();
-    for (const t of activity ?? []) {
-      if (t.channel !== 'CARD' || t.merchLat === null || t.merchLong === null) continue;
-      const key = `${t.merchant}|${t.merchLat.toFixed(3)}|${t.merchLong.toFixed(3)}`;
-      const p = m.get(key) ?? { key, merchant: t.merchant, lat: t.merchLat, long: t.merchLong, count: 0 };
-      p.count++;
-      m.set(key, p);
-    }
-    return [...m.values()].sort((a, b) => b.count - a.count).slice(0, 50);
-  }, [activity]);
+  // How far from home the card paid: how far most payments go, and the farthest one with what it fired.
+  const reach = useMemo(() => {
+    const home = view?.holder.home;
+    if (!home) return null;
+    const paid = (activity ?? [])
+      .filter((t) => t.channel === 'CARD' && t.merchLat !== null && t.merchLong !== null)
+      .map((t) => ({ t, km: kmBetween(home, { lat: t.merchLat as number, long: t.merchLong as number }) }))
+      .sort((a, b) => a.km - b.km);
+    if (paid.length === 0) return null;
+    const far = paid[paid.length - 1];
+    return {
+      count: paid.length,
+      usualKm: paid[Math.floor((paid.length - 1) * 0.9)].km,
+      farKm: far.km,
+      farMerchant: far.t.merchant,
+      farRules: far.t.alerts.length > 0 ? far.t.alerts.map((a) => a.ruleId) : far.t.firedRules,
+    };
+  }, [view, activity]);
 
   const buckets = useMemo<Bucket[]>(() => {
     const start = new Date();
@@ -393,28 +408,16 @@ export function Card({ cardId }: { cardId: string }) {
         </div>
       )}
 
-      {places.length > 0 && (
-        <div className="places">
-          <b>Where this card paid</b> <span className="muted">(card payments in the last {days} days)</span>
-          <PlaceMap
-            places={places}
-            caption={`Where this card paid in the last ${days} days: ${places.length} places, dot size by number of payments`}
-          />
-          <details>
-            <summary>As a list</summary>
-            <ul>
-              {places.map((p) => (
-                <li key={p.key}>
-                  {p.merchant} ·{' '}
-                  <span className="mono">
-                    {p.lat.toFixed(3)}, {p.long.toFixed(3)}
-                  </span>
-                  {p.count > 1 && <span className="muted"> · {p.count} payments</span>}
-                </li>
-              ))}
-            </ul>
-          </details>
-        </div>
+      {reach && (
+        <p className="reach">
+          <b>{Math.round(reach.usualKm)} km</b> from home covers 90% of {reach.count} card payments in the last {days}{' '}
+          days. Farthest: <b>{Math.round(reach.farKm)} km</b> at {reach.farMerchant}
+          {reach.farRules.length > 0 ? (
+            <span className="reach-flag"> · flagged {reach.farRules.join(', ')}</span>
+          ) : (
+            <span className="muted"> · not flagged</span>
+          )}
+        </p>
       )}
 
       {frozen && (

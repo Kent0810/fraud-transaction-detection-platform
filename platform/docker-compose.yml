@@ -93,7 +93,7 @@ services:
       <<: *kafka-env
       EVENTS_SOURCE_FILE: /data/stream/events.csv
       REPLAY_SPEED: ${REPLAY_SPEED:-3600}   # 1 real second = 1 simulated hour; 1 = real time
-      MAX_EVENTS: ${MAX_EVENTS:-1000}          # stop after this many events; 0 = the whole file (~555k)
+      MAX_EVENTS: 0         # stop after this many events; 0 = the whole file (~555k)
     volumes:
       - ../datasets/Sparkov_Data_Generation/data:/data:ro
     depends_on:
@@ -325,7 +325,6 @@ services:
   # ───────────────────────── Cold path: --profile warehouse ─────────────────────────
   batch-loader:                       # topics, audit_log reviews and side files -> BigQuery load jobs
     build: ./services/batch-loader
-    profiles: [warehouse]
     environment:
       <<: [*kafka-env, *postgres-env, *bigquery-env]
       POSTGRES_USER: *postgres-loader-user
@@ -346,7 +345,6 @@ services:
 
   risk-dashboards:                    # Metabase on fraud_mart (BR8), http://localhost:3001
     image: metabase/metabase:${METABASE_VERSION:-v0.64.3.4}
-    profiles: [warehouse]
     ports:
       - "3001:3000"
     environment:

@@ -188,7 +188,9 @@ class Loader:
         loaded_at = now_iso()
         rows: dict[str, list[dict]] = {t: [] for t in self.cfg.topics.values()}
         consumed = 0
-        while consumed < self.cfg.max_rows:
+        # The topics are never quiet for long, so a batch also ends after a minute rather than waiting for max_rows.
+        batch_deadline = time.monotonic() + 60
+        while consumed < self.cfg.max_rows and time.monotonic() < batch_deadline:
             msgs = self.consumer.consume(num_messages=1000, timeout=5.0)
             if not msgs:
                 break

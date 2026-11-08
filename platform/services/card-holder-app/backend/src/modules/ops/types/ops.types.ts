@@ -36,6 +36,8 @@ export type CardholderDto = {
   city: string | null;
   state: string | null;
   dob: string | null;
+  /** Where the cardholder lives, to see how far from home the card is used. */
+  home: { lat: number; long: number } | null;
 };
 
 export type AccountDto = {
