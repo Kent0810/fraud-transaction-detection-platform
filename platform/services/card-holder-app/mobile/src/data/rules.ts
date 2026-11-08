@@ -8,7 +8,7 @@ export const RULE_TEXT: Record<string, { title: string; detail: string }> = {
   FROZEN: { title: 'Card frozen', detail: 'You froze this card, so the payment was declined.' },
   AMOUNT_SPIKE: {
     title: 'Unusually large transfer',
-    detail: 'Much larger than your usual transfers, so the bank confirms it with you first.',
+    detail: 'Much larger than what you usually spend, so the bank confirms it with you first.',
   },
   REJECTED_BY_BANK: { title: 'Rejected by the bank', detail: 'You told us you did not make this transfer.' },
   NOT_CONFIRMED: {

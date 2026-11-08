@@ -17,7 +17,8 @@ public final class Rules {
     public static final String BLOCKED_RECIPIENT = "BLOCKED_RECIPIENT";
     // The recipient carries a bank-wide fraud mark: a transfer is held for an agent, a card payment is declined.
     public static final String FRAUD_RECIPIENT = "FRAUD_RECIPIENT";
-    // A transfer at least SPIKE_FACTOR times the card's average transfer of the last 30 days: held for an agent.
+    // A transfer of at least SPIKE_FLOOR and SPIKE_FACTOR times the card's average payment or transfer of the last
+    // 30 days: held for an agent.
     public static final String AMOUNT_SPIKE = "AMOUNT_SPIKE";
     // Over the cardholder's budget: alert only, never changes the verdict.
     public static final String BUDGET = "BUDGET";
@@ -34,7 +35,9 @@ public final class Rules {
             FRAUD_RECIPIENT, 0.5);
 
     public static final long SPIKE_FACTOR = 20;
-    // Fewer past transfers than this and the card has no normal yet: AMOUNT_SPIKE is skipped.
+    // VND. A smaller transfer is never a spike, however small the card's usual payments.
+    public static final long SPIKE_FLOOR = 10_000_000;
+    // Fewer past payments and transfers than this and the card has no normal yet: AMOUNT_SPIKE is skipped.
     public static final int SPIKE_MIN_HISTORY = 3;
 
     public static final double DECLINE_AT = 0.8;
@@ -46,9 +49,9 @@ public final class Rules {
     /**
      * @param s             the transaction and everything the joins found about it
      * @param spentInPeriod spent so far in the budget's current period, before this transaction (0 with no budget)
-     * @param history       the card's allowed transfers of the last 30 days, before this transaction
+     * @param history       the card's allowed payments and transfers of the last 30 days, before this transaction
      */
-    public static Decision evaluate(String cardId, Screened s, long spentInPeriod, TransferHistory history) {
+    public static Decision evaluate(String cardId, Screened s, long spentInPeriod, PaymentHistory history) {
         Transaction txn = s.txn();
         if (s.frozen()) {
             return decision(cardId, txn, Verdict.DECLINE, 1.0, List.of(FROZEN));
@@ -68,6 +71,7 @@ public final class Rules {
 
         // amount >= 20 x average, without division: amount x count >= 20 x sum.
         if (Transaction.TRANSFER.equals(txn.channel())
+                && txn.amt() >= SPIKE_FLOOR
                 && history.count() >= SPIKE_MIN_HISTORY
                 && txn.amt() * history.count() >= SPIKE_FACTOR * history.sum()) {
             fired.add(AMOUNT_SPIKE);

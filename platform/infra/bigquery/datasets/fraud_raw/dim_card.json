@@ -1,0 +1,9 @@
+[
+  {"name": "card_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "city", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "state", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "zip", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "lat", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "long", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "city_pop", "type": "INT64", "mode": "NULLABLE"}
+]

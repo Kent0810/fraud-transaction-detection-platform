@@ -194,7 +194,7 @@ services:
       <<: *postgres-env
       CARD_HOLDER_FILE: /data/stream/dim_card.csv
       DEMO_PASSWORD: admin1234
-      OPENING_BALANCE: ${OPENING_BALANCE:-100000000}   # VND, every new account; existing balances are kept
+      OPENING_BALANCE: ${OPENING_BALANCE:-1000000000}   # VND, every new account; existing balances are kept
     volumes:
       - ./infra/postgres/seed:/seed:ro
       - ../datasets/Sparkov_Data_Generation/data:/data:ro

@@ -13,7 +13,17 @@ Then load it and open the reports:
 
 ```sh
 cd ../../services/batch-loader && uv lock --exclude-newer "<7 days ago, RFC 3339>"
-cd ../.. && docker compose --profile warehouse up -d --build
+cd ../.. && docker compose up -d --build
 ```
 
 Metabase: http://localhost:3001 → Add database → BigQuery → upload `secrets/gcp-sa-reporting.json`, dataset `fraud_mart`.
+
+## Layout
+
+```
+datasets/fraud_raw/<table>.json  each landing table's columns (main.tf adds the loader's _ columns)
+datasets/fraud_mart/*.sql        each view's query, named for what it does; main.tf says which view runs which
+main.tf                          datasets, tables, views, access and service accounts
+```
+
+In the SQL, `${raw.<table>}` and `${mart.<view>}` are full project.dataset.table names.

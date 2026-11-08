@@ -15,20 +15,23 @@ export const HOLD_MS = 24 * 60 * 60 * 1000;
 
 export type HeldOutcome = 'CONFIRM' | 'REJECT';
 
-type Channel = 'CARD' | 'TRANSFER';
-
 export type TransferRequestInput = {
+  /** The signed-in card. Take it from the session, never from the request body. */
   fromCard: string;
   password: string;
   transferId: string;
+  /** The recipient's bank id (BIN); this bank's when absent. */
   toBank?: string;
+  /** At this bank: an account number, and the name comes from its cardholder. At another bank: as the sender gives it. */
   toAccount: string;
+  /** Required for another bank: nobody here can look its accounts up (that takes a NAPAS member's connection). */
   toName?: string;
   amount: number;
   content: string;
 };
 
 export type PaymentRequestInput = {
+  /** The signed-in card. Take it from the session, never from the request body. */
   fromCard: string;
   password: string;
   paymentId: string;
@@ -39,10 +42,11 @@ export type PaymentRequestInput = {
   merchLong: number | null;
 };
 
+/** The fraud detector's verdict on one transaction, from the decisions topic. */
 export type DecisionInput = {
   txnId: string;
   cardId: string;
-  channel: Channel;
+  channel: 'CARD' | 'TRANSFER';
   ts: string;
   merchant: string | null;
   category: string | null;
@@ -77,15 +81,7 @@ export class TransferRefusedError extends Error {
   }
 }
 
-type Outcome = 'POSTED' | 'DECLINED';
-type Recipient = { cardId: string | null; bank: string | null; name: string };
-type Reader = Pick<PrismaClient, 'transactions' | 'accounts'>;
-type Tx = Pick<PrismaClient, 'transactions' | 'accounts' | 'ledger_entries'>;
-type ReplayKey = 'channel' | 'card_id' | 'to_account' | 'to_bank' | 'merchant' | 'amount';
-
-const refuse = (code: TransferRefusalCode, message: string) => new TransferRefusedError(code, message);
-const frozen = () => refuse('CARD_FROZEN', 'your card is frozen');
-
+/** Records the transfer as PENDING for the fraud detector; no money moves until settle(). */
 export async function requestTransfer(db: PrismaClient, t: TransferRequestInput): Promise<TransactionState> {
   await checkSender(db, t.fromCard, t.password);
   const to = await recipient(db, t);
@@ -94,6 +90,7 @@ export async function requestTransfer(db: PrismaClient, t: TransferRequestInput)
   return record(db, t, to, amount);
 }
 
+/** Records a card payment made in the app as PENDING, like a transfer; no money moves until settle(). */
 export async function requestPayment(db: PrismaClient, p: PaymentRequestInput): Promise<TransactionState> {
   await checkSender(db, p.fromCard, p.password);
   const amount = BigInt(p.amount);
@@ -101,6 +98,10 @@ export async function requestPayment(db: PrismaClient, p: PaymentRequestInput): 
   return recordPayment(db, p, amount);
 }
 
+/**
+ * Applies a decision: posts or declines a pending transfer, or records a card payment already decided. Safe to
+ * repeat: a decided transaction is returned as is. Null when the transfer or the card is unknown.
+ */
 export async function settle(db: PrismaClient, d: DecisionInput): Promise<TransactionState | null> {
   const approve = d.verdict === 'ALLOW';
   // A fraud mark never stops a payment by itself, and the cardholder sees these reasons: it stays between staff.
@@ -123,20 +124,20 @@ export async function settle(db: PrismaClient, d: DecisionInput): Promise<Transa
     return run('DECLINED', reasons);
   }
   try {
-    return await decide(db, d, 'POSTED', []);
+    return await run('POSTED', []);
   } catch (e) {
-    if (isOverdraft(e)) return decide(db, d, 'DECLINED', ['INSUFFICIENT_FUNDS']);
-    if (isFrozenSender(e)) return decide(db, d, 'DECLINED', ['FROZEN']);
+    if (isOverdraft(e)) return run('DECLINED', ['INSUFFICIENT_FUNDS']);
+    if (isFrozenSender(e)) return run('DECLINED', ['FROZEN']);
     throw e;
   }
 }
 
 export function getTransfer(db: PrismaClient, fromCard: string, transferId: string): Promise<TransactionState | null> {
-  return find(db, transferId, fromCard, 'TRANSFER');
+  return getOwn(db, fromCard, transferId, 'TRANSFER');
 }
 
 export function getPayment(db: PrismaClient, fromCard: string, paymentId: string): Promise<TransactionState | null> {
-  return find(db, paymentId, fromCard, 'CARD');
+  return getOwn(db, fromCard, paymentId, 'CARD');
 }
 
 async function getOwn(
@@ -159,8 +160,12 @@ const frozen = () => new TransferRefusedError('CARD_FROZEN', 'your card is froze
 const insufficientFunds = () => new TransferRefusedError('INSUFFICIENT_FUNDS', 'insufficient funds');
 
 async function checkSender(db: PrismaClient, card: string, password: string): Promise<void> {
-  if (await isCardFrozen(db, card)) throw frozen();
-  if (!(await verifyPassword(db, card, password))) throw refuse('INCORRECT_PASSWORD', 'incorrect password');
+  if (await isCardFrozen(db, card)) {
+    throw frozen();
+  }
+  if (!(await verifyPassword(db, card, password))) {
+    throw new TransferRefusedError('INCORRECT_PASSWORD', 'incorrect password');
+  }
 }
 
 // Not a hold: the balance is checked again when the money moves. Money held for an agent is not available.
@@ -370,25 +375,18 @@ function transfer(db: PrismaClient, d: DecisionInput): Settle {
           decided_at: new Date(),
         },
       });
-      const t = pending ?? (d.channel === 'CARD' ? await recordDecided(tx, d, status, reasons) : undefined);
-      if (!t) return find(tx, d.txnId, d.cardId, d.channel);
+      if (!t) return current(tx, d);
 
       if (status === 'POSTED') {
         await checkAvailable(tx, t);
         await postEntries(tx, t);
       }
       const events = [settled(t)];
-      if (status === 'POSTED') {
-        await postEntries(tx, t);
-        if (t.to_card) events.push(await credited(tx, t, t.to_card));
-      }
+      // Money that stayed in this bank also shows in the recipient's history, as received from the sender.
+      if (status === 'POSTED' && t.to_card) events.push(await credited(tx, t, t.to_card));
       await tx.outbox.createMany({ data: events });
       return { ...t, balance: await availableBalance(tx, t.card_id) };
     });
-  } catch (e) {
-    if (isUnknownCard(e)) return null;
-    throw e;
-  }
 }
 
 // A card payment made in the app was recorded PENDING by requestPayment() and is decided like a transfer. One from the
@@ -448,12 +446,31 @@ function cardPayment(db: PrismaClient, d: DecisionInput): Settle {
   };
 }
 
+type Tx = Pick<PrismaClient, 'transactions' | 'accounts' | 'ledger_entries'>;
+
+// The database applies each entry to its balance (apply_ledger_entry). In card_id order, so two opposite
+// transfers lock the same accounts in the same order and can't deadlock.
 async function postEntries(tx: Tx, t: transactions): Promise<void> {
   const kind = t.channel === 'CARD' ? 'CARD_PAYMENT' : 'TRANSFER';
-  const entries = [{ card_id: t.card_id, kind, amount: -t.amount, reference: t.reference }];
-  if (t.to_card) entries.push({ card_id: t.to_card, kind, amount: t.amount, reference: t.reference });
-  entries.sort((a, b) => (a.card_id < b.card_id ? -1 : 1));
-  await tx.ledger_entries.createMany({ data: entries });
+  const entries = [
+    {
+      card_id: t.card_id,
+      kind,
+      amount: -t.amount,
+      reference: t.reference,
+    },
+  ];
+  if (t.to_card) {
+    entries.push({
+      card_id: t.to_card,
+      kind,
+      amount: t.amount,
+      reference: t.reference,
+    });
+  }
+  await tx.ledger_entries.createMany({
+    data: entries.sort((a, b) => (a.card_id < b.card_id ? -1 : 1)),
+  });
 }
 
 async function current(tx: Tx, d: DecisionInput): Promise<TransactionState | null> {
@@ -467,9 +484,10 @@ async function current(tx: Tx, d: DecisionInput): Promise<TransactionState | nul
   return t && { ...t, balance: await availableBalance(tx, t.card_id) };
 }
 
+// Same shape as a card payment from the event source, so the fraud detector reads all of them alike.
+// createMany: no RETURNING, so no SELECT on the outbox.
 function requested(t: transactions): Prisma.outboxCreateManyInput {
   const transfer = t.channel === 'TRANSFER';
-  const bank = t.to_bank ? (bankByBin(t.to_bank)?.code ?? t.to_bank) : OUR_BANK;
   return {
     aggregate_type: REQUESTS_TOPIC,
     aggregate_id: t.card_id,
@@ -481,7 +499,9 @@ function requested(t: transactions): Prisma.outboxCreateManyInput {
       cc_num: t.card_id,
       channel: t.channel,
       merchant: transfer ? t.to_name : t.merchant,
-      recipient_account: transfer ? `${bank}:${t.to_account}` : null,
+      recipient_account: transfer
+        ? `${t.to_bank ? (bankByBin(t.to_bank)?.code ?? t.to_bank) : OUR_BANK}:${t.to_account}`
+        : null,
       category: transfer ? 'transfer' : t.category,
       amt: Number(t.amount),
       currency: 'VND',
@@ -491,6 +511,7 @@ function requested(t: transactions): Prisma.outboxCreateManyInput {
   };
 }
 
+// ts is the transaction's own time: the Cassandra sink finds the row the decision wrote by (card_id, ts).
 function settled(t: transactions): Prisma.outboxCreateManyInput {
   return {
     aggregate_type: OUTCOMES_TOPIC,
@@ -510,6 +531,8 @@ function settled(t: transactions): Prisma.outboxCreateManyInput {
   };
 }
 
+// The recipient's side of a posted transfer: a whole history row, since nothing else writes to the recipient's card.
+// ts is the transfer's own, so a replayed event lands on the same row.
 async function credited(
   tx: Pick<PrismaClient, 'accounts'>,
   t: transactions,
@@ -529,7 +552,7 @@ async function credited(
       cc_num: toCard,
       channel: 'TRANSFER',
       direction: 'IN',
-      merchant: fullName(sender.cardholders),
+      merchant: `${sender.cardholders.first_name} ${sender.cardholders.last_name}`.toUpperCase(),
       recipient_account: `${OUR_BANK}:${sender.account_number}`,
       category: 'transfer',
       amount: Number(t.amount),
@@ -543,20 +566,44 @@ async function credited(
   };
 }
 
+async function balanceOf(tx: Pick<PrismaClient, 'accounts'>, cardId: string): Promise<bigint> {
+  const { balance } = await tx.accounts.findUniqueOrThrow({
+    where: { card_id: cardId },
+    select: { balance: true },
+  });
+  return balance;
+}
+
 async function recipient(db: PrismaClient, t: TransferRequestInput): Promise<Recipient> {
   if (t.toBank && t.toBank !== OUR_BIN) {
-    if (!bankByBin(t.toBank)) throw refuse('BANK_NOT_SUPPORTED', 'transfers to this bank are not supported');
+    if (!bankByBin(t.toBank))
+      throw new TransferRefusedError('BANK_NOT_SUPPORTED', 'transfers to this bank are not supported');
     const name = t.toName?.trim().toUpperCase();
-    if (!name) throw refuse('NAME_REQUIRED', "the recipient's name is required for another bank");
+    if (!name) throw new TransferRefusedError('NAME_REQUIRED', "the recipient's name is required for another bank");
     return { cardId: null, bank: t.toBank, name };
   }
   const account = await db.accounts.findUnique({
     where: { account_number: t.toAccount },
-    select: { card_id: true, cardholders: { select: { first_name: true, last_name: true } } },
+    select: {
+      card_id: true,
+      cardholders: {
+        select: {
+          first_name: true,
+          last_name: true,
+        },
+      },
+    },
   });
-  if (!account) throw refuse('ACCOUNT_NOT_FOUND', 'account not found');
-  if (account.card_id === t.fromCard) throw refuse('OWN_ACCOUNT', 'cannot transfer to your own account');
-  return { cardId: account.card_id, bank: null, name: fullName(account.cardholders) };
+  if (!account) throw new TransferRefusedError('ACCOUNT_NOT_FOUND', 'account not found');
+  if (account.card_id === t.fromCard) {
+    throw new TransferRefusedError('OWN_ACCOUNT', 'cannot transfer to your own account');
+  }
+  const { first_name, last_name } = account.cardholders;
+  return {
+    cardId: account.card_id,
+    bank: null,
+    name: `${first_name} ${last_name}`.toUpperCase(),
+  };
 }
 
 async function replay(tx: Tx, t: TransferRequestInput, amount: bigint): Promise<TransactionState> {
@@ -597,16 +644,23 @@ function isOverdraft(e: unknown): boolean {
   return cause?.originalCode === '23514' && !!cause.originalMessage?.includes('accounts_balance_check');
 }
 
+// forbid_frozen_sender() refused the transaction: SQLSTATE 55000 (object_not_in_prerequisite_state).
 function isFrozenSender(e: unknown): boolean {
   return postgresError(e)?.originalCode === '55000';
 }
 
+// The card has no account: transactions_card_id_fkey, SQLSTATE 23503.
 function isUnknownCard(e: unknown): boolean {
   const cause = postgresError(e);
   return cause?.originalCode === '23503' && !!cause.originalMessage?.includes('transactions_card_id_fkey');
 }
 
+// Prisma wraps a Postgres error; its own SQLSTATE and message are on the driver adapter's cause.
 function postgresError(e: unknown): { originalCode?: string; originalMessage?: string } | undefined {
   if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return undefined;
-  return (e.meta?.driverAdapterError as { cause?: { originalCode?: string; originalMessage?: string } })?.cause;
+  return (
+    e.meta?.driverAdapterError as {
+      cause?: { originalCode?: string; originalMessage?: string };
+    }
+  )?.cause;
 }

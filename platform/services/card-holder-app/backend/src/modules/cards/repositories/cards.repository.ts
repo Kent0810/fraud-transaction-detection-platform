@@ -57,7 +57,7 @@ export class CardsRepository {
       this.alertRows.find({ cardId }, { limit }),
       this.transactions(cardId, 500),
     ]);
-    const merchants = new Map(txns.map((t) => [t.txnId, t.merchant]));
+    const byId = new Map(txns.map((t) => [t.txnId, t]));
     return alerts
       .toArray()
       .filter((r) => !STAFF_ONLY_RULES.has(r.ruleId))
@@ -67,8 +67,9 @@ export class CardsRepository {
         ruleId: r.ruleId,
         ts: iso(r.ts) ?? '',
         amount: num(r.amount),
-        merchant: merchants.get(r.txnId) ?? 'Unknown merchant',
-        status: (r.status as AlertStatus | null) ?? 'OPEN',
+        merchant: byId.get(r.txnId)?.merchant ?? 'Unknown merchant',
+        // No case status: an allowed payment never goes to triage, so it never needs review.
+        status: (r.status as AlertStatus | null) ?? (byId.get(r.txnId)?.decision === 'ALLOW' ? 'APPROVED' : 'OPEN'),
       }));
   }
 }

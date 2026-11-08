@@ -14,88 +14,45 @@ locals {
     decisions = {
       description = "decisions topic: one verdict per card payment or transfer."
       clustering  = ["category", "card_id"]
-      schema = concat([
-        { name = "txn_id", type = "STRING", mode = "REQUIRED" },
-        { name = "card_id", type = "STRING", mode = "REQUIRED" },
-        { name = "ts", type = "TIMESTAMP", mode = "REQUIRED" },
-        { name = "channel", type = "STRING", mode = "NULLABLE" },
-        { name = "merchant", type = "STRING", mode = "NULLABLE" },
-        { name = "recipient_account", type = "STRING", mode = "NULLABLE" },
-        { name = "category", type = "STRING", mode = "NULLABLE" },
-        { name = "amount", type = "INT64", mode = "REQUIRED" },
-        { name = "currency", type = "STRING", mode = "NULLABLE" },
-        { name = "merch_lat", type = "FLOAT64", mode = "NULLABLE" },
-        { name = "merch_long", type = "FLOAT64", mode = "NULLABLE" },
-        { name = "decision", type = "STRING", mode = "REQUIRED" },
-        { name = "score", type = "FLOAT64", mode = "NULLABLE" },
-        { name = "fired_rules", type = "STRING", mode = "REPEATED" },
-        { name = "decided_at", type = "TIMESTAMP", mode = "NULLABLE" },
-      ], local.kafka_meta)
+      schema      = concat(jsondecode(file("${path.module}/datasets/fraud_raw/decisions.json")), local.kafka_meta)
     }
     settlements = {
       description = "settlements topic: whether the ledger posted or refused an approved transaction."
       clustering  = ["cc_num"]
-      schema = concat([
-        { name = "txn_id", type = "STRING", mode = "REQUIRED" },
-        { name = "ts", type = "TIMESTAMP", mode = "REQUIRED" },
-        { name = "cc_num", type = "STRING", mode = "REQUIRED" },
-        { name = "channel", type = "STRING", mode = "NULLABLE" },
-        { name = "amt", type = "INT64", mode = "REQUIRED" },
-        { name = "status", type = "STRING", mode = "REQUIRED" },
-        { name = "declined_for", type = "STRING", mode = "REPEATED" },
-      ], local.kafka_meta)
+      schema      = concat(jsondecode(file("${path.module}/datasets/fraud_raw/settlements.json")), local.kafka_meta)
     }
     alerts = {
       description = "alerts topic: one row per fired rule."
       clustering  = ["rule_id", "card_id"]
-      schema = concat([
-        { name = "card_id", type = "STRING", mode = "REQUIRED" },
-        { name = "txn_id", type = "STRING", mode = "REQUIRED" },
-        { name = "rule_id", type = "STRING", mode = "REQUIRED" },
-        { name = "score", type = "FLOAT64", mode = "NULLABLE" },
-        { name = "amount", type = "INT64", mode = "NULLABLE" },
-        { name = "ts", type = "TIMESTAMP", mode = "REQUIRED" },
-      ], local.kafka_meta)
+      schema      = concat(jsondecode(file("${path.module}/datasets/fraud_raw/alerts.json")), local.kafka_meta)
     }
     alert_reviews = {
       description = "Analyst CONFIRM_ALERT / CLEAR_ALERT rows from the Postgres audit_log."
       clustering  = ["txn_id"]
-      schema = concat([
-        { name = "audit_id", type = "INT64", mode = "REQUIRED" },
-        { name = "card_id", type = "STRING", mode = "REQUIRED" },
-        { name = "alert_id", type = "STRING", mode = "REQUIRED" },
-        { name = "txn_id", type = "STRING", mode = "REQUIRED" },
-        { name = "status", type = "STRING", mode = "REQUIRED" },
-        { name = "staff_id", type = "INT64", mode = "NULLABLE" },
-        { name = "reason", type = "STRING", mode = "NULLABLE" },
-        { name = "reviewed_at", type = "TIMESTAMP", mode = "REQUIRED" },
-      ], local.file_meta)
+      schema      = concat(jsondecode(file("${path.module}/datasets/fraud_raw/alert_reviews.json")), local.file_meta)
     }
     ground_truth = {
       description = "ground_truth.csv: the dataset's is_fraud label per transaction, never sent through Kafka."
       clustering  = ["txn_id"]
-      schema = concat([
-        { name = "txn_id", type = "STRING", mode = "REQUIRED" },
-        { name = "is_fraud", type = "BOOL", mode = "REQUIRED" },
-      ], local.file_meta)
+      schema      = concat(jsondecode(file("${path.module}/datasets/fraud_raw/ground_truth.json")), local.file_meta)
     }
     dim_card = {
       description = "dim_card.csv: where each card lives. Names, addresses and birth dates are left out."
       clustering  = ["state"]
-      schema = concat([
-        { name = "card_id", type = "STRING", mode = "REQUIRED" },
-        { name = "city", type = "STRING", mode = "NULLABLE" },
-        { name = "state", type = "STRING", mode = "NULLABLE" },
-        { name = "zip", type = "STRING", mode = "NULLABLE" },
-        { name = "lat", type = "FLOAT64", mode = "NULLABLE" },
-        { name = "long", type = "FLOAT64", mode = "NULLABLE" },
-        { name = "city_pop", type = "INT64", mode = "NULLABLE" },
-      ], local.file_meta)
+      schema      = concat(jsondecode(file("${path.module}/datasets/fraud_raw/dim_card.json")), local.file_meta)
     }
   }
 
   raw  = "${var.project_id}.${google_bigquery_dataset.raw.dataset_id}"
   mart = "${var.project_id}.${google_bigquery_dataset.mart.dataset_id}"
+
+  # ${raw.<table>} and ${mart.<view>} in datasets/fraud_mart/*.sql, through the resources so a view waits for what it reads.
+  raw_table_names = { for id, t in google_bigquery_table.raw : id => "${local.raw}.${t.table_id}" }
+  mart_view_names = {
+    fact_transactions = "${local.mart}.${google_bigquery_table.fact_transactions.table_id}"
+    fact_labels       = "${local.mart}.${google_bigquery_table.fact_labels.table_id}"
+    dim_card          = "${local.mart}.${google_bigquery_table.dim_card.table_id}"
+  }
 }
 
 resource "google_project_service" "apis" {
@@ -144,25 +101,7 @@ resource "google_bigquery_table" "fact_transactions" {
 
   view {
     use_legacy_sql = false
-    query          = <<-SQL
-      WITH d AS (
-        SELECT * FROM `${local.raw}.${google_bigquery_table.raw["decisions"].table_id}`
-        WHERE TRUE
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY txn_id ORDER BY _kafka_offset DESC) = 1
-      ),
-      s AS (
-        SELECT txn_id, status, declined_for FROM `${local.raw}.${google_bigquery_table.raw["settlements"].table_id}`
-        WHERE TRUE
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY txn_id ORDER BY _kafka_offset DESC) = 1
-      )
-      SELECT
-        d.txn_id, d.card_id, d.ts, d.channel, d.merchant, d.recipient_account,
-        COALESCE(d.category, LOWER(d.channel)) AS category,
-        d.amount, d.currency, d.decision, d.score, d.fired_rules,
-        s.status AS settlement_status, s.declined_for,
-        COALESCE(s.status = 'POSTED', d.decision != 'DECLINE') AS money_moved
-      FROM d LEFT JOIN s USING (txn_id)
-    SQL
+    query          = templatefile("${path.module}/datasets/fraud_mart/join_latest_decision_with_settlement.sql", { raw = local.raw_table_names })
   }
 }
 
@@ -174,28 +113,7 @@ resource "google_bigquery_table" "fact_labels" {
 
   view {
     use_legacy_sql = false
-    query          = <<-SQL
-      WITH gt AS (
-        SELECT txn_id, is_fraud FROM `${local.raw}.${google_bigquery_table.raw["ground_truth"].table_id}`
-        WHERE TRUE
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY txn_id ORDER BY _loaded_at DESC) = 1
-      ),
-      analyst AS (
-        SELECT txn_id, status = 'CONFIRMED' AS is_fraud, staff_id, reviewed_at
-        FROM `${local.raw}.${google_bigquery_table.raw["alert_reviews"].table_id}`
-        WHERE TRUE
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY txn_id ORDER BY reviewed_at DESC) = 1
-      )
-      SELECT
-        txn_id,
-        gt.is_fraud AS ground_truth_fraud,
-        a.is_fraud AS analyst_fraud,
-        a.staff_id AS reviewed_by,
-        a.reviewed_at,
-        COALESCE(a.is_fraud, gt.is_fraud) AS is_fraud,
-        CASE WHEN a.is_fraud IS NOT NULL THEN 'ANALYST' WHEN gt.is_fraud IS NOT NULL THEN 'GROUND_TRUTH' END AS label_source
-      FROM gt FULL OUTER JOIN analyst AS a USING (txn_id)
-    SQL
+    query          = templatefile("${path.module}/datasets/fraud_mart/resolve_fraud_label.sql", { raw = local.raw_table_names })
   }
 }
 
@@ -207,12 +125,7 @@ resource "google_bigquery_table" "dim_card" {
 
   view {
     use_legacy_sql = false
-    query          = <<-SQL
-      SELECT card_id, city, state AS region, zip, lat, long, city_pop
-      FROM `${local.raw}.${google_bigquery_table.raw["dim_card"].table_id}`
-      WHERE TRUE
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY _loaded_at DESC) = 1
-    SQL
+    query          = templatefile("${path.module}/datasets/fraud_mart/dedupe_card_locations.sql", { raw = local.raw_table_names })
   }
 }
 
@@ -224,24 +137,7 @@ resource "google_bigquery_table" "fraud_loss_monthly" {
 
   view {
     use_legacy_sql = false
-    query          = <<-SQL
-      SELECT
-        DATE_TRUNC(DATE(t.ts), MONTH) AS month,
-        COALESCE(c.region, 'UNKNOWN') AS region,
-        t.category,
-        COUNT(*) AS txns,
-        SUM(t.amount) AS volume,
-        COUNTIF(l.is_fraud) AS fraud_txns,
-        SUM(IF(l.is_fraud AND t.money_moved, t.amount, 0)) AS fraud_loss,
-        SUM(IF(l.is_fraud AND NOT t.money_moved, t.amount, 0)) AS fraud_prevented,
-        SUM(IF(l.analyst_fraud AND t.money_moved, t.amount, 0)) AS analyst_confirmed_loss,
-        SUM(IF(l.ground_truth_fraud AND t.money_moved, t.amount, 0)) AS ground_truth_loss,
-        COUNTIF(l.analyst_fraud = FALSE) AS false_positives
-      FROM `${local.mart}.${google_bigquery_table.fact_transactions.table_id}` AS t
-      LEFT JOIN `${local.mart}.${google_bigquery_table.fact_labels.table_id}` AS l USING (txn_id)
-      LEFT JOIN `${local.mart}.${google_bigquery_table.dim_card.table_id}` AS c USING (card_id)
-      GROUP BY month, region, category
-    SQL
+    query          = templatefile("${path.module}/datasets/fraud_mart/aggregate_monthly_fraud_loss.sql", { mart = local.mart_view_names })
   }
 }
 
